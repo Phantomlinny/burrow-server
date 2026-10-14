@@ -16,14 +16,16 @@ node_modules/
 tools/recorder.js
 SITE.md
 
-# python leaves these beside the tools
+
 __pycache__/
 
-# kept in the private repository, never here
+# internal markdown files
 *.md
-/swf
-/swf-src
-/client-updates
 /HANDOFF.md
 /DISCOVERIES.md
 /GOING-PUBLIC.md
+
+# decompiled AJC
+/swf
+/swf-src
+/client-updates
