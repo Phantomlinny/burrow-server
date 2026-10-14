@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Game Client</title>
+  </head>
+  <body>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+      }
+    </style>
+    <embed id="flash-content"></embed>
+    <script>
+      "use strict";
+
+      // local stand-in for desktop.animaljam.com/gameClient/game/index.html.
+      // same contract with the launcher (gui/gamePreload.js) and the SWF.
+
+      const flashContent = document.getElementById("flash-content");
+      // only a SWF from this server may call into this page. with "always"
+      // any SWF the game came to load, from anywhere, could: and this page
+      // is handed the player's login token.
+      flashContent.setAttribute("allowScriptAccess", "sameDomain");
+      flashContent.setAttribute("wmode", "window");
+      flashContent.style.width = "100vw";
+      flashContent.style.height = "100vh";
+
+      window.ipc.on("flashVarsReady", (event, flashVars) => {
+        const flashVarsParams = Object.entries(flashVars)
+          .map(([key, val]) => `${encodeURIComponent(key)}=${encodeURIComponent(val)}`)
+          .join("&");
+
+        flashContent.setAttribute("FlashVars", flashVarsParams);
+        // the game from the address this page came from, whatever name the
+        // server knows itself by: "sameDomain" above goes by that.
+        const client = new URL(flashVars.clientURL, location.href);
+        flashContent.src = location.origin + client.pathname + client.search;
+        flashContent.style.display = "block";
+      });
+
+      window.ipc.on("removed", () => document.body.innerHTML = "");
+
+      // the client's top bar: the game's HUD shown or hidden (AJClient.setHudShown
+      // in the patched SWF).
+      window.ipc.on("hud", (event, shown) => {
+        try {
+          flashContent.ajHud(shown === true);
+        }
+        catch (err) {
+          // not this server's SWF, or the game is not up yet.
+        }
+      });
+
+      window.addEventListener("resize", resize);
+
+      // ExternalInterface functions called by the SWF.
+      function complete_signup(username, password) {
+        window.ipc.sendToHost("signupCompleted", {username, password});
+      }
+
+      function aj_initialized() {
+        // the game has read its start values; the login token among them
+        // need not stay in the page.
+        flashContent.removeAttribute("FlashVars");
+        window.ipc.sendToHost("initialized");
+        for (let i = 0; i < 50; i++) {
+          setTimeout(() => resize(), i * 500);
+        }
+      }
+
+      // pictures drawn in the last second, told by the patched SWF once a
+      // second (AJClient.onSmoothFrame), for the client's top bar.
+      function ajFps(count) {
+        window.ipc.sendToHost("fps", count);
+      }
+
+      function ajPrint(imageData) {
+        window.ipc.sendToHost("printImage", imageData);
+      }
+
+      function reloadSwfOrGetIP(reloadSwf, params) {
+        window.ipc.sendToHost("reloadGame", reloadSwf, params);
+      }
+
+      // moderator remote-control and analytics hooks; nothing to do locally.
+      function mrc() {}
+      function handleGAEvent() {}
+      function handleKey() {}
+
+      function resize() {
+        if (flashContent && flashContent.handleResize) {
+          try {
+            flashContent.handleResize(window.innerWidth, window.innerHeight);
+          }
+          catch (err) {
+          }
+        }
+      }
+
+      window.addEventListener("error", event => {
+        window.ipc.sendToHost("reportError", (event.error && event.error.stack) || event.message);
+      });
+
+      window.addEventListener("beforeunload", event => {
+        if (flashContent && typeof flashContent.unloadAJClient === "function") {
+          try {
+            flashContent.unloadAJClient();
+          }
+          catch (err) {
+          }
+        }
+        delete event["returnValue"];
+      });
+    </script>
+  </body>
+</html>

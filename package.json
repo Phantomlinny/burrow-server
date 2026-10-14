@@ -1,0 +1,14 @@
+{
+  "name": "aj-classic-private-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local server for the AJ Classic desktop client",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}

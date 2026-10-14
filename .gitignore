@@ -1,0 +1,29 @@
+# Accounts, login tokens and logs
+data/
+
+# Assets mirrored from the official CDN; re-downloaded on demand
+cache/
+
+# Third-party decompiler and its output; see HANDOFF.md for how to restore them
+tools/ffdec/
+tools/decompiled/
+tools/hud/hud.xml
+tools/hud/hud.pickle
+tools/hud/__pycache__/
+
+node_modules/
+*.log
+tools/recorder.js
+SITE.md
+
+# python leaves these beside the tools
+__pycache__/
+
+# kept in the private repository, never here
+*.md
+/swf
+/swf-src
+/client-updates
+/HANDOFF.md
+/DISCOVERIES.md
+/GOING-PUBLIC.md

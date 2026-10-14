@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Moderators</title>
+    <link rel="icon" type="image/png" href="/logo-square.png">
+    <style>
+      /* black and white throughout, in the game's own text font: the look of
+         the client (its app/index.html). Nothing is said by colour: what
+         went wrong is white with a "!" before it, and what cannot be undone
+         has a dashed edge. */
+      @font-face { font-family: "DigitalDelivery"; font-weight: 400; src: url("/fonts/CCDigitalDelivery-Regular.otf") format("opentype"); }
+      @font-face { font-family: "DigitalDelivery"; font-weight: 700; src: url("/fonts/CCDigitalDelivery-Bold.otf") format("opentype"); }
+      :root {
+        color-scheme: dark;
+        --bg: #000;
+        --panel: #0d0d0d;
+        --raised: #1a1a1a;
+        --line: #2e2e2e;
+        --text: #fff;
+        --muted: #8c8c8c;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      ::selection { background: #fff; color: #000; }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 3px solid var(--bg); }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.4 "DigitalDelivery", system-ui, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; text-underline-offset: 3px; }
+      h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.01em; }
+      h2 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+      h3 { font-size: 14px; font-weight: 700; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      label { display: block; margin: 12px 0 5px; color: var(--muted); font-size: 13px; }
+      .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+      input, select, textarea {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 9px 14px 10px;
+        transition: border-color 0.12s;
+      }
+      input::placeholder, textarea::placeholder { color: #555; }
+      input:hover, select:hover, textarea:hover { border-color: #555; }
+      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--text); }
+      input:disabled, select:disabled, textarea:disabled { opacity: 0.4; }
+      select:not([multiple]) {
+        -webkit-appearance: none;
+        appearance: none;
+        padding-right: 34px;
+        background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+        background-position: calc(100% - 19px) 55%, calc(100% - 14px) 55%;
+        background-size: 5px 5px;
+        background-repeat: no-repeat;
+      }
+      input[type="checkbox"] {
+        -webkit-appearance: none;
+        appearance: none;
+        flex: none;
+        width: 18px;
+        height: 18px;
+        margin: 0 6px 0 0;
+        padding: 0;
+        vertical-align: -4px;
+        border: 1px solid #666;
+        border-radius: 6px;
+        background: var(--panel);
+        cursor: pointer;
+      }
+      input[type="checkbox"]:hover { border-color: var(--text); }
+      input[type="checkbox"]:checked {
+        border-color: var(--text);
+        background: var(--text) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4.5 9.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 16px 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.12s, border-color 0.12s, color 0.12s;
+      }
+      button:hover { background: var(--raised); border-color: #555; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      button:focus-visible, a:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+      button.primary { font-weight: 700; color: #000; background: var(--text); border-color: var(--text); }
+      button.primary:hover { background: #d9d9d9; border-color: #d9d9d9; }
+      button.primary:disabled, button.primary:disabled:hover { background: #3a3a3a; border-color: #3a3a3a; color: #000; }
+      button.danger { border-style: dashed; border-color: #666; }
+      button.danger:hover { border-style: solid; border-color: var(--text); }
+      .status, #status { min-height: 20px; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+      .status.bad, #status.bad { color: var(--text); }
+      .status.bad::before, #status.bad::before, .notice::before {
+        content: "!";
+        display: inline-block;
+        width: 17px;
+        height: 17px;
+        margin-right: 7px;
+        border-radius: 50%;
+        background: var(--text);
+        color: #000;
+        font-weight: 700;
+        line-height: 17px;
+        text-align: center;
+      }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+      input, select, textarea { background: var(--bg); }
+      label.check { margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
+
+      #gate {
+        max-width: 380px;
+        margin: 6vh auto 0;
+        padding: 24px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+      #gate h1 { margin-bottom: 4px; }
+      #gate input { width: 100%; }
+      #gate button { width: 100%; margin-top: 18px; padding: 10px 16px 11px; }
+      #captcha { margin-top: 16px; }
+
+      #panel { max-width: 1080px; margin: 0 auto; }
+      header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+      header h1 { flex: 1; }
+      /* the pages: one row of names, the chosen one filled. */
+      nav { display: flex; gap: 2px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--line); border-radius: 22px; flex-wrap: wrap; }
+      nav button { border: 0; color: var(--muted); padding: 6px 14px 7px; }
+      nav button:hover { color: var(--text); }
+      nav button[aria-selected="true"] { color: #000; background: var(--text); font-weight: 700; }
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .tile { padding: 12px 14px 11px; border: 1px solid var(--line); border-radius: 18px; }
+      .tile .value { font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .tile .name { margin-top: 2px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+      .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+      .columns section { margin: 0; }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+      dt { color: var(--muted); }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 400; }
+      td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      td button { padding: 2px 12px 3px; font-weight: 700; }
+      tbody tr:last-child td { border-bottom: 0; }
+      tbody tr.selected td { background: var(--raised); }
+      tbody tr.pick { cursor: pointer; }
+      .empty { color: var(--muted); padding: 8px 0; }
+      .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+      .toolbar input[type="search"] { flex: 1; min-width: 180px; }
+      .tag { display: inline-block; padding: 1px 9px 2px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      .tag.good { color: #000; background: var(--text); border-color: var(--text); font-weight: 700; }
+      .tag.bad { color: var(--text); border-color: var(--text); font-weight: 700; }
+      #detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+      .action .hint { margin: 8px 0 0; }
+      .action { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+      .action h3 { margin: 0 0 8px; }
+      .action .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .action .row input, .action .row select { flex: 1; min-width: 90px; }
+      .action .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+      /* what the server printed keeps a fixed-width face: it is read in columns. */
+      #log {
+        height: 60vh;
+        overflow: auto;
+        margin: 0;
+        padding: 12px 14px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        font: 12px/1.5 ui-monospace, Consolas, monospace;
+        color: #bdbdbd;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #log .time { color: var(--muted); }
+      #log .error { color: var(--text); font-weight: 700; }
+      .report { border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+      .report h3 { margin: 0 0 4px; }
+      .report .typed { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+      .report pre { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
+      .report .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .paintings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+      .painting { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+      .painting img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
+      .painting h3 { margin: 8px 0 2px; }
+      .painting .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      textarea { width: 100%; resize: vertical; }
+      .send-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+      #owned { margin-top: 16px; }
+      #owned ul { margin: 4px 0 12px; padding-left: 18px; columns: 220px; }
+      #ban-record h3 { margin: 14px 0 4px; }
+      #ban-record ul { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
+      #ban-record li { margin: 3px 0; }
+      #ban-record li button { padding: 2px 10px 3px; font-size: 12px; }
+      #owned li { break-inside: avoid; }
+      #password-form { max-width: 360px; }
+      #password-form input { width: 100%; }
+      #password-form button { margin-top: 16px; }
+      .logo { display: block; height: 72px; margin: 0 0 12px; }
+      .mark { height: 34px; flex: none; }
+      #chat-lines { margin: 0; padding: 0; list-style: none; }
+      #chat-lines li, #chat-context li { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+      #chat-lines li:last-child, #chat-context li:last-child { border-bottom: 0; }
+      .chat-time { flex: none; width: 128px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+      .chat-who { flex: none; max-width: 190px; padding: 0; border: 0; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+      .chat-who:hover { background: none; text-decoration: underline; }
+      .chat-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+      .chat-room { display: block; color: var(--muted); font-size: 12px; }
+      .chat-more { flex: none; padding: 2px 10px 3px; font-size: 12px; }
+      #chat-context { margin: 0; padding: 0; list-style: none; }
+      #chat-context li.this { background: var(--raised); border-radius: 10px; }
+      #player-facts { margin-bottom: 14px; }
+      #player-history { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
+      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    </style>
+  </head>
+  <body>
+    <main id="gate" hidden>
+      <img class="logo" src="/logo.png" alt="">
+      <h1>Moderators</h1>
+      <form id="gate-form">
+        <label for="username">Username</label>
+        <input id="username" autocomplete="username" maxlength="100" spellcheck="false" required>
+        <label for="password">Password</label>
+        <input id="password" type="password" autocomplete="current-password" maxlength="100" required>
+        <label for="code">2FA code</label>
+        <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" spellcheck="false" required>
+        <div id="captcha"></div>
+        <button class="primary" id="gate-button">Sign in</button>
+      </form>
+      <p class="status" id="gate-status" role="status"></p>
+    </main>
+
+    <div id="panel" hidden>
+      <header>
+        <img class="mark" src="/logo.png" alt="">
+        <h1>Moderators</h1>
+        <span class="hint" id="who"></span>
+        <button id="sign-out" type="button">Sign out</button>
+      </header>
+      <nav role="tablist">
+        <button role="tab" data-tab="players" aria-selected="true">Players</button>
+        <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
+        <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
+        <button role="tab" data-tab="requests" aria-selected="false">Requests<span id="request-count"></span></button>
+        <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
+        <button role="tab" data-tab="bans" aria-selected="false">Bans</button>
+      </nav>
+
+      <div data-view="players">
+        <section>
+          <div class="toolbar">
+            <input id="player-search" type="search" placeholder="Search" aria-label="Search players">
+            <span class="hint" id="online-count"></span>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>State</th><th>Where</th><th>Last seen</th></tr></thead>
+            <tbody id="players"></tbody>
+          </table></div>
+          <div class="empty" id="no-players" hidden>No players match.</div>
+        </section>
+        <section id="detail" hidden>
+          <h2 id="detail-name"></h2>
+          <p class="status" id="detail-status" role="status"></p>
+          <dl id="player-facts"></dl>
+          <div class="actions">
+            <div class="action">
+              <h3>Ban</h3>
+              <div class="row"><input id="ban-hours" type="number" min="0" placeholder="Hours (0 = forever)" aria-label="Ban length in hours">
+                <input id="ban-reason" maxlength="300" placeholder="Reason" autocomplete="off" aria-label="Reason, shown to the banned player"></div>
+              <div class="row" style="margin-top:8px">
+                <button type="button" data-action="ban" class="danger">Ban</button>
+                <button type="button" data-action="banReason">Save reason</button>
+                <button type="button" data-action="unban">Lift</button>
+                <button type="button" data-action="banAddress" class="danger">Ban address</button></div>
+            </div>
+            <div class="action">
+              <h3>Chat</h3>
+              <div class="row"><input id="silence-hours" type="number" min="0" placeholder="Hours (0 = until lifted)" aria-label="Silence length in hours">
+                <button type="button" data-action="silence">Silence</button>
+                <button type="button" data-action="unsilence">Lift</button></div>
+              <div class="row" style="margin-top:8px"><button type="button" id="open-chat">Chat history</button></div>
+            </div>
+            <div class="action">
+              <h3>Message</h3>
+              <div class="row"><input id="message-text" maxlength="200" placeholder="Text" aria-label="Message">
+                <button type="button" data-action="message">Send</button></div>
+              <div class="row" style="margin-top:8px"><button type="button" data-action="kick">Disconnect</button></div>
+            </div>
+            <div class="action">
+              <h3>Username and bio</h3>
+              <div class="row">
+                <button type="button" data-action="rejectName" class="danger">Reject username</button>
+                <button type="button" data-action="acceptName">Take back</button>
+                <button type="button" data-action="clearBio">Clear bio</button></div>
+            </div>
+          </div>
+          <h3 style="margin:16px 0 4px" id="history-title" hidden>Ban history</h3>
+          <ul id="player-history"></ul>
+        </section>
+      </div>
+
+      <div data-view="chat" hidden>
+        <section>
+          <form id="chat-form" class="toolbar">
+            <input id="chat-player" maxlength="100" placeholder="Player" autocomplete="off" spellcheck="false" aria-label="Player">
+            <input id="chat-room" maxlength="100" placeholder="Room" autocomplete="off" spellcheck="false" aria-label="Room">
+            <input id="chat-text" maxlength="100" placeholder="Words" autocomplete="off" aria-label="Words" style="flex:1">
+            <button class="primary" type="submit">Search</button>
+          </form>
+          <p class="status" id="chat-status" role="status"></p>
+          <div id="context-box" hidden>
+            <div class="toolbar"><h2 style="margin:0;flex:1" id="context-title"></h2><button type="button" id="context-close">Close</button></div>
+            <ul id="chat-context"></ul>
+          </div>
+          <ul id="chat-lines"></ul>
+          <div class="empty" id="no-chat" hidden>Nothing here.</div>
+          <div class="send-row"><button type="button" id="chat-older" hidden>Older</button></div>
+        </section>
+      </div>
+
+      <div data-view="reports" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Reports</h2>
+            <select id="report-filter" aria-label="Which reports">
+              <option value="0">Waiting</option>
+              <option value="1">Dealt with</option>
+            </select>
+          </div>
+          <p class="status" id="report-status" role="status"></p>
+          <div id="reports"></div>
+          <div class="empty" id="no-reports" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="requests" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Requests</h2>
+            <select id="request-filter" aria-label="Which requests">
+              <option value="0">Waiting</option>
+              <option value="1">Answered</option>
+            </select>
+          </div>
+          <p class="status" id="request-status" role="status"></p>
+          <h2>Ban appeals</h2>
+          <div id="appeals"></div>
+          <div class="empty" id="no-appeals" hidden>Nothing here.</div>
+          <h2 style="margin-top:20px">Username changes</h2>
+          <div id="name-requests"></div>
+          <div class="empty" id="no-name-requests" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="masterpieces" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Masterpieces</h2>
+            <select id="masterpiece-filter" aria-label="Which masterpieces">
+              <option value="waiting">Waiting</option>
+              <option value="approved">On show</option>
+            </select>
+          </div>
+          <p class="status" id="masterpiece-status" role="status"></p>
+          <div class="paintings" id="masterpieces"></div>
+          <div class="empty" id="no-masterpieces" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="bans" hidden>
+        <section>
+          <h2>Banned and silenced</h2>
+          <p class="status" id="ban-status" role="status"></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Ban</th><th>Reason</th><th>By</th><th>Chat</th><th></th></tr></thead>
+            <tbody id="bans"></tbody>
+          </table></div>
+          <div class="empty" id="no-bans" hidden>Nobody is banned or silenced.</div>
+        </section>
+        <section>
+          <h2>Banned addresses</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Address</th><th>Reason</th><th>By</th><th>Since</th><th></th></tr></thead>
+            <tbody id="addresses"></tbody>
+          </table></div>
+          <div class="empty" id="no-addresses" hidden>No address is banned.</div>
+        </section>
+      </div>
+    </div>
+
+    <script src="/captcha.js"></script>
+    <script>
+      "use strict";
+
+      const $ = id => document.getElementById(id);
+      const REFRESH_MS = 8000;
+
+      let signedIn = false;
+      let tab = "players";
+      let selected = null; // the username of the player whose box is open
+      let players = [];
+      let chatQuery = null; // what the Chat page shows: {username, room, text}
+      let chatLines = [];
+      let timer = null;
+
+      const el = (tag, text, className) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) {
+          node.textContent = text;
+        }
+        if (className) {
+          node.className = className;
+        }
+        return node;
+      };
+      const button = (label, onClick, className) => {
+        const node = el("button", label, className);
+        node.type = "button";
+        node.addEventListener("click", async () => {
+          node.disabled = true;
+          await onClick();
+          node.disabled = false;
+        });
+        return node;
+      };
+
+      const setStatus = (element, text, bad = false) => {
+        element.textContent = text;
+        element.classList.toggle("bad", bad);
+      };
+
+      const when = seconds => (seconds ? new Date(seconds * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "never");
+      const duration = seconds => {
+        for (const [size, name] of [[86400, "day"], [3600, "hour"], [60, "minute"]]) {
+          if (seconds >= size) {
+            const count = Math.floor(seconds / size);
+            return `${count} ${name}${count === 1 ? "" : "s"}`;
+          }
+        }
+        return "under a minute";
+      };
+      const left = seconds => (seconds === -1 ? "Until lifted" : seconds ? `${duration(seconds)} left` : "—");
+
+      let check = null; // the captcha (public/captcha.js), once the sign-in is shown
+
+      const showGate = message => {
+        check = check || window.captcha.mount($("captcha"), "login");
+        clearTimeout(timer);
+        signedIn = false;
+        $("panel").hidden = true;
+        $("gate").hidden = false;
+        $("password").value = "";
+        $("code").value = "";
+        setStatus($("gate-status"), message || "", Boolean(message));
+      };
+
+      const api = async (path, body) => {
+        try {
+          const response = await fetch(`/mod/api/${path}`, body === undefined ? {} : {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(body),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.status === 401 && signedIn) {
+            showGate("Your session ended. Sign in again.");
+          }
+          return {ok: response.ok, status: response.status, data};
+        }
+        catch (err) {
+          return {ok: false, status: 0, data: {error: "The server did not answer."}};
+        }
+      };
+      const said = result => result.data.ok || result.data.error || "That did not work.";
+
+      const stateTags = player => {
+        const tags = [];
+        if (player.online) {
+          tags.push(el("span", "Online", "tag good"));
+        }
+        if (player.banned !== 0) {
+          tags.push(el("span", player.banned === -1 ? "Banned" : `Banned ${duration(player.banned)}`, "tag bad"));
+        }
+        if (player.silenced !== 0) {
+          tags.push(el("span", "Silenced", "tag bad"));
+        }
+        if (player.nameRejected) {
+          tags.push(el("span", "Name rejected", "tag bad"));
+        }
+        if (player.moderator) {
+          tags.push(el("span", "Moderator", "tag"));
+        }
+        return tags;
+      };
+
+      const renderPlayers = () => {
+        $("players").replaceChildren(...players.map(player => {
+          const row = el("tr", undefined, player.username === selected ? "pick selected" : "pick");
+          const stateCell = el("td");
+          stateCell.append(...stateTags(player).flatMap(tag => [tag, " "]));
+          row.append(el("td", player.username), stateCell, el("td", player.room || "—"), el("td", player.online ? "Now" : when(player.lastSeen)));
+          row.addEventListener("click", () => select(player.username === selected ? null : player.username));
+          return row;
+        }));
+        $("no-players").hidden = players.length > 0;
+      };
+
+      const HISTORY = {ban: "Banned", unban: "Ban lifted", reason: "Reason changed", appeal: "Appealed",
+        appeal_approved: "Appeal approved", appeal_denied: "Appeal denied"};
+      const loadDetail = async () => {
+        $("detail").hidden = !selected;
+        if (!selected) {
+          return;
+        }
+        const username = selected;
+        const result = await api(`player?username=${encodeURIComponent(username)}`);
+        if (username !== selected) {
+          return;
+        }
+        if (!result.ok) {
+          selected = null;
+          $("detail").hidden = true;
+          return;
+        }
+        const player = result.data;
+        $("detail-name").textContent = player.username;
+        const facts = [
+          ["State", null],
+          ["Where", player.online ? player.room : "Offline"],
+          ["Last seen", player.online ? "Now" : when(player.lastSeen)],
+          ["Joined", when(player.createdAt)],
+          ["Ban", player.banned === 0 ? "—" : `${left(player.banned)} · ${player.banReason}`],
+          ["Chat", player.silenced === 0 ? "—" : `Silenced: ${left(player.silenced).toLowerCase()}`],
+          ["Reports waiting", String(player.openReports)],
+          ["Appeal", player.appeal ? `${player.appeal.status} · ${player.appeal.text}` : "—"],
+          ["Discord", player.discord || "—"],
+          ["Bio", player.bio || "—"],
+        ];
+        $("player-facts").replaceChildren(...facts.flatMap(([name, value]) => {
+          const cell = el("dd", value === null ? undefined : value);
+          if (value === null) {
+            const tags = stateTags(player);
+            cell.append(...(tags.length ? tags.flatMap(tag => [tag, " "]) : ["—"]));
+          }
+          return [el("dt", name), cell];
+        }));
+        if (document.activeElement !== $("ban-reason")) {
+          $("ban-reason").value = player.banned === 0 ? "" : player.banReason;
+        }
+        $("history-title").hidden = player.history.length === 0;
+        $("player-history").replaceChildren(...player.history.map(entry => el("li", [when(entry.at), HISTORY[entry.action] || entry.action,
+          entry.action === "ban" ? (entry.seconds === -1 ? "for good" : duration(entry.seconds)) : "", entry.reason, entry.by && `by ${entry.by}`]
+          .filter(Boolean).join(" · "))));
+      };
+
+      const select = username => {
+        selected = username;
+        setStatus($("detail-status"), "");
+        for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text"]) {
+          $(id).value = "";
+        }
+        renderPlayers();
+        loadDetail();
+      };
+
+      // from another page: that player's box, whether or not the search shows them.
+      const openPlayer = username => {
+        $("player-search").value = username;
+        selected = username;
+        showTab("players");
+      };
+
+      const numberFrom = id => ($(id).value.trim() === "" ? NaN : Number($(id).value));
+      const actionBody = action => {
+        switch (action) {
+          case "ban": return {hours: numberFrom("ban-hours"), reason: $("ban-reason").value};
+          case "banReason": case "banAddress": return {reason: $("ban-reason").value};
+          case "silence": return {hours: numberFrom("silence-hours")};
+          case "message": return {text: $("message-text").value};
+          default: return {};
+        }
+      };
+      const CONFIRM = {
+        banAddress: name => `Ban the address ${name} last signed in from, for good?`,
+        rejectName: name => `Reject the username ${name}? They are signed out and must pick another.`,
+      };
+
+      $("detail").addEventListener("click", async event => {
+        const pressed = event.target.closest("button[data-action]");
+        if (!pressed || !selected) {
+          return;
+        }
+        const {action} = pressed.dataset;
+        if (CONFIRM[action] && !window.confirm(CONFIRM[action](selected))) {
+          return;
+        }
+        pressed.disabled = true;
+        const result = await api("act", {username: selected, action, ...actionBody(action)});
+        pressed.disabled = false;
+        setStatus($("detail-status"), said(result), !result.ok);
+        if (result.ok) {
+          $("ban-hours").value = "";
+          $("silence-hours").value = "";
+          $("message-text").value = "";
+          refresh();
+        }
+      });
+
+      $("player-search").addEventListener("input", () => refresh());
+
+      const chatUrl = before => `chat?username=${encodeURIComponent(chatQuery.username)}&room=${encodeURIComponent(chatQuery.room)}`
+        + `&text=${encodeURIComponent(chatQuery.text)}&before=${before}`;
+
+      const lineNode = (line, inContext = false) => {
+        const item = el("li", undefined, inContext && line.marked ? "this" : "");
+        const who = button(line.username, () => openPlayer(line.username), "chat-who");
+        const text = el("span", undefined, "chat-text");
+        text.append(line.text, el("span", line.whisperTo ? `Whisper to ${line.whisperTo}` : line.room, "chat-room"));
+        item.append(el("span", when(line.at), "chat-time"), who, text);
+        if (!inContext) {
+          item.append(button("Around", () => showContext(line.id), "chat-more"));
+        }
+        return item;
+      };
+
+      const renderChat = more => {
+        $("chat-lines").replaceChildren(...chatLines.map(line => lineNode(line)));
+        $("no-chat").hidden = chatLines.length > 0;
+        $("chat-older").hidden = !more;
+      };
+
+      const loadChat = async older => {
+        if (!chatQuery) {
+          chatQuery = {username: "", room: "", text: ""};
+        }
+        const before = older && chatLines.length ? chatLines[chatLines.length - 1].id : 0;
+        const result = await api(chatUrl(before));
+        if (!result.ok) {
+          setStatus($("chat-status"), said(result), true);
+          return;
+        }
+        chatLines = older ? [...chatLines, ...result.data.lines] : result.data.lines;
+        setStatus($("chat-status"), result.data.days > 0 ? `Kept ${result.data.days} days.` : "Chat is not being kept.");
+        renderChat(result.data.more);
+      };
+
+      const showContext = async id => {
+        const result = await api(`chat/around?id=${id}`);
+        if (!result.ok) {
+          setStatus($("chat-status"), said(result), true);
+          return;
+        }
+        const {line, lines} = result.data;
+        $("context-title").textContent = line.whisperTo ? `${line.username} and ${line.whisperTo}` : line.room;
+        $("chat-context").replaceChildren(...lines.map(entry => lineNode({...entry, marked: entry.id === line.id}, true)));
+        $("context-box").hidden = false;
+        $("context-box").scrollIntoView({block: "nearest"});
+      };
+      $("context-close").addEventListener("click", () => {
+        $("context-box").hidden = true;
+      });
+
+      $("chat-form").addEventListener("submit", event => {
+        event.preventDefault();
+        chatQuery = {username: $("chat-player").value.trim(), room: $("chat-room").value.trim(), text: $("chat-text").value.trim()};
+        $("context-box").hidden = true;
+        loadChat(false);
+      });
+      $("chat-older").addEventListener("click", () => loadChat(true));
+
+      const openChat = username => {
+        $("chat-player").value = username;
+        $("chat-room").value = "";
+        $("chat-text").value = "";
+        chatQuery = {username, room: "", text: ""};
+        $("context-box").hidden = true;
+        showTab("chat");
+      };
+      $("open-chat").addEventListener("click", () => selected && openChat(selected));
+
+      const renderReports = data => {
+        const handled = $("report-filter").value === "1";
+        $("report-count").textContent = data.open ? ` (${data.open})` : "";
+        $("reports").replaceChildren(...data.reports.map(report => {
+          const box = el("div", undefined, "report");
+          box.append(el("h3", `${report.target} — ${report.reason}`),
+            el("div", `Reported by ${report.reporter} on ${when(report.createdAt)}${report.room ? `, in ${report.room}` : ""}`, "hint"));
+          if (report.detail) {
+            box.append(el("div", report.detail, "typed"));
+          }
+          if (report.context) {
+            box.append(el("pre", report.context));
+          }
+          const buttons = el("div", undefined, "buttons");
+          buttons.append(button("Player", () => openPlayer(report.target)), button("Chat history", () => openChat(report.target)));
+          if (handled) {
+            box.append(el("div", `Dealt with on ${when(report.handledAt)}`, "hint"));
+          }
+          else {
+            buttons.append(button("Dealt with", async () => {
+              const result = await api("report", {id: report.id});
+              setStatus($("report-status"), said(result), !result.ok);
+              refresh();
+            }, "primary"));
+          }
+          box.append(buttons);
+          return box;
+        }));
+        $("no-reports").hidden = data.reports.length > 0;
+      };
+      $("report-filter").addEventListener("change", () => refresh());
+
+      const renderRequests = data => {
+        const handled = $("request-filter").value === "1";
+        const answer = async body => {
+          const result = await api("request", body);
+          setStatus($("request-status"), said(result), !result.ok);
+          if (document.activeElement) {
+            document.activeElement.blur();
+          }
+          refresh();
+        };
+        // typed replies are left alone while one is being written.
+        if (!$("appeals").contains(document.activeElement) || document.activeElement.tagName !== "INPUT") {
+          $("appeals").replaceChildren(...data.appeals.map(appeal => {
+            const box = el("div", undefined, "report");
+            box.append(el("h3", appeal.username), el("div", `Sent on ${when(appeal.createdAt)}${appeal.gone ? " · account deleted" : ""}`, "hint"));
+            if (appeal.ban) {
+              box.append(el("div", `Banned${appeal.ban.seconds === -1 ? " for good" : `, ${duration(appeal.ban.seconds)} left`} · ${appeal.ban.reason}`, "hint"));
+            }
+            if (appeal.ofAddress) {
+              box.append(el("div", "Their address is banned.", "hint"));
+            }
+            box.append(el("div", appeal.text, "typed"));
+            if (handled) {
+              box.append(el("div", `${appeal.status === "approved" ? "Approved" : "Denied"} on ${when(appeal.handledAt)}${appeal.reply ? ` · ${appeal.reply}` : ""}`, "hint"));
+              return box;
+            }
+            const reply = el("input");
+            reply.maxLength = 500;
+            reply.placeholder = "Reply (optional)";
+            reply.setAttribute("aria-label", `Reply to ${appeal.username}`);
+            reply.style.width = "100%";
+            const buttons = el("div", undefined, "buttons");
+            buttons.append(button("Unban", () => answer({action: "appealApprove", id: appeal.accountId, reply: reply.value}), "primary"),
+              button("Deny", () => answer({action: "appealDeny", id: appeal.accountId, reply: reply.value})),
+              button("Player", () => openPlayer(appeal.username)), button("Chat history", () => openChat(appeal.username)));
+            box.append(reply, buttons);
+            return box;
+          }));
+        }
+        $("no-appeals").hidden = data.appeals.length > 0;
+        $("name-requests").replaceChildren(...data.names.map(request => {
+          const box = el("div", undefined, "report");
+          box.append(el("h3", `${request.oldName} → ${request.newName}`), el("div", `Asked on ${when(request.createdAt)}`, "hint"));
+          if (request.reason) {
+            box.append(el("div", request.reason, "typed"));
+          }
+          if (handled) {
+            box.append(el("div", `${request.status === "approved" ? "Approved" : "Denied"} on ${when(request.handledAt)}`, "hint"));
+          }
+          else {
+            const buttons = el("div", undefined, "buttons");
+            buttons.append(button("Approve", () => answer({action: "approve", id: request.id}), "primary"), button("Deny", () => answer({action: "deny", id: request.id})));
+            box.append(buttons);
+          }
+          return box;
+        }));
+        $("no-name-requests").hidden = data.names.length > 0;
+      };
+      $("request-filter").addEventListener("change", () => refresh());
+
+      let paintingsShown = "";
+      const renderMasterpieces = data => {
+        const which = $("masterpiece-filter").value;
+        const paintings = data[which];
+        $("masterpiece-count").textContent = data.waiting.length ? ` (${data.waiting.length})` : "";
+        $("no-masterpieces").hidden = paintings.length > 0;
+        // drawn again only when the list changed, so the pictures do not flicker.
+        const shown = `${which} ${paintings.map(painting => painting.id).join(" ")}`;
+        if (shown === paintingsShown) {
+          return;
+        }
+        paintingsShown = shown;
+        $("masterpieces").replaceChildren(...paintings.map(painting => {
+          const box = el("div", undefined, "painting");
+          const picture = el("img");
+          picture.src = `/mod/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
+          picture.alt = `Painting by ${painting.creator}`;
+          picture.loading = "lazy";
+          box.append(picture, el("h3", painting.creator), el("div", when(painting.createdAt), "hint"));
+          const buttons = el("div", undefined, "buttons");
+          const does = (label, action, className) => button(label, async () => {
+            const result = await api("masterpiece", {id: painting.id, action});
+            setStatus($("masterpiece-status"), said(result), !result.ok);
+            refresh();
+          }, className);
+          if (which === "waiting") {
+            buttons.append(does("Approve", "approve", "primary"), does("Reject", "reject", "danger"));
+          }
+          else {
+            buttons.append(does("Remove", "remove", "danger"));
+          }
+          buttons.append(button("Player", () => openPlayer(painting.creator)));
+          box.append(buttons);
+          return box;
+        }));
+      };
+      $("masterpiece-filter").addEventListener("change", () => refresh());
+
+      const renderBans = data => {
+        $("bans").replaceChildren(...data.accounts.map(account => {
+          const row = el("tr");
+          const buttons = el("td");
+          const lifts = (label, action) => button(label, async () => {
+            const result = await api("act", {username: account.username, action});
+            setStatus($("ban-status"), said(result), !result.ok);
+            refresh();
+          });
+          if (account.banned !== 0) {
+            buttons.append(lifts("Lift ban", "unban"), " ");
+          }
+          if (account.silenced !== 0) {
+            buttons.append(lifts("Lift silence", "unsilence"), " ");
+          }
+          buttons.append(button("Player", () => openPlayer(account.username)));
+          row.append(el("td", account.username), el("td", left(account.banned)), el("td", account.reason || "—"), el("td", account.by || "—"),
+            el("td", account.silenced === 0 ? "—" : `Silenced: ${left(account.silenced).toLowerCase()}`), buttons);
+          return row;
+        }));
+        $("no-bans").hidden = data.accounts.length > 0;
+        $("addresses").replaceChildren(...data.addresses.map(ban => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(button("Unban", async () => {
+            const result = await api("address", {id: ban.id});
+            setStatus($("ban-status"), said(result), !result.ok);
+            refresh();
+          }));
+          row.append(el("td", ban.address), el("td", ban.reason), el("td", ban.by || "—"), el("td", when(ban.createdAt)), buttons);
+          return row;
+        }));
+        $("no-addresses").hidden = data.addresses.length > 0;
+      };
+
+      const refresh = async () => {
+        clearTimeout(timer);
+        if (!signedIn) {
+          return;
+        }
+        const shown = tab;
+        const counts = await api("overview");
+        if (counts.ok) {
+          $("report-count").textContent = counts.data.reports ? ` (${counts.data.reports})` : "";
+          $("request-count").textContent = counts.data.requests ? ` (${counts.data.requests})` : "";
+          $("masterpiece-count").textContent = counts.data.paintings ? ` (${counts.data.paintings})` : "";
+          $("online-count").textContent = `${counts.data.online} playing`;
+        }
+        if (shown === "players") {
+          const result = await api(`players?q=${encodeURIComponent($("player-search").value.trim())}`);
+          if (result.ok) {
+            players = result.data.players;
+            renderPlayers();
+            await loadDetail();
+          }
+        }
+        else if (shown === "chat") {
+          // only the first page keeps itself up to date: older pages stay as they were read.
+          if (!chatQuery || chatLines.length <= 100) {
+            await loadChat(false);
+          }
+        }
+        else if (shown === "reports") {
+          const result = await api(`reports?handled=${$("report-filter").value}`);
+          if (result.ok) {
+            renderReports(result.data);
+          }
+        }
+        else if (shown === "requests") {
+          const result = await api(`requests?handled=${$("request-filter").value}`);
+          if (result.ok) {
+            renderRequests(result.data);
+          }
+        }
+        else if (shown === "masterpieces") {
+          const result = await api("masterpieces");
+          if (result.ok) {
+            renderMasterpieces(result.data);
+          }
+        }
+        else if (shown === "bans") {
+          const result = await api("bans");
+          if (result.ok) {
+            renderBans(result.data);
+          }
+        }
+        if (signedIn) {
+          clearTimeout(timer);
+          timer = setTimeout(refresh, REFRESH_MS);
+        }
+      };
+
+      const showTab = name => {
+        tab = name;
+        for (const one of document.querySelectorAll("nav button")) {
+          one.setAttribute("aria-selected", String(one.dataset.tab === name));
+        }
+        for (const view of document.querySelectorAll("[data-view]")) {
+          view.hidden = view.dataset.view !== name;
+        }
+        refresh();
+      };
+      for (const one of document.querySelectorAll("nav button")) {
+        one.addEventListener("click", () => showTab(one.dataset.tab));
+      }
+
+      const showPanel = username => {
+        signedIn = true;
+        $("who").textContent = username;
+        $("gate").hidden = true;
+        $("panel").hidden = false;
+        showTab(tab);
+      };
+
+      $("gate-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        $("gate-button").disabled = true;
+        const answer = await check.answer();
+        if (answer === "") {
+          $("gate-button").disabled = false;
+          setStatus($("gate-status"), window.captcha.FAILED, true);
+          return;
+        }
+        const result = await api("login", {username: $("username").value, password: $("password").value, code: $("code").value.trim(), captcha: answer});
+        check.reset();
+        $("gate-button").disabled = false;
+        if (result.ok) {
+          showPanel(result.data.username);
+        }
+        else {
+          setStatus($("gate-status"), said(result), true);
+          $("code").value = "";
+        }
+      });
+
+      $("sign-out").addEventListener("click", async () => {
+        await api("logout", {});
+        showGate("");
+      });
+
+      const start = async () => {
+        const result = await api("state");
+        if (result.ok && result.data.signedIn) {
+          showPanel(result.data.username);
+        }
+        else {
+          showGate(result.status === 0 ? result.data.error : "");
+        }
+      };
+
+      start();
+    </script>
+  </body>
+</html>

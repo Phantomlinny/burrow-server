@@ -1,0 +1,1502 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Server admin</title>
+    <link rel="icon" type="image/png" href="/logo-square.png">
+    <style>
+      /* black and white throughout, in the game's own text font: the look of
+         the client (its app/index.html). Nothing is said by colour: what
+         went wrong is white with a "!" before it, and what cannot be undone
+         has a dashed edge. */
+      @font-face { font-family: "DigitalDelivery"; font-weight: 400; src: url("/fonts/CCDigitalDelivery-Regular.otf") format("opentype"); }
+      @font-face { font-family: "DigitalDelivery"; font-weight: 700; src: url("/fonts/CCDigitalDelivery-Bold.otf") format("opentype"); }
+      :root {
+        color-scheme: dark;
+        --bg: #000;
+        --panel: #0d0d0d;
+        --raised: #1a1a1a;
+        --line: #2e2e2e;
+        --text: #fff;
+        --muted: #8c8c8c;
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      ::selection { background: #fff; color: #000; }
+      ::-webkit-scrollbar { width: 10px; height: 10px; }
+      ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 3px solid var(--bg); }
+      body {
+        margin: 0;
+        padding: 24px 16px 48px;
+        background: var(--bg);
+        color: var(--text);
+        font: 15px/1.4 "DigitalDelivery", system-ui, "Segoe UI", sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      a { color: inherit; text-underline-offset: 3px; }
+      h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.01em; }
+      h2 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+      h3 { font-size: 14px; font-weight: 700; }
+      p { margin: 0 0 12px; color: var(--muted); }
+      label { display: block; margin: 12px 0 5px; color: var(--muted); font-size: 13px; }
+      .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+      input, select, textarea {
+        font: inherit;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 9px 14px 10px;
+        transition: border-color 0.12s;
+      }
+      input::placeholder, textarea::placeholder { color: #555; }
+      input:hover, select:hover, textarea:hover { border-color: #555; }
+      input:focus, select:focus, textarea:focus { outline: none; border-color: var(--text); }
+      input:disabled, select:disabled, textarea:disabled { opacity: 0.4; }
+      select:not([multiple]) {
+        -webkit-appearance: none;
+        appearance: none;
+        padding-right: 34px;
+        background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+        background-position: calc(100% - 19px) 55%, calc(100% - 14px) 55%;
+        background-size: 5px 5px;
+        background-repeat: no-repeat;
+      }
+      input[type="checkbox"] {
+        -webkit-appearance: none;
+        appearance: none;
+        flex: none;
+        width: 18px;
+        height: 18px;
+        margin: 0 6px 0 0;
+        padding: 0;
+        vertical-align: -4px;
+        border: 1px solid #666;
+        border-radius: 6px;
+        background: var(--panel);
+        cursor: pointer;
+      }
+      input[type="checkbox"]:hover { border-color: var(--text); }
+      input[type="checkbox"]:checked {
+        border-color: var(--text);
+        background: var(--text) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4.5 9.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: none;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 16px 8px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition: background 0.12s, border-color 0.12s, color 0.12s;
+      }
+      button:hover { background: var(--raised); border-color: #555; }
+      button:disabled { opacity: 0.45; cursor: default; }
+      button:focus-visible, a:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+      button.primary { font-weight: 700; color: #000; background: var(--text); border-color: var(--text); }
+      button.primary:hover { background: #d9d9d9; border-color: #d9d9d9; }
+      button.primary:disabled, button.primary:disabled:hover { background: #3a3a3a; border-color: #3a3a3a; color: #000; }
+      button.danger { border-style: dashed; border-color: #666; }
+      button.danger:hover { border-style: solid; border-color: var(--text); }
+      .status, #status { min-height: 20px; margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+      .status.bad, #status.bad { color: var(--text); }
+      .status.bad::before, #status.bad::before, .notice::before {
+        content: "!";
+        display: inline-block;
+        width: 17px;
+        height: 17px;
+        margin-right: 7px;
+        border-radius: 50%;
+        background: var(--text);
+        color: #000;
+        font-weight: 700;
+        line-height: 17px;
+        text-align: center;
+      }
+      @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+      input, select, textarea { background: var(--bg); }
+      label.check { margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
+
+      #gate {
+        max-width: 380px;
+        margin: 6vh auto 0;
+        padding: 24px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+      #gate h1 { margin-bottom: 4px; }
+      #gate input { width: 100%; }
+      #gate button { width: 100%; margin-top: 18px; padding: 10px 16px 11px; }
+
+      #panel { max-width: 1080px; margin: 0 auto; }
+      header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+      header h1 { flex: 1; }
+      nav { display: flex; gap: 2px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--line); border-radius: 22px; flex-wrap: wrap; }
+      nav button { border: 0; color: var(--muted); padding: 6px 14px 7px; }
+      nav button:hover { color: var(--text); }
+      nav button[aria-selected="true"] { color: #000; background: var(--text); font-weight: 700; }
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
+      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .tile { padding: 12px 14px 11px; border: 1px solid var(--line); border-radius: 18px; }
+      .tile .value { font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+      .tile .name { margin-top: 2px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+      .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+      .columns section { margin: 0; }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+      dt { color: var(--muted); }
+      dd { margin: 0; overflow-wrap: anywhere; }
+      .table-wrap { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 400; }
+      td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+      td button { padding: 2px 12px 3px; font-weight: 700; }
+      tbody tr:last-child td { border-bottom: 0; }
+      tbody tr.selected td { background: var(--raised); }
+      tbody tr.pick { cursor: pointer; }
+      .empty { color: var(--muted); padding: 8px 0; }
+      .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+      .toolbar input[type="search"] { flex: 1; min-width: 180px; }
+      .tag { display: inline-block; padding: 1px 9px 2px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      .tag.good { color: #000; background: var(--text); border-color: var(--text); font-weight: 700; }
+      .tag.bad { color: var(--text); border-color: var(--text); font-weight: 700; }
+      #detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+      .action .hint { margin: 8px 0 0; }
+      .action { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+      .action h3 { margin: 0 0 8px; }
+      .action .row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .action .row input, .action .row select { flex: 1; min-width: 90px; }
+      .action .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+      /* what the server printed keeps a fixed-width face: it is read in columns. */
+      #log {
+        height: 60vh;
+        overflow: auto;
+        margin: 0;
+        padding: 12px 14px;
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        font: 12px/1.5 ui-monospace, Consolas, monospace;
+        color: #bdbdbd;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+      #log .time { color: var(--muted); }
+      #log .error { color: var(--text); font-weight: 700; }
+      .report { border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+      .report h3 { margin: 0 0 4px; }
+      .report .typed { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
+      .report pre { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
+      .report .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .paintings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+      .painting { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+      .painting img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
+      .painting h3 { margin: 8px 0 2px; }
+      .painting .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      textarea { width: 100%; resize: vertical; }
+      .send-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+      #owned { margin-top: 16px; }
+      #owned ul { margin: 4px 0 12px; padding-left: 18px; columns: 220px; }
+      #ban-record h3 { margin: 14px 0 4px; }
+      #ban-record ul { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
+      #ban-record li { margin: 3px 0; }
+      #ban-record li button { padding: 2px 10px 3px; font-size: 12px; }
+      #owned li { break-inside: avoid; }
+      #password-form { max-width: 360px; }
+      #password-form input { width: 100%; }
+      #password-form button { margin-top: 16px; }
+      .logo { display: block; height: 72px; margin: 0 0 12px; }
+      .mark { height: 34px; flex: none; }
+    </style>
+  </head>
+  <body>
+    <main id="gate" hidden>
+      <img class="logo" src="/logo.png" alt="">
+      <h1 id="gate-title">Server admin</h1>
+      <p id="gate-text"></p>
+      <form id="gate-form">
+        <div id="code-field" hidden>
+          <label for="code">Setup code <span class="hint">[admin] line of the server's output</span></label>
+          <input id="code" autocomplete="off" spellcheck="false">
+        </div>
+        <label for="password" id="password-label">Password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <div id="confirm-field" hidden>
+          <label for="confirm">Password again</label>
+          <input id="confirm" type="password" autocomplete="new-password">
+        </div>
+        <button class="primary" id="gate-button">Sign in</button>
+      </form>
+      <p class="status" id="gate-status" role="status"></p>
+    </main>
+
+    <div id="panel" hidden>
+      <header>
+        <img class="mark" src="/logo.png" alt="">
+        <h1>Server admin</h1>
+        <span class="hint" id="updated"></span>
+        <button id="sign-out" type="button">Sign out</button>
+      </header>
+      <nav role="tablist">
+        <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+        <button role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
+        <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
+        <button role="tab" data-tab="support" aria-selected="false">Requests<span id="support-count"></span></button>
+        <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
+        <button role="tab" data-tab="bans" aria-selected="false">Bans</button>
+        <button role="tab" data-tab="moderators" aria-selected="false">Moderators</button>
+        <button role="tab" data-tab="messages" aria-selected="false">Messages</button>
+        <button role="tab" data-tab="logs" aria-selected="false">Logs</button>
+        <button role="tab" data-tab="debug" aria-selected="false">Debug</button>
+        <button role="tab" data-tab="settings" aria-selected="false">Password</button>
+      </nav>
+
+      <div data-view="overview">
+        <div class="tiles" id="tiles"></div>
+        <div class="columns">
+          <section>
+            <h2>Playing now</h2>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Player</th><th>Room</th><th>Address</th></tr></thead>
+              <tbody id="players"></tbody>
+            </table></div>
+            <div class="empty" id="no-players" hidden>Nobody is online.</div>
+          </section>
+          <section>
+            <h2>Server</h2>
+            <dl id="server-facts"></dl>
+          </section>
+        </div>
+      </div>
+
+      <div data-view="accounts" hidden>
+        <section>
+          <div class="toolbar">
+            <input id="account-search" type="search" placeholder="Search" aria-label="Search accounts">
+            <select id="account-filter" aria-label="Which accounts">
+              <option value="all">All</option>
+              <option value="online">Online</option>
+              <option value="banned">Banned</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>State</th><th>Created</th><th>Last login</th><th>Last seen</th><th class="num">Logins</th><th class="num">Animals</th><th class="num">Items</th></tr></thead>
+            <tbody id="accounts"></tbody>
+          </table></div>
+          <div class="empty" id="no-accounts" hidden>No accounts match.</div>
+
+          <div id="detail" hidden>
+            <h2 id="detail-name"></h2>
+            <p class="status" id="detail-status" role="status"></p>
+            <div class="actions">
+              <div class="action">
+                <h3>Username</h3>
+                <div class="row"><input id="new-name" maxlength="100" placeholder="New username" autocomplete="off" spellcheck="false" aria-label="New username">
+                  <button type="button" data-action="rename">Rename</button></div>
+              </div>
+              <div class="action">
+                <h3>Password</h3>
+                <div class="row"><input id="new-password" type="password" placeholder="New password" autocomplete="new-password" aria-label="New password">
+                  <button type="button" data-action="password">Set</button></div>
+              </div>
+              <div class="action">
+                <h3>Adventure level</h3>
+                <div class="row"><input id="quest-level" type="number" min="0" max="100" step="1" aria-label="Adventure level of the animal in use">
+                  <button type="button" data-action="level">Set</button></div>
+              </div>
+              <div class="action">
+                <h3>Last seen</h3>
+                <div class="row"><input id="last-seen" type="datetime-local" aria-label="Last seen, in your local time">
+                  <button type="button" data-action="lastSeen">Set</button></div>
+                <div class="row">
+                  <button type="button" data-ago="5">5 min ago</button>
+                  <button type="button" data-ago="180">3 hours ago</button>
+                  <button type="button" data-ago="2880">2 days ago</button>
+                  <button type="button" data-ago="86400">60 days ago</button></div>
+              </div>
+              <div class="action">
+                <h3>Bio</h3>
+                <textarea id="bio-text" rows="4" maxlength="220" spellcheck="true" aria-label="Bio" style="width:100%"></textarea>
+                <div class="row" style="margin-top:8px"><button type="button" data-action="bio">Set</button></div>
+              </div>
+              <div class="action">
+                <h3>Badges</h3>
+                <div class="buttons" id="badge-boxes"></div>
+                <div class="row" style="margin-top:8px"><button type="button" data-action="badges">Set</button></div>
+                <div class="row" style="margin-top:8px"><input id="discord-name" maxlength="33" placeholder="Discord username" autocomplete="off" spellcheck="false" aria-label="Discord username">
+                  <button type="button" data-action="discord">Set</button></div>
+              </div>
+              <div class="action">
+                <h3>Ban</h3>
+                <div class="row"><input id="ban-hours" type="number" min="0" placeholder="Hours (0 = forever)" aria-label="Ban length in hours">
+                  <input id="ban-reason" maxlength="300" placeholder="Reason" autocomplete="off" aria-label="Reason, shown to the banned player"></div>
+                <div class="row" style="margin-top:8px">
+                  <button type="button" data-action="ban" class="danger">Ban</button>
+                  <button type="button" data-action="banReason">Save reason</button>
+                  <button type="button" data-action="unban">Lift</button></div>
+                <div id="ban-record"></div>
+              </div>
+              <div class="action">
+                <h3>Chat</h3>
+                <div class="row"><input id="silence-hours" type="number" min="0" placeholder="Hours (0 = until lifted)" aria-label="Silence length in hours">
+                  <button type="button" data-action="silence">Silence</button>
+                  <button type="button" data-action="unsilence">Lift</button></div>
+              </div>
+              <div class="action">
+                <h3>Message</h3>
+                <div class="row"><input id="message-text" maxlength="200" placeholder="Text" aria-label="Message">
+                  <button type="button" data-action="message">Send</button></div>
+              </div>
+              <div class="action">
+                <h3>Gems</h3>
+                <div class="row"><input id="gems-amount" type="number" placeholder="Amount" aria-label="Gems to add">
+                  <button type="button" data-action="gems">Add</button></div>
+              </div>
+              <div class="action">
+                <h3>Gift</h3>
+                <div class="row">
+                  <select id="gift-kind" aria-label="What to give">
+                    <option value="gems">Gems</option>
+                    <option value="diamonds">Diamonds</option>
+                    <option value="tickets">Tickets</option>
+                    <option value="clothing">Clothing</option>
+                    <option value="den">Den item</option>
+                    <option value="adopt">Adopt-A-Pet</option>
+                    <option value="achievement">Achievement</option>
+                  </select>
+                  <input id="gift-value" placeholder="Amount" autocomplete="off" aria-label="Amount or id">
+                  <button type="button" data-action="gift">Give</button></div>
+                <div class="row" style="margin-top:8px"><input id="gift-text" maxlength="200" placeholder="Message (optional)" aria-label="Message on the Jam-A-Gram"></div>
+              </div>
+              <div class="action">
+                <h3>Other</h3>
+                <div class="buttons">
+                  <button type="button" data-action="kick">Disconnect</button>
+                  <button type="button" data-action="unlock">Unlock</button>
+                  <button type="button" data-action="twoStepOff">Turn off 2FA</button>
+                  <button type="button" data-action="rejectName">Reject username</button>
+                  <button type="button" data-action="acceptName">Take rejection back</button>
+                  <button type="button" data-action="moderator" id="moderator-toggle">Make moderator</button>
+                  <button type="button" data-action="clearDen">Clear den</button>
+                  <button type="button" data-action="delete" class="danger">Delete</button>
+                </div>
+              </div>
+            </div>
+            <div id="owned"></div>
+          </div>
+        </section>
+      </div>
+
+      <div data-view="reports" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Reports</h2>
+            <select id="report-filter" aria-label="Which reports">
+              <option value="0">Waiting</option>
+              <option value="1">Handled</option>
+            </select>
+          </div>
+          <p class="status" id="report-status" role="status"></p>
+          <div id="reports"></div>
+          <div class="empty" id="no-reports" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="support" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Requests</h2>
+            <select id="support-filter" aria-label="Which requests">
+              <option value="0">Waiting</option>
+              <option value="1">Answered</option>
+            </select>
+          </div>
+          <p class="status" id="support-status" role="status"></p>
+          <h2>Username changes</h2>
+          <div id="name-requests"></div>
+          <div class="empty" id="no-name-requests" hidden>Nothing here.</div>
+          <h2 style="margin-top:20px">Ban appeals</h2>
+          <div id="appeals"></div>
+          <div class="empty" id="no-appeals" hidden>Nothing here.</div>
+          <h2 style="margin-top:20px">Feedback</h2>
+          <div id="feedback"></div>
+          <div class="empty" id="no-feedback" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="moderators" hidden>
+        <section>
+          <h2>Moderators</h2>
+          <p class="hint">They sign in at <a href="/mod">/mod</a>.</p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>2FA</th><th>Last seen</th><th></th></tr></thead>
+            <tbody id="moderators"></tbody>
+          </table></div>
+          <div class="empty" id="no-moderators" hidden>Nobody. Make one from Accounts.</div>
+        </section>
+        <section>
+          <h2>What they did</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>When</th><th>Who</th><th>What</th><th>Player</th><th>Detail</th></tr></thead>
+            <tbody id="mod-log"></tbody>
+          </table></div>
+          <div class="empty" id="no-mod-log" hidden>Nothing yet.</div>
+        </section>
+      </div>
+
+      <div data-view="bans" hidden>
+        <section>
+          <h2>Banned and silenced</h2>
+          <p class="status" id="ban-status" role="status"></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>Ban</th><th>Reason</th><th>Chat</th><th></th></tr></thead>
+            <tbody id="bans"></tbody>
+          </table></div>
+          <div class="empty" id="no-bans" hidden>Nobody is banned or silenced.</div>
+        </section>
+        <section>
+          <h2>Banned addresses</h2>
+          <form id="address-form" class="toolbar">
+            <input id="address" maxlength="60" placeholder="IP address" autocomplete="off" spellcheck="false" aria-label="IP address" required>
+            <input id="address-reason" maxlength="300" placeholder="Reason" autocomplete="off" aria-label="Reason" style="flex:1">
+            <button class="danger" type="submit">Ban</button>
+          </form>
+          <p class="status" id="address-status" role="status"></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Address</th><th>Reason</th><th>Since</th><th></th></tr></thead>
+            <tbody id="addresses"></tbody>
+          </table></div>
+          <div class="empty" id="no-addresses" hidden>No address is banned.</div>
+        </section>
+      </div>
+
+      <div data-view="messages" hidden>
+        <div class="columns">
+          <section>
+            <h2>Message of the day</h2>
+            <textarea id="motd-text" rows="4" maxlength="300" aria-label="Message of the day"></textarea>
+            <div class="send-row"><button class="primary" type="button" id="motd-save">Save</button></div>
+            <p class="status" id="motd-status" role="status"></p>
+          </section>
+          <section>
+            <h2>Announcement</h2>
+            <textarea id="announce-text" rows="4" maxlength="300" aria-label="Announcement"></textarea>
+            <div class="send-row">
+              <select id="announce-room" aria-label="Who sees it"></select>
+              <button class="primary" type="button" id="announce-send">Send</button>
+            </div>
+            <p class="status" id="announce-status" role="status"></p>
+          </section>
+        </div>
+      </div>
+
+      <div data-view="masterpieces" hidden>
+        <section>
+          <div class="toolbar">
+            <h2 style="margin:0;flex:1">Masterpieces</h2>
+            <select id="masterpiece-filter" aria-label="Which masterpieces">
+              <option value="waiting">Waiting</option>
+              <option value="approved">Approved</option>
+            </select>
+          </div>
+          <label class="check"><input id="masterpiece-review" type="checkbox"> Review new masterpieces</label>
+          <p class="status" id="masterpiece-status" role="status"></p>
+          <div class="paintings" id="masterpieces"></div>
+          <div class="empty" id="no-masterpieces" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="debug" hidden>
+        <div class="columns">
+          <section>
+            <h2>Teleport</h2>
+            <div class="send-row">
+              <select id="debug-player" aria-label="Player"></select>
+              <input id="debug-room-filter" type="search" placeholder="Filter" aria-label="Filter rooms">
+              <label class="check"><input id="debug-noted" type="checkbox"> Unreachable only</label>
+            </div>
+            <select id="debug-room" size="14" aria-label="Room" style="width:100%;margin-top:8px"></select>
+            <div class="send-row"><button class="primary" type="button" id="debug-go">Go</button></div>
+            <p class="status" id="debug-status" role="status"></p>
+          </section>
+          <section>
+            <h2>Sale dates</h2>
+            <label class="check"><input id="debug-onsale" type="checkbox"> Everything on sale</label>
+            <p class="status" id="debug-sale-status" role="status"></p>
+          </section>
+        </div>
+      </div>
+
+      <div data-view="logs" hidden>
+        <section>
+          <div class="toolbar">
+            <input id="log-filter" type="search" placeholder="Filter" aria-label="Filter log lines">
+            <select id="log-preset" aria-label="Common filters">
+              <option value="">Everything</option>
+              <option value="[client-error]">Client errors</option>
+              <option value="[world]">World</option>
+              <option value="[admin]">Admin</option>
+              <option value="[accounts]">Accounts</option>
+            </select>
+            <label class="check"><input id="log-follow" type="checkbox" checked> Follow</label>
+          </div>
+          <pre id="log" tabindex="0" aria-label="Server log"></pre>
+        </section>
+      </div>
+
+      <div data-view="settings" hidden>
+        <section>
+          <h2>Admin password</h2>
+          <form id="password-form">
+            <label for="current-password">Current</label>
+            <input id="current-password" type="password" autocomplete="current-password" required>
+            <label for="next-password">New</label>
+            <input id="next-password" type="password" autocomplete="new-password" required minlength="8">
+            <label for="next-confirm">New again</label>
+            <input id="next-confirm" type="password" autocomplete="new-password" required>
+            <button class="primary">Change</button>
+          </form>
+          <p class="status" id="password-status" role="status"></p>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      "use strict";
+
+      const $ = id => document.getElementById(id);
+      const REFRESH_MS = 5000;
+      const LOG_REFRESH_MS = 2000;
+      const MAX_LOG_LINES = 2000;
+
+      let state = null; // {needsSetup, needsSetupCode, signedIn}
+      let accounts = [];
+      let badges = []; // {id, label}: the badges an account's card can show
+      let selected = null; // username whose actions are shown
+      let tab = "overview";
+      let lastLogId = 0;
+      let timer = null;
+
+      const api = async (path, body) => {
+        const response = await fetch(`/admin/api/${path}`, body === undefined ? {} : {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(body),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (response.status === 401 && state && state.signedIn) {
+          // the session ended (the server restarted, or 12 hours passed).
+          state.signedIn = false;
+          showGate("Your session ended. Sign in again.");
+        }
+        return {ok: response.ok, status: response.status, data};
+      };
+
+      const setStatus = (element, text, bad = false) => {
+        element.textContent = text;
+        element.classList.toggle("bad", bad);
+      };
+
+      const el = (tag, text, className) => {
+        const node = document.createElement(tag);
+        if (text !== undefined) {
+          node.textContent = text;
+        }
+        if (className) {
+          node.className = className;
+        }
+        return node;
+      };
+
+      const when = seconds => (seconds ? new Date(seconds * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "never");
+
+      const duration = seconds => {
+        const units = [[86400, "day"], [3600, "hour"], [60, "minute"]];
+        for (const [size, name] of units) {
+          if (seconds >= size) {
+            const count = Math.floor(seconds / size);
+            return `${count} ${name}${count === 1 ? "" : "s"}`;
+          }
+        }
+        return "under a minute";
+      };
+
+      const showGate = message => {
+        clearTimeout(timer);
+        $("panel").hidden = true;
+        $("gate").hidden = false;
+        const setup = state.needsSetup;
+        $("gate-title").textContent = setup ? "Set admin password" : "Server admin";
+        $("gate-text").hidden = true;
+        $("password-label").textContent = setup ? "Password (8+ characters)" : "Password";
+        $("password").autocomplete = setup ? "new-password" : "current-password";
+        $("confirm-field").hidden = !setup;
+        $("code-field").hidden = !(setup && state.needsSetupCode);
+        $("gate-button").textContent = setup ? "Set password" : "Sign in";
+        $("password").value = "";
+        $("confirm").value = "";
+        setStatus($("gate-status"), message || "");
+        ($("code-field").hidden ? $("password") : $("code")).focus();
+      };
+
+      $("gate-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const password = $("password").value;
+        if (state.needsSetup && password !== $("confirm").value) {
+          setStatus($("gate-status"), "The two passwords are different.", true);
+          return;
+        }
+        $("gate-button").disabled = true;
+        const result = state.needsSetup
+          ? await api("setup", {password, code: $("code").value})
+          : await api("login", {password});
+        $("gate-button").disabled = false;
+        if (!result.ok) {
+          setStatus($("gate-status"), result.data.error || "That did not work.", true);
+          return;
+        }
+        state = {needsSetup: false, needsSetupCode: false, signedIn: true};
+        showPanel();
+      });
+
+      $("sign-out").addEventListener("click", async () => {
+        await api("logout", {});
+        state.signedIn = false;
+        showGate("Signed out.");
+      });
+
+      const TILES = [
+        ["online", "Playing now"],
+        ["accounts", "Accounts"],
+        ["activeToday", "Logged in, last 24 hours"],
+        ["newToday", "Created, last 24 hours"],
+        ["banned", "Banned"],
+        ["reports", "Reports waiting"],
+        ["support", "Requests and feedback waiting"],
+        ["masterpieces", "Masterpieces waiting"],
+        ["clientErrors", "Game client errors logged"],
+      ];
+
+      const renderOverview = data => {
+        $("tiles").replaceChildren(...TILES.map(([key, name]) => {
+          const tile = el("div", undefined, "tile");
+          tile.append(el("div", data.stats[key].toLocaleString(), "value"), el("div", name, "name"));
+          return tile;
+        }));
+        $("report-count").textContent = data.stats.reports ? ` (${data.stats.reports})` : "";
+        $("support-count").textContent = data.stats.support ? ` (${data.stats.support})` : "";
+        $("masterpiece-count").textContent = data.stats.masterpieces ? ` (${data.stats.masterpieces})` : "";
+        $("players").replaceChildren(...data.players.map(player => {
+          const row = el("tr");
+          row.append(el("td", player.username), el("td", player.room || "(between rooms)"), el("td", player.address));
+          return row;
+        }));
+        $("no-players").hidden = data.players.length > 0;
+        const yesNo = value => (value ? "Yes" : "No");
+        const facts = [
+          ["Address", data.server.address],
+          ["Running for", duration(data.server.uptimeSeconds)],
+          ["Memory", `${data.server.memoryMb} MB`],
+          ["Node", data.server.node],
+          ["Reachable from other machines", yesNo(data.server.reachableFromOtherMachines)],
+          ["Encrypted (TLS)", yesNo(data.server.encrypted)],
+          ["Packet log", data.server.packetLog ? "On" : "Off"],
+          ["Custom colours", data.server.customColours.toLocaleString()],
+          ["Busiest rooms", data.rooms.slice(0, 5).map(room => `${room.name} (${room.count})`).join(", ") || "none"],
+        ];
+        $("server-facts").replaceChildren(...facts.flatMap(([name, value]) => [el("dt", name), el("dd", String(value))]));
+      };
+
+      const accountState = account => {
+        const tags = [];
+        if (account.online) {
+          tags.push(el("span", `Online · ${account.room}`, "tag"));
+        }
+        if (account.banned !== 0) {
+          tags.push(el("span", account.banned === -1 ? "Banned" : `Banned ${duration(account.banned)}`, "tag bad"));
+        }
+        if (account.silenced) {
+          tags.push(el("span", "Silenced", "tag bad"));
+        }
+        if (account.locked) {
+          tags.push(el("span", "Locked", "tag bad"));
+        }
+        if (account.nameRejected) {
+          tags.push(el("span", "Name rejected", "tag bad"));
+        }
+        if (account.moderator) {
+          tags.push(el("span", "Moderator", "tag good"));
+        }
+        if (account.twoStep) {
+          tags.push(el("span", "2FA", "tag"));
+        }
+        for (const id of account.badges) {
+          tags.push(el("span", (badges.find(badge => badge.id === id) || {label: id}).label, "tag"));
+        }
+        if (account.featuresOff && account.featuresOff.length) {
+          tags.push(el("span", `Off: ${account.featuresOff.join(", ")}`, "tag"));
+        }
+        return tags.length ? tags : [el("span", "Offline", "hint")];
+      };
+
+      const renderAccounts = () => {
+        const query = $("account-search").value.trim().toLowerCase();
+        const filter = $("account-filter").value;
+        const shown = accounts
+          .filter(account => account.username.toLowerCase().includes(query))
+          .filter(account => filter === "all" || (filter === "online" ? account.online : account.banned !== 0))
+          .sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
+        $("accounts").replaceChildren(...shown.map(account => {
+          const row = el("tr", undefined, account.username === selected ? "pick selected" : "pick");
+          const stateCell = el("td");
+          stateCell.append(...accountState(account).flatMap(tag => [tag, " "]));
+          const nameCell = el("td");
+          const pick = el("button", account.username);
+          pick.type = "button";
+          pick.addEventListener("click", event => {
+            event.stopPropagation();
+            select(account.username);
+          });
+          nameCell.append(pick);
+          row.addEventListener("click", () => select(account.username));
+          row.append(nameCell, stateCell, el("td", when(account.createdAt)), el("td", when(account.lastLogin)), el("td", account.online ? "online" : when(account.lastSeen)),
+            el("td", account.logins.toLocaleString(), "num"), el("td", account.animals.toLocaleString(), "num"),
+            el("td", account.items.toLocaleString(), "num"));
+          return row;
+        }));
+        $("no-accounts").hidden = shown.length > 0;
+        const current = accounts.find(account => account.username === selected);
+        $("detail").hidden = !current;
+        if (current) {
+          $("detail-name").textContent = `${current.username} · ${current.gems.toLocaleString()} gems`;
+        }
+      };
+
+      const listOf = (title, entries) => {
+        const nodes = [el("h3", `${title} (${entries.length})`)];
+        if (entries.length) {
+          const list = el("ul");
+          list.append(...entries.map(entry => el("li", entry)));
+          nodes.push(list);
+        }
+        return nodes;
+      };
+
+      const loadOwned = async () => {
+        const username = selected;
+        $("owned").replaceChildren();
+        if (!username) {
+          return;
+        }
+        const result = await api(`owned?username=${encodeURIComponent(username)}`);
+        if (!result.ok || username !== selected) {
+          return;
+        }
+        const owned = result.data;
+        const counted = entries => entries.map(entry => (entry.count > 1 ? `${entry.name} ×${entry.count}` : entry.name));
+        const facts = el("dl");
+        const pairs = [
+          ["Gems", owned.currency.gems.toLocaleString()],
+          ["Diamonds", owned.currency.diamonds.toLocaleString()],
+          ["Tickets", owned.currency.tickets.toLocaleString()],
+          ["Dens", owned.dens],
+          ["Achievements", owned.achievements],
+          ["Adopt-A-Pets", owned.adoptAPets],
+          ["Jam-A-Grams in inbox", owned.jamAGrams],
+          ["Posts on their wall", owned.wallPosts],
+          ["Hides blocked players", owned.hidesBlockedPlayers ? "Yes" : "No"],
+        ];
+        facts.append(...pairs.flatMap(([name, value]) => [el("dt", name), el("dd", String(value))]));
+        const more = (shown, total) => (total > shown ? [el("p", `…and ${total - shown} more.`, "hint")] : []);
+        $("owned").append(el("h2", "What they own"), facts,
+          ...listOf("Animals", owned.animals), ...listOf("Pets", owned.pets),
+          ...listOf("Clothing, by kind", counted(owned.clothing)), ...more(owned.clothing.reduce((sum, entry) => sum + entry.count, 0), owned.clothingTotal),
+          ...listOf("Den items, by kind", counted(owned.denItems)), ...more(owned.denItems.reduce((sum, entry) => sum + entry.count, 0), owned.denItemsTotal),
+          ...listOf("Buddies", owned.buddies), ...listOf("Blocked", owned.blocked),
+          ...listOf("Saved outfits", owned.outfits), ...listOf("Saved den layouts", owned.denLayouts));
+      };
+
+      // what was done about the selected account's bans, its appeal, and the
+      // addresses it signed in from, each with a button to ban that address
+      // (for good, with the reason in the box above).
+      const BAN_ACTIONS = {ban: "Banned", unban: "Ban lifted", reason: "Reason changed", appeal: "Appealed",
+        appeal_approved: "Appeal approved", appeal_denied: "Appeal denied"};
+      const loadBanRecord = async () => {
+        const username = selected;
+        $("ban-record").replaceChildren();
+        if (!username) {
+          return;
+        }
+        const result = await api(`banrecord?username=${encodeURIComponent(username)}`);
+        if (!result.ok || username !== selected) {
+          return;
+        }
+        const {history, addresses, appeal} = result.data;
+        const nodes = [];
+        if (addresses.length) {
+          const list = el("ul");
+          list.append(...addresses.map(entry => {
+            const item = el("li", `${entry.address} · ${when(entry.at)} `);
+            if (entry.own) {
+              return item;
+            }
+            const node = el("button", entry.banned ? "Unban address" : "Ban address", entry.banned ? "" : "danger");
+            node.type = "button";
+            node.addEventListener("click", async () => {
+              node.disabled = true;
+              const answer = await api("address", {action: entry.banned ? "unban" : "ban", address: entry.address, reason: $("ban-reason").value});
+              setStatus($("detail-status"), answer.data.ok || answer.data.error || "That did not work.", !answer.ok);
+              loadBanRecord();
+            });
+            item.append(node);
+            return item;
+          }));
+          nodes.push(el("h3", "Addresses"), list);
+        }
+        if (appeal) {
+          nodes.push(el("h3", `Appeal: ${appeal.status}`), el("p", appeal.text, "hint"));
+        }
+        if (history.length) {
+          const list = el("ul");
+          list.append(...history.map(entry => el("li", [when(entry.at), BAN_ACTIONS[entry.action] || entry.action,
+            entry.action === "ban" ? (entry.seconds === -1 ? "for good" : duration(entry.seconds)) : "", entry.reason, entry.by && `by ${entry.by}`]
+            .filter(Boolean).join(" · "))));
+          nodes.push(el("h3", "Ban history"), list);
+        }
+        $("ban-record").replaceChildren(...nodes);
+      };
+
+      const fillCard = () => {
+        const current = accounts.find(account => account.username === selected);
+        $("badge-boxes").replaceChildren(...badges.map(badge => {
+          const label = el("label", undefined, "check");
+          const box = el("input");
+          box.type = "checkbox";
+          box.value = badge.id;
+          box.checked = Boolean(current && current.badges.includes(badge.id));
+          label.append(box, ` ${badge.label}`);
+          return label;
+        }));
+        $("discord-name").value = current ? current.discord : "";
+        $("bio-text").value = current ? current.bio : "";
+        $("quest-level").value = current ? current.level : "";
+        $("ban-reason").value = current ? current.banReason : "";
+        $("moderator-toggle").textContent = current && current.moderator ? "Remove moderator" : "Make moderator";
+      };
+
+      const select = username => {
+        selected = selected === username ? null : username;
+        setStatus($("detail-status"), "");
+        for (const id of ["new-name", "new-password", "ban-hours", "silence-hours", "message-text", "gems-amount", "gift-value", "gift-text"]) {
+          $(id).value = "";
+        }
+        renderAccounts();
+        fillCard();
+        loadOwned();
+        loadBanRecord();
+      };
+
+      const GIFT_PLACEHOLDERS = {gems: "Amount", diamonds: "Amount", tickets: "Amount", clothing: "Item id", den: "Item id",
+        adopt: "Id, or all", achievement: "Achievement id"};
+      $("gift-kind").addEventListener("change", () => {
+        $("gift-value").placeholder = GIFT_PLACEHOLDERS[$("gift-kind").value];
+      });
+
+      const giftBody = () => {
+        const kind = $("gift-kind").value;
+        const value = $("gift-value").value.trim();
+        const text = $("gift-text").value;
+        if (["gems", "diamonds", "tickets"].includes(kind)) {
+          return {kind, text, amount: value === "" ? NaN : Number(value)};
+        }
+        return {kind, text, id: kind === "adopt" && value.toLowerCase() === "all" ? "all" : Number(value)};
+      };
+
+      const numberFrom = id => ($(id).value.trim() === "" ? NaN : Number($(id).value));
+
+      const actionBody = action => {
+        switch (action) {
+          case "rename": return {newName: $("new-name").value};
+          case "password": return {password: $("new-password").value};
+          case "lastSeen": return {when: Math.floor(new Date($("last-seen").value).getTime() / 1000)};
+          case "ban": return {hours: numberFrom("ban-hours"), reason: $("ban-reason").value};
+          case "banReason": return {reason: $("ban-reason").value};
+          case "silence": return {hours: numberFrom("silence-hours")};
+          case "moderator": return {on: !(accounts.find(account => account.username === selected) || {}).moderator};
+          case "message": return {text: $("message-text").value};
+          case "gems": return {amount: numberFrom("gems-amount")};
+          case "gift": return giftBody();
+          case "badges": return {badges: [...$("badge-boxes").querySelectorAll("input:checked")].map(box => box.value)};
+          case "discord": return {name: $("discord-name").value};
+          case "bio": return {text: $("bio-text").value};
+          case "level": return {level: numberFrom("quest-level")};
+          default: return {};
+        }
+      };
+
+      // the "N ago" buttons fill the last-seen box and press Set.
+      $("detail").addEventListener("click", event => {
+        const quick = event.target.closest("button[data-ago]");
+        if (quick) {
+          const then = new Date(Date.now() - Number(quick.dataset.ago) * 60000);
+          then.setMinutes(then.getMinutes() - then.getTimezoneOffset());
+          $("last-seen").value = then.toISOString().slice(0, 16);
+          document.querySelector('button[data-action="lastSeen"]').click();
+        }
+      });
+
+      $("detail").addEventListener("click", async event => {
+        const button = event.target.closest("button[data-action]");
+        if (!button || !selected) {
+          return;
+        }
+        const action = button.dataset.action;
+        if (action === "delete" && !window.confirm(`Delete ${selected} and everything they own? This cannot be undone.`)) {
+          return;
+        }
+        button.disabled = true;
+        const result = await api("account", {username: selected, action, ...actionBody(action)});
+        button.disabled = false;
+        setStatus($("detail-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+        if (result.ok && action === "delete") {
+          selected = null;
+        }
+        if (result.ok && action === "rename") {
+          selected = result.data.username;
+          $("new-name").value = "";
+        }
+        if (result.ok) {
+          $("new-password").value = "";
+          await refresh();
+          fillCard();
+          loadOwned();
+          loadBanRecord();
+        }
+      });
+
+      $("account-search").addEventListener("input", renderAccounts);
+      $("account-filter").addEventListener("change", renderAccounts);
+
+      const act = async (username, action, extra, statusElement) => {
+        const result = await api("account", {username, action, ...extra});
+        setStatus(statusElement, result.data.ok || result.data.error || "That did not work.", !result.ok);
+        return result.ok;
+      };
+
+      const renderReports = data => {
+        const handled = $("report-filter").value === "1";
+        $("report-count").textContent = data.open ? ` (${data.open})` : "";
+        $("reports").replaceChildren(...data.reports.map(report => {
+          const box = el("div", undefined, "report");
+          box.append(el("h3", `${report.target} — ${report.reason}`),
+            el("div", `Reported by ${report.reporter} on ${when(report.createdAt)}${report.room ? `, in ${report.room}` : ""}`, "hint"));
+          if (report.detail) {
+            box.append(el("div", report.detail, "typed"));
+          }
+          if (report.context) {
+            box.append(el("pre", report.context));
+          }
+          if (!handled) {
+            const buttons = el("div", undefined, "buttons");
+            const button = (label, run, className) => {
+              const node = el("button", label, className);
+              node.type = "button";
+              node.addEventListener("click", async () => {
+                node.disabled = true;
+                await run();
+                node.disabled = false;
+                refresh();
+              });
+              return node;
+            };
+            buttons.append(
+              button("Dealt with", async () => {
+                const result = await api("report", {id: report.id});
+                setStatus($("report-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+              }, "primary"),
+              button("Silence 1 hour", () => act(report.target, "silence", {hours: 1}, $("report-status"))),
+              button("Ban 1 day", () => act(report.target, "ban", {hours: 24}, $("report-status")), "danger"),
+              button("Open account", async () => {
+                selected = report.target;
+                showTab("accounts");
+                loadOwned();
+              }));
+            box.append(buttons);
+          }
+          else {
+            box.append(el("div", `Dealt with on ${when(report.handledAt)}`, "hint"));
+          }
+          return box;
+        }));
+        $("no-reports").hidden = data.reports.length > 0;
+      };
+
+      $("report-filter").addEventListener("change", () => refresh());
+
+      const renderSupport = data => {
+        const handled = $("support-filter").value === "1";
+        $("support-count").textContent = data.open ? ` (${data.open})` : "";
+        const button = (label, body, className) => {
+          const node = el("button", label, className);
+          node.type = "button";
+          node.addEventListener("click", async () => {
+            node.disabled = true;
+            const result = await api("support", body);
+            setStatus($("support-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+            node.disabled = false;
+            refresh();
+          });
+          return node;
+        };
+        $("name-requests").replaceChildren(...data.names.map(request => {
+          const box = el("div", undefined, "report");
+          box.append(el("h3", `${request.oldName} → ${request.newName}`), el("div", `Asked on ${when(request.createdAt)}`, "hint"));
+          if (request.reason) {
+            box.append(el("div", request.reason, "typed"));
+          }
+          if (handled) {
+            box.append(el("div", `${request.status === "approved" ? "Approved" : "Denied"} on ${when(request.handledAt)}`, "hint"));
+          }
+          else {
+            const buttons = el("div", undefined, "buttons");
+            buttons.append(button("Approve", {action: "approve", id: request.id}, "primary"), button("Deny", {action: "deny", id: request.id}));
+            box.append(buttons);
+          }
+          return box;
+        }));
+        $("no-name-requests").hidden = data.names.length > 0;
+        $("feedback").replaceChildren(...data.feedback.map(message => {
+          const box = el("div", undefined, "report");
+          box.append(el("h3", `${message.kind === "bug" ? "Bug report" : "Feedback"} from ${message.username}`),
+            el("div", `Sent on ${when(message.createdAt)}`, "hint"), el("pre", message.text));
+          if (handled) {
+            box.append(el("div", `Read on ${when(message.handledAt)}`, "hint"));
+          }
+          else {
+            const buttons = el("div", undefined, "buttons");
+            buttons.append(button("Mark as read", {action: "read", id: message.id}, "primary"));
+            box.append(buttons);
+          }
+          return box;
+        }));
+        $("no-feedback").hidden = data.feedback.length > 0;
+        // typed replies are left alone while one is being written.
+        if (!$("appeals").contains(document.activeElement)) {
+          $("appeals").replaceChildren(...data.appeals.map(appeal => {
+            const box = el("div", undefined, "report");
+            box.append(el("h3", appeal.username), el("div", `Sent on ${when(appeal.createdAt)}${appeal.gone ? " · account deleted" : ""}`, "hint"));
+            if (appeal.ban) {
+              box.append(el("div", `Banned${appeal.ban.seconds === -1 ? " for good" : `, ${duration(appeal.ban.seconds)} left`}${appeal.ban.reason ? ` · ${appeal.ban.reason}` : ""}`, "hint"));
+            }
+            if (appeal.address) {
+              box.append(el("div", `Address ${appeal.address.key} banned${appeal.address.reason ? ` · ${appeal.address.reason}` : ""}`, "hint"));
+            }
+            box.append(el("div", appeal.text, "typed"));
+            if (handled) {
+              box.append(el("div", `${appeal.status === "approved" ? "Approved" : "Denied"} on ${when(appeal.handledAt)}${appeal.reply ? ` · ${appeal.reply}` : ""}`, "hint"));
+              return box;
+            }
+            const reply = el("input");
+            reply.maxLength = 500;
+            reply.placeholder = "Reply (optional)";
+            reply.setAttribute("aria-label", `Reply to ${appeal.username}`);
+            reply.style.width = "100%";
+            const buttons = el("div", undefined, "buttons");
+            for (const [label, action, className] of [["Unban", "appealApprove", "primary"], ["Deny", "appealDeny", ""]]) {
+              const node = el("button", label, className);
+              node.type = "button";
+              node.addEventListener("click", async () => {
+                node.disabled = true;
+                const result = await api("support", {action, id: appeal.accountId, reply: reply.value});
+                setStatus($("support-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+                reply.blur();
+                refresh();
+              });
+              buttons.append(node);
+            }
+            box.append(reply, buttons);
+            return box;
+          }));
+        }
+        $("no-appeals").hidden = data.appeals.length > 0;
+      };
+
+      $("support-filter").addEventListener("change", () => refresh());
+
+      let paintingsShown = "";
+      const renderMasterpieces = data => {
+        const which = $("masterpiece-filter").value;
+        const paintings = data[which];
+        $("masterpiece-count").textContent = data.waiting.length ? ` (${data.waiting.length})` : "";
+        $("masterpiece-review").checked = data.review;
+        $("no-masterpieces").hidden = paintings.length > 0;
+        // drawn again only when the list changed, so the pictures do not flicker.
+        const shown = `${which} ${paintings.map(painting => `${painting.id}:${painting.likes}`).join(" ")}`;
+        if (shown === paintingsShown) {
+          return;
+        }
+        paintingsShown = shown;
+        $("masterpieces").replaceChildren(...paintings.map(painting => {
+          const box = el("div", undefined, "painting");
+          const picture = el("img");
+          picture.src = `/admin/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
+          picture.alt = `Painting by ${painting.creator}`;
+          picture.loading = "lazy";
+          box.append(picture, el("h3", painting.creator),
+            el("div", `${when(painting.createdAt)}${which === "approved" ? `, ${painting.likes} like${painting.likes === 1 ? "" : "s"}` : ""}`, "hint"));
+          const buttons = el("div", undefined, "buttons");
+          const button = (label, action, className) => {
+            const node = el("button", label, className);
+            node.type = "button";
+            node.addEventListener("click", async () => {
+              node.disabled = true;
+              const result = await api("masterpiece", {id: painting.id, action});
+              setStatus($("masterpiece-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+              refresh();
+            });
+            return node;
+          };
+          if (which === "waiting") {
+            buttons.append(button("Approve", "approve", "primary"), button("Reject", "reject", "danger"));
+          }
+          else {
+            buttons.append(button("Remove", "remove", "danger"));
+          }
+          const open = el("button", "Open account");
+          open.type = "button";
+          open.addEventListener("click", () => {
+            selected = painting.creator;
+            showTab("accounts");
+            loadOwned();
+          });
+          buttons.append(open);
+          box.append(buttons);
+          return box;
+        }));
+      };
+
+      $("masterpiece-filter").addEventListener("change", () => refresh());
+      $("masterpiece-review").addEventListener("change", async () => {
+        const result = await api("masterpiece", {action: "review", on: $("masterpiece-review").checked});
+        setStatus($("masterpiece-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+      });
+
+      const renderBans = data => {
+        const left = seconds => (seconds === -1 ? "Until lifted" : seconds ? `${duration(seconds)} left` : "—");
+        $("bans").replaceChildren(...data.accounts.map(account => {
+          const row = el("tr");
+          const buttons = el("td");
+          const button = (label, action) => {
+            const node = el("button", label);
+            node.type = "button";
+            node.addEventListener("click", async () => {
+              node.disabled = true;
+              await act(account.username, action, {}, $("ban-status"));
+              refresh();
+            });
+            return node;
+          };
+          if (account.banned !== 0) {
+            buttons.append(button("Lift ban", "unban"), " ");
+          }
+          if (account.silenced !== 0) {
+            buttons.append(button("Lift silence", "unsilence"));
+          }
+          row.append(el("td", account.username), el("td", left(account.banned)), el("td", account.reason || "—"),
+            el("td", account.silenced === 0 ? "—" : `Silenced: ${left(account.silenced).toLowerCase()}`), buttons);
+          return row;
+        }));
+        $("no-bans").hidden = data.accounts.length > 0;
+        $("addresses").replaceChildren(...data.addresses.map(ban => {
+          const row = el("tr");
+          const buttons = el("td");
+          const node = el("button", "Unban");
+          node.type = "button";
+          node.addEventListener("click", async () => {
+            node.disabled = true;
+            const result = await api("address", {action: "unban", address: ban.key});
+            setStatus($("address-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+            refresh();
+          });
+          buttons.append(node);
+          row.append(el("td", ban.key), el("td", ban.reason || "—"), el("td", when(ban.createdAt)), buttons);
+          return row;
+        }));
+        $("no-addresses").hidden = data.addresses.length > 0;
+      };
+
+      $("address-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const result = await api("address", {action: "ban", address: $("address").value, reason: $("address-reason").value});
+        setStatus($("address-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+        if (result.ok) {
+          event.target.reset();
+        }
+        refresh();
+      });
+
+      let messagesLoaded = false;
+      const renderMessages = data => {
+        if (!messagesLoaded) {
+          // only once: refreshing must not wipe what is being typed.
+          $("motd-text").value = data.motd;
+          messagesLoaded = true;
+        }
+        const chosen = $("announce-room").value;
+        const everyone = el("option", "Everyone playing");
+        everyone.value = "";
+        $("announce-room").replaceChildren(everyone, ...data.rooms.map(room => {
+          const option = el("option", `${room.title} (${room.players})`);
+          option.value = room.name;
+          return option;
+        }));
+        $("announce-room").value = [...$("announce-room").options].some(option => option.value === chosen) ? chosen : "";
+      };
+
+      $("motd-save").addEventListener("click", async () => {
+        const result = await api("motd", {text: $("motd-text").value});
+        setStatus($("motd-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+      });
+
+      $("announce-send").addEventListener("click", async () => {
+        const result = await api("announce", {text: $("announce-text").value, room: $("announce-room").value});
+        setStatus($("announce-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+        if (result.ok) {
+          $("announce-text").value = "";
+        }
+      });
+
+      let debugRooms = [];
+      const renderDebugRooms = () => {
+        const wanted = $("debug-room-filter").value.trim().toLowerCase();
+        const notedOnly = $("debug-noted").checked;
+        const chosen = $("debug-room").value;
+        $("debug-room").replaceChildren(...debugRooms
+          .filter(room => (!notedOnly || room.note) && (!wanted || `${room.path} ${room.note}`.toLowerCase().includes(wanted)))
+          .map(room => {
+            const option = el("option", room.note ? `${room.path}  (${room.note})` : room.path);
+            option.value = room.path;
+            return option;
+          }));
+        $("debug-room").value = chosen;
+      };
+      const renderDebug = data => {
+        const player = $("debug-player").value;
+        $("debug-player").replaceChildren(...(data.players.length ? data.players : [""]).map(name => {
+          const option = el("option", name || "Nobody is online");
+          option.value = name;
+          return option;
+        }));
+        if (data.players.includes(player)) {
+          $("debug-player").value = player;
+        }
+        $("debug-onsale").checked = data.everythingOnSale;
+        if (debugRooms.length !== data.rooms.length) {
+          debugRooms = data.rooms;
+          renderDebugRooms();
+        }
+      };
+      $("debug-room-filter").addEventListener("input", renderDebugRooms);
+      $("debug-noted").addEventListener("change", renderDebugRooms);
+      $("debug-go").addEventListener("click", async () => {
+        const result = await api("debug", {action: "teleport", username: $("debug-player").value, room: $("debug-room").value});
+        setStatus($("debug-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+      });
+      $("debug-room").addEventListener("dblclick", () => $("debug-go").click());
+      $("debug-onsale").addEventListener("change", async () => {
+        const result = await api("debug", {action: "everythingOnSale", on: $("debug-onsale").checked});
+        setStatus($("debug-sale-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
+      });
+
+      const appendLog = lines => {
+        const log = $("log");
+        for (const line of lines) {
+          const row = el("div", undefined, /\[client-error\]|failed|error/i.test(line.text) ? "error" : "");
+          row.append(el("span", `${new Date(line.time).toLocaleTimeString()}  `, "time"), line.text);
+          log.append(row);
+          lastLogId = Math.max(lastLogId, line.id);
+        }
+        while (log.childElementCount > MAX_LOG_LINES) {
+          log.firstElementChild.remove();
+        }
+        if (lines.length && $("log-follow").checked) {
+          log.scrollTop = log.scrollHeight;
+        }
+      };
+
+      const reloadLog = () => {
+        lastLogId = 0;
+        $("log").replaceChildren();
+        refresh();
+      };
+
+      let filterDelay = null;
+      $("log-filter").addEventListener("input", () => {
+        clearTimeout(filterDelay);
+        filterDelay = setTimeout(reloadLog, 250);
+      });
+      $("log-preset").addEventListener("change", () => {
+        $("log-filter").value = $("log-preset").value;
+        reloadLog();
+      });
+
+      $("password-form").addEventListener("submit", async event => {
+        event.preventDefault();
+        if ($("next-password").value !== $("next-confirm").value) {
+          setStatus($("password-status"), "The two new passwords are different.", true);
+          return;
+        }
+        const result = await api("password", {current: $("current-password").value, password: $("next-password").value});
+        setStatus($("password-status"), result.ok ? "Password changed." : result.data.error || "That did not work.", !result.ok);
+        if (result.ok) {
+          event.target.reset();
+        }
+      });
+
+      const refresh = async () => {
+        clearTimeout(timer);
+        if (!state || !state.signedIn) {
+          return;
+        }
+        let result = null;
+        if (tab === "overview") {
+          result = await api("overview");
+          if (result.ok) {
+            renderOverview(result.data);
+          }
+        }
+        else if (tab === "accounts") {
+          result = await api("accounts");
+          if (result.ok) {
+            accounts = result.data.accounts;
+            badges = result.data.badges || [];
+            renderAccounts();
+          }
+        }
+        else if (tab === "reports") {
+          result = await api(`reports?handled=${$("report-filter").value}`);
+          if (result.ok) {
+            renderReports(result.data);
+          }
+        }
+        else if (tab === "support") {
+          result = await api(`support?handled=${$("support-filter").value}`);
+          if (result.ok) {
+            renderSupport(result.data);
+          }
+        }
+        else if (tab === "masterpieces") {
+          result = await api("masterpieces");
+          if (result.ok) {
+            renderMasterpieces(result.data);
+          }
+        }
+        else if (tab === "moderators") {
+          result = await api("moderators");
+          if (result.ok) {
+            $("moderators").replaceChildren(...result.data.moderators.map(mod => {
+              const row = el("tr");
+              const open = el("button", "Open account");
+              open.type = "button";
+              open.addEventListener("click", () => {
+                selected = mod.username;
+                showTab("accounts");
+                fillCard();
+                loadOwned();
+                loadBanRecord();
+              });
+              const cell = el("td");
+              cell.append(open);
+              row.append(el("td", mod.username), el("td", mod.twoStep ? "On" : "Off: cannot sign in"), el("td", when(mod.lastSeen)), cell);
+              return row;
+            }));
+            $("no-moderators").hidden = result.data.moderators.length > 0;
+            $("mod-log").replaceChildren(...result.data.log.map(entry => {
+              const row = el("tr");
+              const detail = el("td", entry.detail);
+              detail.style.whiteSpace = "normal";
+              row.append(el("td", when(entry.at)), el("td", entry.by), el("td", entry.action), el("td", entry.target || "—"), detail);
+              return row;
+            }));
+            $("no-mod-log").hidden = result.data.log.length > 0;
+          }
+        }
+        else if (tab === "bans") {
+          result = await api("bans");
+          if (result.ok) {
+            renderBans(result.data);
+          }
+        }
+        else if (tab === "messages") {
+          result = await api("messages");
+          if (result.ok) {
+            renderMessages(result.data);
+          }
+        }
+        else if (tab === "debug") {
+          result = await api("debug");
+          if (result.ok) {
+            renderDebug(result.data);
+          }
+        }
+        else if (tab === "logs") {
+          result = await api(`logs?after=${lastLogId}&filter=${encodeURIComponent($("log-filter").value)}`);
+          if (result.ok) {
+            appendLog(result.data.lines);
+          }
+        }
+        if (result && result.ok) {
+          $("updated").textContent = `Updated ${new Date().toLocaleTimeString()}`;
+        }
+        if (state.signedIn && tab !== "settings") {
+          timer = setTimeout(refresh, tab === "logs" ? LOG_REFRESH_MS : REFRESH_MS);
+        }
+      };
+
+      const showTab = name => {
+        tab = name;
+        for (const button of document.querySelectorAll("nav button")) {
+          button.setAttribute("aria-selected", String(button.dataset.tab === name));
+        }
+        for (const view of document.querySelectorAll("[data-view]")) {
+          view.hidden = view.dataset.view !== name;
+        }
+        refresh();
+      };
+
+      for (const button of document.querySelectorAll("nav button")) {
+        button.addEventListener("click", () => showTab(button.dataset.tab));
+      }
+
+      const showPanel = () => {
+        $("gate").hidden = true;
+        $("panel").hidden = false;
+        showTab(tab);
+      };
+
+      const start = async () => {
+        try {
+          state = (await api("state")).data;
+        }
+        catch (err) {
+          state = {needsSetup: false, needsSetupCode: false, signedIn: false};
+          showGate("The server did not answer.");
+          return;
+        }
+        if (state.signedIn) {
+          showPanel();
+        }
+        else {
+          showGate();
+        }
+      };
+
+      start();
+    </script>
+  </body>
+</html>
