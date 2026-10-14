@@ -4,7 +4,7 @@ data/
 # Assets mirrored from the official CDN; re-downloaded on demand
 cache/
 
-# Third-party decompiler and its output; see HANDOFF.md for how to restore them
+# Third-party decompiler and its output
 tools/ffdec/
 tools/decompiled/
 tools/hud/hud.xml
