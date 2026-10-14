@@ -1,12 +1,11 @@
 # accounts, login tokens and logs
-data/
+/data/
 
 # assets mirrored from the official CDN
-cache/
+/cache/
 
-# decompiler and its output
+# decompiler
 tools/ffdec/
-tools/decompiled/
 tools/hud/hud.xml
 tools/hud/hud.pickle
 tools/hud/__pycache__/
@@ -25,6 +24,4 @@ __pycache__/
 /DISCOVERIES.md
 /GOING-PUBLIC.md
 
-/swf
-/swf-src
 /client-updates
