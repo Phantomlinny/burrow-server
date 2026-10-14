@@ -1,10 +1,10 @@
-# Accounts, login tokens and logs
+# accounts, login tokens and logs
 data/
 
-# Assets mirrored from the official CDN; re-downloaded on demand
+# assets mirrored from the official CDN
 cache/
 
-# Third-party decompiler and its output
+# decompiler and its output
 tools/ffdec/
 tools/decompiled/
 tools/hud/hud.xml
@@ -25,7 +25,6 @@ __pycache__/
 /DISCOVERIES.md
 /GOING-PUBLIC.md
 
-# decompiled AJC
 /swf
 /swf-src
 /client-updates
