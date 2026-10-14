@@ -131,6 +131,9 @@ module.exports = {
   // updates for installed clients, served at /client/ (the client's
   // tools/make-update.js writes them here; they are in the repository)
   clientUpdatesDir: env.AJ_CLIENT_UPDATES_DIR || path.join(__dirname, "client-updates"),
+  // the client's installers, listed at /download. not in the repository:
+  // copied here by hand after a build (the client's BUILDING.md).
+  downloadsDir: env.AJ_DOWNLOADS_DIR || path.join(env.AJ_DATA_DIR || path.join(__dirname, "data"), "downloads"),
   publicDir: path.join(__dirname, "public"),
 
   // accounts are made through the client's Create Account screens or the

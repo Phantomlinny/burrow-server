@@ -7,15 +7,18 @@
 # no markdown file of any kind goes public. the public repository has a
 # history of its own: nothing of this one's
 # history goes there, so a file that was ever committed here and is private
-# never shows up in an old public commit. its .gitignore names the private
-# paths too, so they are not added there by hand either.
+# never shows up in an old public commit. the public repository's own files
+# (its README, .gitignore and licence, written there) are left as they are.
 set -euo pipefail
 
 name=burrow-server
 remote=git@github.com:burrow-dev/$name.git
-# what stays private: the game's own client and SWFs, the client decompiled,
-# the client updates (release files), and the working notes
-private=(swf swf-src client-updates HANDOFF.md DISCOVERIES.md GOING-PUBLIC.md)
+# what stays private: the client updates (release files) and the working
+# notes. the game's client, its SWFs and the client decompiled go public.
+private=(client-updates HANDOFF.md DISCOVERIES.md GOING-PUBLIC.md TBA.md)
+
+# the public repository's own: never replaced or removed from here
+public_own=(README.md .gitignore LICENSE)
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 public=${BURROW_PUBLIC_DIR:-$HOME/burrow-public/$name}
@@ -48,29 +51,38 @@ done
 # no markdown file goes public, of any kind (the owner's rule)
 find "$work" -name '*.md' -delete
 
-# a last look before anything leaves: none of the game's code or SWFs
-leaked=$(find "$work" \( -name '*.swf' -o -name '*.as' -o -name '*.pem' -o -name '*.md' \) -print)
+# a last look before anything leaves: no markdown and no key
+leaked=$(find "$work" \( -name '*.pem' -o -name '*.md' \) -print)
 if [ -n "$leaked" ]; then
   echo "refused: these would have gone public:" >&2
   echo "$leaked" >&2
   exit 1
 fi
 
-{
-  cat "$work/.gitignore"
-  printf '\n# kept in the private repository, never here\n'
-  printf '*.md\n'
-  for path in "${private[@]}"; do
-    printf '/%s\n' "$path"
-  done
-} > "$work/.gitignore.public"
-mv "$work/.gitignore.public" "$work/.gitignore"
+rm -f "$work/.gitignore"
 
-# the public tree becomes exactly this
-find "$public" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+# start from what is on github: changes made there are kept
+if git -C "$public" fetch -q origin main 2>/dev/null; then
+  git -C "$public" reset -q --hard origin/main
+fi
+
+# the public tree becomes exactly this, beside the public repository's own
+keep=(! -name .git)
+for name in "${public_own[@]}"; do
+  keep+=(! -name "$name")
+  rm -rf "${work:?}/$name"
+done
+find "$public" -mindepth 1 -maxdepth 1 "${keep[@]}" -exec rm -rf {} +
 cp -a "$work/." "$public/"
 cd "$public"
 git add -A
+# its .gitignore must not hold back a file meant to go public
+missing=$(cd "$work" && find . -type f | sed 's|^\./||' | sort | comm -23 - <(git -C "$public" ls-files --cached | sort))
+if [ -n "$missing" ]; then
+  echo "refused: the public .gitignore holds these back ($(echo "$missing" | wc -l) files), e.g.:" >&2
+  echo "$missing" | head -5 >&2
+  exit 1
+fi
 if git diff --cached --quiet; then
   echo "the public copy is already up to date"
   exit 0
