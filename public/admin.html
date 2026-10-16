@@ -399,6 +399,13 @@
                   <button type="button" data-action="rejectName">Reject username</button>
                   <button type="button" data-action="acceptName">Take rejection back</button>
                   <button type="button" data-action="moderator" id="moderator-toggle">Make moderator</button>
+                  <select id="role-select" aria-label="Staff role">
+                    <option value="none">No staff role</option>
+                    <option value="helper">Helper</option>
+                    <option value="moderator">Moderator</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <button type="button" data-action="role">Set role</button>
                   <button type="button" data-action="clearDen">Clear den</button>
                   <button type="button" data-action="delete" class="danger">Delete</button>
                 </div>
@@ -747,7 +754,8 @@
           tags.push(el("span", "Name rejected", "tag bad"));
         }
         if (account.moderator) {
-          tags.push(el("span", "Moderator", "tag good"));
+          const label = {helper: "Helper", moderator: "Moderator", admin: "Admin"}[account.role] || "Moderator";
+          tags.push(el("span", label, "tag good"));
         }
         if (account.twoStep) {
           tags.push(el("span", "2FA", "tag"));
@@ -959,6 +967,7 @@
         $("quest-level").value = current ? current.level : "";
         $("ban-reason").value = current ? current.banReason : "";
         $("moderator-toggle").textContent = current && current.moderator ? "Remove moderator" : "Make moderator";
+        $("role-select").value = current && current.role ? current.role : "none";
       };
 
       const select = username => {
@@ -1000,6 +1009,7 @@
           case "banReason": return {reason: $("ban-reason").value};
           case "silence": return {hours: numberFrom("silence-hours")};
           case "moderator": return {on: !(accounts.find(account => account.username === selected) || {}).moderator};
+          case "role": return {role: $("role-select").value};
           case "message": return {text: $("message-text").value};
           case "gems": return {amount: numberFrom("gems-amount")};
           case "gift": return giftBody();
