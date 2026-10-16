@@ -61,8 +61,9 @@ const webSession = () => {
 const say = (client, roomId, text) =>
   client.send(`<msg t='sys'><body action='pubMsg' r='${roomId}'><txt><![CDATA[${text}%0]]></txt></body></msg>`);
 
-// logs in (with a 2FA code when given) and walks into `room`.
-const arrive = async (username, password, room, totp) => {
+// logs in (with a 2FA code when given) and walks into `room`. `onLogin`
+// sees what comes with the login, before joining skips past it.
+const arrive = async (username, password, room, totp, onLogin = async () => {}) => {
   const res = await postJson(`${BASE}/authenticate`, {username, password, ...(totp ? {totp} : {})});
   const auth = await res.json();
   assert.strictEqual(res.status, 200, `${username} could not sign in: ${JSON.stringify(auth)}`);
@@ -70,6 +71,7 @@ const arrive = async (username, password, room, totp) => {
   await client.connect();
   const login = await client.logIn(username, auth.auth_token);
   assert.strictEqual(login.status, "1");
+  await onLogin(client);
   client.xt("rj", 1, room, 1, 0, 0);
   const rj = await client.untilXt("rj");
   await client.untilXt("rp");
@@ -134,7 +136,13 @@ const run = async () => {
 
   // --- the game: the login reply carries your own role, and nobody else's
   usedStep.Mira++;
-  const mira = await arrive("Mira", people.Mira, TOWNSHIP, codeAt(secrets.Mira, usedStep.Mira));
+  // and the patched client's staff window is told the same ("xsp")
+  let staffSaid = null;
+  const mira = await arrive("Mira", people.Mira, TOWNSHIP, codeAt(secrets.Mira, usedStep.Mira), async client => {
+    staffSaid = await client.untilXt("xsp");
+  });
+  assert.strictEqual(staffSaid[2], "moderator");
+  assert.ok(staffSaid[3].split(",").includes("player.summon"));
   assert.strictEqual(mira.login.params.staffRole, "moderator");
   assert.ok(mira.login.params.staffPermissions.split(",").includes("player.summon"));
   usedStep.Hal++;
@@ -186,6 +194,20 @@ const run = async () => {
   assert.strictEqual(await nextBox(mira.client), "Shown to Ann.");
   say(mira.client, ann.roomId, "!warnings Ann");
   assert.match(await nextBox(mira.client), /^Ann has 2 warnings\. Latest: \S+ behavior by Mira; \S+ bullying by Mira \(called names\)$/);
+  // the client's staff window ("xmd"): the same commands, one field each
+  mira.client.xt("xmd", ann.roomId, "warn", "Ann", "personal");
+  assert.deepStrictEqual((await ann.client.untilXt("fd")).slice(2, 4), ["fw", "3"]);
+  assert.strictEqual(await nextBox(mira.client), "Ann warned (personal): warning 3.");
+  mira.client.xt("xmd", ann.roomId, "message", "Ann", "hello there");
+  assert.deepStrictEqual((await ann.client.untilXt("fd")).slice(2, 4), ["fp", "hello there"]);
+  assert.strictEqual(await nextBox(mira.client), "Shown to Ann.");
+  mira.client.xt("xmd", ann.roomId, "ban", "Ann"); // not one the window has: nothing
+  // and from a player, nothing at all: Ann warns Mira
+  ann.client.xt("xmd", ann.roomId, "warn", "Mira", "bullying");
+  mira.client.xt("xmd", ann.roomId, "warnings", "Ann");
+  assert.match(await nextBox(mira.client), /^Ann has 3 warnings\. /);
+  say(mira.client, ann.roomId, "!warnings Mira");
+  assert.strictEqual(await nextBox(mira.client), "Mira has no warnings.");
   say(mira.client, ann.roomId, "!kick Ann");
   assert.strictEqual((await ann.client.untilXt("fd"))[2], "fk");
   assert.strictEqual(await nextBox(mira.client), "Ann was disconnected.");

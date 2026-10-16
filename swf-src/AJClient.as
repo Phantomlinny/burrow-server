@@ -91,6 +91,24 @@ package
       private var _finderKind:int;
       
       private var _finderColourInput:TextField;
+
+      // the staff's window for one player (openModerate), and what the
+      // signed-in role may do ("xsp" from the server; empty for players).
+      private var _moderate:Sprite;
+
+      private var _moderateContent:MovieClip;
+
+      private var _moderateName:String;
+
+      private var _moderateReason:int;
+
+      private var _moderateMessageBar:MovieClip;
+
+      private var _moderateButtons:Array;
+
+      public static var staffRole:String = "";
+
+      public static var staffPermissions:Array = [];
       
       // the items drawn on the rows shown, by row number
       private var _finderIcons:Object = {};
@@ -513,6 +531,41 @@ package
          catch(e:Error)
          {
             GlobalErrorCatch.reportToServer("item defs: " + e + "\n" + e.getStackTrace());
+         }
+      }
+
+      // "xsp": [.., .., role, permissions]. sent at login to staff only: their
+      // role and what it allows, comma separated (the server's lib/roles.js).
+      public static function onStaff(param1:Object) : void
+      {
+         staffRole = String(param1[2]);
+         staffPermissions = String(param1[3]).length > 0 ? String(param1[3]).split(",") : [];
+      }
+
+      public static function staffMay(param1:String) : Boolean
+      {
+         return staffPermissions.indexOf(param1) != -1;
+      }
+
+      // whether a player's card offers the staff's window instead of a report.
+      public static function canModerate() : Boolean
+      {
+         return _toolsInstance != null && (staffMay("player.warn") || staffMay("player.kick") || staffMay("chat.silence") || staffMay("player.summon") || staffMay("player.goto"));
+      }
+
+      public static function openModerate(param1:String) : void
+      {
+         if(_toolsInstance == null)
+         {
+            return;
+         }
+         try
+         {
+            _toolsInstance.showModerate(param1);
+         }
+         catch(e:Error)
+         {
+            GlobalErrorCatch.reportToServer("moderate: " + e + "\n" + e.getStackTrace());
          }
       }
 
@@ -1977,6 +2030,162 @@ package
       {
          param1.stopPropagation();
          showItemFinder(false);
+      }
+
+      // ---- the staff's window for one player, from the report button of
+      // their card. each button is a staff command for that player ("xmd",
+      // which the server runs as if typed: lib/commands.js, its permission
+      // checks and log included); only the ones the role allows are shown.
+      // the window closes and the server's answer comes as a message box.
+      private static const MODERATE_REASONS:Array = ["behavior","bullying","personal","scamming"];
+
+      private static const MODERATE_REASON_NAMES:Array = ["Inappropriate behavior","Bullying","Personal information","Scamming"];
+
+      private function buildModerate() : void
+      {
+         var _loc1_:MovieClip = GETDEFINITIONBYNAME("ReportRulesPopupSkin");
+         var _loc2_:int = 1;
+         _moderate = new Sprite();
+         _moderate.graphics.beginFill(0,0.45);
+         _moderate.graphics.drawRect(0,0,900,550);
+         _moderate.graphics.endFill();
+         var _loc3_:Sprite = new Sprite();
+         _loc3_.x = 450;
+         _loc3_.y = 275;
+         _moderate.addChild(_loc3_);
+         _loc3_.addChild(_loc1_);
+         _moderateContent = GETDEFINITIONBYNAME("ReportRulesPopupContent");
+         _moderateContent.x = _loc1_.c.x;
+         _moderateContent.y = _loc1_.c.y;
+         _loc3_.addChild(_moderateContent);
+         _loc1_.bx.addEventListener("mouseDown",onModerateCloseClick);
+         while(_loc2_ <= 5)
+         {
+            _moderateContent["ruleTxt" + _loc2_].visible = false;
+            _moderateContent["ruleBodyTxt" + _loc2_].visible = false;
+            _loc2_++;
+         }
+         var _loc4_:TextField = _moderateContent.ruleBodyTxt1;
+         _loc4_.visible = true;
+         _loc4_.wordWrap = true;
+         _loc4_.x = -245;
+         _loc4_.y = -150;
+         _loc4_.width = 490;
+         _loc4_.height = 40;
+         _loc4_.text = "What you do here is written down under your name, as in the moderator panel.";
+         _moderateButtons = [];
+         // a row each: warn (the reason cycles), a message, chat, moving them.
+         moderateButton("reason","",-150,-88,"player.warn");
+         moderateButton("warn","Warn",90,-88,"player.warn");
+         _moderateMessageBar = finderSearchBar(-247,-56,330,"Message to show them",null,200,false);
+         _moderateContent.addChild(_moderateMessageBar);
+         moderateButton("message","Send",150,-52,"player.warn");
+         moderateButton("silence 1","Silence 1 hour",-160,12,"chat.silence");
+         moderateButton("silence 24","Silence 1 day",0,12,"chat.silence");
+         moderateButton("silence off","Lift silence",160,12,"chat.silence");
+         moderateButton("summon","Bring here",-160,72,"player.summon");
+         moderateButton("goto","Go to them",0,72,"player.goto");
+         moderateButton("kick","Disconnect",160,72,"player.kick");
+         moderateButton("warnings","Warnings",0,132,"player.warn");
+         _moderate.addEventListener("mouseDown",onFinderMouse);
+         _moderate.addEventListener("mouseUp",onFinderMouse);
+         _moderate.addEventListener("click",onFinderMouse);
+         _moderate.addEventListener("mouseWheel",onFinderMouse);
+         _moderate.visible = false;
+         addChild(_moderate);
+      }
+
+      private function moderateButton(param1:String, param2:String, param3:Number, param4:Number, param5:String) : void
+      {
+         var _loc6_:MovieClip = GETDEFINITIONBYNAME("introBtnCont");
+         _loc6_.x = param3;
+         _loc6_.y = param4;
+         _loc6_.name = param1;
+         finderButtonText(_loc6_,param2);
+         _loc6_.addEventListener("mouseDown",onModerateButton);
+         _moderateContent.addChild(_loc6_);
+         _moderateButtons.push({
+            "clip":_loc6_,
+            "permission":param5
+         });
+      }
+
+      private function showModerate(param1:String) : void
+      {
+         if(_moderate == null)
+         {
+            buildModerate();
+         }
+         _moderateName = param1;
+         _moderateReason = 0;
+         _moderateContent.titleTxt.text = "Moderate " + param1;
+         _moderateMessageBar.searchTxt.text = "";
+         _moderateMessageBar.txt.visible = true;
+         for each(var _loc2_:Object in _moderateButtons)
+         {
+            _loc2_.clip.visible = staffMay(_loc2_.permission);
+         }
+         _moderateMessageBar.visible = staffMay("player.warn");
+         showModerateReason();
+         _moderate.visible = true;
+         setChildIndex(_moderate,numChildren - 1);
+      }
+
+      private function showModerateReason() : void
+      {
+         finderButtonText(_moderateContent.getChildByName("reason") as MovieClip,MODERATE_REASON_NAMES[_moderateReason]);
+      }
+
+      private function hideModerate() : void
+      {
+         if(_moderate != null)
+         {
+            _moderate.visible = false;
+         }
+         gMainFrame.stage.focus = null;
+      }
+
+      private function onModerateCloseClick(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         hideModerate();
+      }
+
+      private function onModerateButton(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         var _loc2_:String = MovieClip(param1.currentTarget).name;
+         var _loc3_:String = null;
+         if(_loc2_ == "reason")
+         {
+            _moderateReason = (_moderateReason + 1) % MODERATE_REASONS.length;
+            showModerateReason();
+            return;
+         }
+         if(_loc2_ == "warn")
+         {
+            gMainFrame.server.setXtObject_Str("xmd",["warn",_moderateName,MODERATE_REASONS[_moderateReason]]);
+         }
+         else if(_loc2_ == "message")
+         {
+            // "%" ends a field of the message: left out.
+            _loc3_ = _moderateMessageBar.searchTxt.text.split("%").join("").replace(/^\s+|\s+$/g,"");
+            if(_loc3_.length == 0)
+            {
+               gMainFrame.stage.focus = _moderateMessageBar.searchTxt;
+               return;
+            }
+            gMainFrame.server.setXtObject_Str("xmd",["message",_moderateName,_loc3_]);
+         }
+         else if(_loc2_.indexOf("silence ") == 0)
+         {
+            gMainFrame.server.setXtObject_Str("xmd",["silence",_moderateName,_loc2_.substr(8)]);
+         }
+         else
+         {
+            gMainFrame.server.setXtObject_Str("xmd",[_loc2_,_moderateName]);
+         }
+         hideModerate();
       }
       
       private function onFinderKey(param1:KeyboardEvent) : void

@@ -3325,6 +3325,12 @@ package buddy
       private function reportDownHandler(param1:MouseEvent) : void
       {
          param1.stopPropagation();
+         // staff get their window for this player instead (AJClient.openModerate).
+         if(!param1.currentTarget.isGray && AJClient.canModerate())
+         {
+            AJClient.openModerate(_currUserName);
+            return;
+         }
          if(!param1.currentTarget.isGray)
          {
             if(_reportAPlayer)
@@ -3344,7 +3350,7 @@ package buddy
          param1.stopPropagation();
          if(!param1.currentTarget.isGray)
          {
-            GuiManager.toolTip.init(_popupLayer,LocalizationManager.translateIdOnly(14633),845,210);
+            GuiManager.toolTip.init(_popupLayer,AJClient.canModerate() ? "Moderate" : LocalizationManager.translateIdOnly(14633),845,210);
             GuiManager.toolTip.startTimer(param1);
          }
       }

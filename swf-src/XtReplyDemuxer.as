@@ -84,6 +84,11 @@ package
             PaletteHelper.handleCustomColors(param1.obj);
             return;
          }
+         if(param1.obj[0] == "xsp")
+         {
+            AJClient.onStaff(param1.obj);
+            return;
+         }
          if(param1.obj[0] == "xdi")
          {
             AJClient.onItemDefs(param1.obj);
