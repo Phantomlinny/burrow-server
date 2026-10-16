@@ -84,6 +84,11 @@ package
             PaletteHelper.handleCustomColors(param1.obj);
             return;
          }
+         if(param1.obj[0] == "xdi")
+         {
+            AJClient.onItemDefs(param1.obj);
+            return;
+         }
          if(param1.obj[0] == "xtl")
          {
             AJClient.showMessage(param1.obj);

@@ -74,7 +74,9 @@ set -- \
   ecard.ECard ECard.as \
   game.ArtStudioKit ArtStudioKit.as \
   game.artStudioPainting.ArtStudioPainting ArtStudioPainting.as \
-  game.artStudioGridDrawing.ArtStudioGridDrawing ArtStudioGridDrawing.as
+  game.artStudioGridDrawing.ArtStudioGridDrawing ArtStudioGridDrawing.as \
+  item.ItemXtCommManager ItemXtCommManager.as \
+  den.DenXtCommManager DenXtCommManager.as
 # not in the game: added before the replace (game.ArtStudioKit is Strawberry
 # Jam's, shared by its two art studio painters)
 NEW_CLASSES="game.ArtStudioKit"

@@ -119,6 +119,8 @@
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
       input, select, textarea { background: var(--bg); }
       label.check { margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
+      #item-colours { display: flex; gap: 6px 14px; flex-wrap: wrap; margin-top: 8px; }
+      #item-colours label.check { display: inline-flex; gap: 5px; align-items: center; }
 
       #gate {
         max-width: 380px;
@@ -255,13 +257,14 @@
         <button id="sign-out" type="button">Sign out</button>
       </header>
       <nav role="tablist">
-        <button role="tab" data-tab="players" aria-selected="true">Players</button>
-        <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
-        <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
-        <button role="tab" data-tab="requests" aria-selected="false">Requests<span id="request-count"></span></button>
-        <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
-        <button role="tab" data-tab="bans" aria-selected="false">Bans</button>
-        <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
+        <button role="tab" data-tab="players" data-needs="player.view" aria-selected="true">Players</button>
+        <button role="tab" data-tab="chat" data-needs="player.view" aria-selected="false">Chat</button>
+        <button role="tab" data-tab="reports" data-needs="player.view" aria-selected="false">Reports<span id="report-count"></span></button>
+        <button role="tab" data-tab="requests" data-needs="player.view" aria-selected="false">Requests<span id="request-count"></span></button>
+        <button role="tab" data-tab="masterpieces" data-needs="player.view" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
+        <button role="tab" data-tab="bans" data-needs="player.view" aria-selected="false">Bans</button>
+        <button role="tab" data-tab="stats" data-needs="player.view" aria-selected="false">Stats</button>
+        <button role="tab" data-tab="items" data-needs="items.create" aria-selected="false" hidden>Items</button>
       </nav>
 
       <div data-view="players">
@@ -407,6 +410,45 @@
           <p class="status" id="masterpiece-status" role="status"></p>
           <div class="paintings" id="masterpieces"></div>
           <div class="empty" id="no-masterpieces" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="items" hidden>
+        <section>
+          <h2 id="item-form-title">Make an item</h2>
+          <p class="hint">One of the game's items under a new name, price and colours. Players have it at once, with no restart: in the item finder, and first in the hidden shops of oddities.</p>
+          <div class="actions">
+            <div class="action">
+              <h3>Made from</h3>
+              <div class="row">
+                <select id="item-kind" aria-label="Kind">
+                  <option value="clothing">Clothing</option>
+                  <option value="den">Den item</option>
+                </select>
+                <input id="item-base" type="number" min="1" placeholder="Id of the game's item" aria-label="Id of the item to copy">
+                <button type="button" id="item-look">Look up</button></div>
+              <p class="hint" id="item-base-name"></p>
+            </div>
+            <div class="action">
+              <h3>The new item</h3>
+              <div class="row"><input id="item-name" maxlength="40" placeholder="Name" aria-label="Name"></div>
+              <div class="row" style="margin-top:8px"><input id="item-cost" type="number" min="0" placeholder="Price in gems" aria-label="Price in gems">
+                <label class="check"><input type="checkbox" id="item-members"> Members only</label></div>
+              <div id="item-colours" aria-label="Colours offered"></div>
+              <div class="row" style="margin-top:12px">
+                <button type="button" class="primary" id="item-save">Make it</button>
+                <button type="button" id="item-cancel" hidden>Cancel</button></div>
+            </div>
+          </div>
+          <p class="status" id="item-status" role="status"></p>
+        </section>
+        <section>
+          <h2>Items made</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th class="num">Id</th><th>Name</th><th>Made from</th><th class="num">Price</th><th>By</th><th></th></tr></thead>
+            <tbody id="items"></tbody>
+          </table></div>
+          <div class="empty" id="no-items" hidden>None yet.</div>
         </section>
       </div>
 
@@ -912,13 +954,119 @@
         $("no-addresses").hidden = data.addresses.length > 0;
       };
 
+      // ---- items (lib/customitems.js)
+      let items = [];
+      let editing = null; // the item the form is changing, or null to make one
+      let baseColours = []; // the colours of the item looked up
+
+      const showColours = (colours, chosen) => {
+        $("item-colours").replaceChildren(...colours.map((colour, index) => {
+          const box = el("input");
+          box.type = "checkbox";
+          box.value = String(colour);
+          box.checked = !chosen || chosen.includes(colour);
+          const label = el("label", undefined, "check");
+          label.append(box, ` Colour ${index + 1}`);
+          return label;
+        }));
+      };
+
+      const lookUp = async () => {
+        const result = await api(`items/base?kind=${$("item-kind").value}&id=${encodeURIComponent($("item-base").value.trim())}`);
+        baseColours = result.ok && result.data.colors ? result.data.colors : [];
+        if (!result.ok) {
+          $("item-base-name").textContent = said(result);
+          showColours([]);
+          return null;
+        }
+        if (!editing) {
+          $("item-base-name").textContent = `${result.data.name || "(no name)"}: ${result.data.cost} gems in the game.`;
+          if (!$("item-name").value.trim()) {
+            $("item-name").value = result.data.name || "";
+          }
+          showColours(baseColours);
+        }
+        return result.data;
+      };
+      $("item-look").addEventListener("click", lookUp);
+      $("item-kind").addEventListener("change", () => {
+        $("item-base-name").textContent = "";
+        showColours([]);
+      });
+
+      const itemForm = item => {
+        editing = item;
+        $("item-form-title").textContent = item ? `Change ${item.name}` : "Make an item";
+        $("item-save").textContent = item ? "Save" : "Make it";
+        $("item-cancel").hidden = !item;
+        for (const field of ["item-kind", "item-base", "item-look"]) {
+          $(field).disabled = Boolean(item);
+        }
+        if (item) {
+          $("item-kind").value = item.kind;
+        }
+        $("item-base").value = item ? item.base : "";
+        $("item-name").value = item ? item.name : "";
+        $("item-cost").value = item ? item.cost : "";
+        $("item-members").checked = Boolean(item && item.members);
+        $("item-base-name").textContent = item ? `${item.baseName} (${item.kind === "den" ? "den item" : "clothing"} ${item.base})` : "";
+        showColours([]);
+        if (item && item.kind === "clothing") {
+          // the base's colours, and any of the item's own that are not among them
+          lookUp().then(() => showColours([...new Set([...baseColours, ...item.colors])], item.colors));
+        }
+      };
+      $("item-cancel").addEventListener("click", () => itemForm(null));
+
+      $("item-save").addEventListener("click", async () => {
+        const fields = {name: $("item-name").value, cost: $("item-cost").value, members: $("item-members").checked};
+        const boxes = [...$("item-colours").querySelectorAll("input")];
+        if (boxes.length) {
+          fields.colors = boxes.filter(box => box.checked).map(box => Number(box.value));
+          if (!fields.colors.length) {
+            setStatus($("item-status"), "Leave at least one colour.", true);
+            return;
+          }
+        }
+        $("item-save").disabled = true;
+        const result = await api("items", editing
+          ? {action: "update", kind: editing.kind, id: editing.id, ...fields}
+          : {action: "create", kind: $("item-kind").value, base: $("item-base").value.trim(), ...fields});
+        $("item-save").disabled = false;
+        setStatus($("item-status"), said(result), !result.ok);
+        if (result.ok) {
+          itemForm(null);
+          refresh();
+        }
+      });
+
+      const renderItems = () => {
+        $("items").replaceChildren(...items.map(item => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(button("Change", () => itemForm(item)), " ",
+            button(item.inShop ? "Take off sale" : "Put on sale", async () => {
+              const result = await api("items", {action: "update", kind: item.kind, id: item.id, inShop: !item.inShop});
+              setStatus($("item-status"), said(result), !result.ok);
+              await refresh();
+            }));
+          row.append(el("td", String(item.id), "num"), el("td", `${item.name}${item.members ? " (members)" : ""}${item.inShop ? "" : " (off sale)"}`),
+            el("td", `${item.baseName} (${item.kind === "den" ? "den item" : "clothing"} ${item.base})`), el("td", String(item.cost), "num"),
+            el("td", item.createdBy), buttons);
+          return row;
+        }));
+        $("no-items").hidden = items.length > 0;
+      };
+
+      let permissions = new Set(); // what the signed-in role may do (GET /mod/api/me)
+
       const refresh = async () => {
         clearTimeout(timer);
         if (!signedIn) {
           return;
         }
         const shown = tab;
-        const counts = await api("overview");
+        const counts = permissions.has("player.view") ? await api("overview") : {ok: false};
         if (counts.ok) {
           $("report-count").textContent = counts.data.reports ? ` (${counts.data.reports})` : "";
           $("request-count").textContent = counts.data.requests ? ` (${counts.data.requests})` : "";
@@ -979,6 +1127,13 @@
             renderBans(result.data);
           }
         }
+        else if (shown === "items") {
+          const result = await api("items");
+          if (result.ok) {
+            items = result.data.items;
+            renderItems();
+          }
+        }
         if (signedIn) {
           clearTimeout(timer);
           timer = setTimeout(refresh, REFRESH_MS);
@@ -1014,9 +1169,19 @@
           return;
         }
         const allowed = new Set(result.data.permissions || []);
+        permissions = allowed;
         for (const pressed of document.querySelectorAll("button[data-action]")) {
           const needed = ACTION_PERMISSIONS[pressed.dataset.action];
           pressed.hidden = Boolean(needed) && !allowed.has(needed);
+        }
+        // the pages the role may see; the first of them when the one open is not.
+        const pages = [...document.querySelectorAll("nav button")];
+        for (const page of pages) {
+          page.hidden = !allowed.has(page.dataset.needs);
+        }
+        const open = pages.find(page => page.dataset.tab === tab && !page.hidden) || pages.find(page => !page.hidden);
+        if (open) {
+          tab = open.dataset.tab;
         }
         if (result.data.role) {
           $("who").textContent = `${result.data.username} (${result.data.role})`;
@@ -1028,8 +1193,7 @@
         $("who").textContent = username;
         $("gate").hidden = true;
         $("panel").hidden = false;
-        showTab(tab);
-        applyPermissions();
+        applyPermissions().then(() => showTab(tab));
       };
 
       $("gate-form").addEventListener("submit", async event => {

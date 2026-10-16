@@ -401,6 +401,7 @@
                   <button type="button" data-action="moderator" id="moderator-toggle">Make moderator</button>
                   <select id="role-select" aria-label="Staff role">
                     <option value="none">No staff role</option>
+                    <option value="developer">Developer</option>
                     <option value="helper">Helper</option>
                     <option value="moderator">Moderator</option>
                     <option value="admin">Admin</option>
@@ -754,7 +755,7 @@
           tags.push(el("span", "Name rejected", "tag bad"));
         }
         if (account.moderator) {
-          const label = {helper: "Helper", moderator: "Moderator", admin: "Admin"}[account.role] || "Moderator";
+          const label = {developer: "Developer", helper: "Helper", moderator: "Moderator", admin: "Admin"}[account.role] || "Moderator";
           tags.push(el("span", label, "tag good"));
         }
         if (account.twoStep) {

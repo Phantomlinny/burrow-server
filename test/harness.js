@@ -145,8 +145,10 @@ const postJson = (url, body) => fetch(url, {
 
 // starts a server on the given ports with an empty database, runs `run`
 // against it, and prints `name` passed or the server's output on failure.
-const withServer = async (name, httpPort, gamePort, run) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
+// with `dataDir` it uses that database instead, and leaves it there (for a
+// test of what is still there after a restart).
+const withServer = async (name, httpPort, gamePort, run, {dataDir: keptDir = null} = {}) => {
+  const dataDir = keptDir || fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
   const server = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
     env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1"},
     stdio: ["ignore", "pipe", "inherit"],
@@ -175,7 +177,9 @@ const withServer = async (name, httpPort, gamePort, run) => {
     const exited = server.exitCode !== null ? Promise.resolve() : new Promise(resolve => server.once("exit", resolve));
     server.kill();
     await exited;
-    fs.rmSync(dataDir, {recursive: true, force: true, maxRetries: 10, retryDelay: 200});
+    if (!keptDir) {
+      fs.rmSync(dataDir, {recursive: true, force: true, maxRetries: 10, retryDelay: 200});
+    }
   }
 };
 

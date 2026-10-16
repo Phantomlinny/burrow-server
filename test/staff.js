@@ -114,7 +114,7 @@ const run = async () => {
   assert.strictEqual((await admin("/admin/api/setup", {password: "AdminPass99!"})).status, 200);
   assert.strictEqual((await admin("/admin/api/login", {password: "AdminPass99!"})).status, 200);
   const roleList = await admin("/admin/api/roles");
-  assert.deepStrictEqual(roleList.data.roles.map(role => role.id), ["helper", "moderator", "admin"]);
+  assert.deepStrictEqual(roleList.data.roles.map(role => role.id), ["developer", "helper", "moderator", "admin"]);
   assert.match((await admin("/admin/api/account", {username: "Mira", action: "role", role: "boss"})).data.error, /No such role/);
 
   // staff need 2FA: turned on from the account page.

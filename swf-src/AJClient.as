@@ -7,7 +7,9 @@ package
    import den.DenXtCommManager;
    import item.ItemXtCommManager;
    import den.DenItem;
+   import den.DenXtCommManager;
    import item.Item;
+   import item.ItemXtCommManager;
    import com.sbi.loader.ResourceStack;
    import com.sbi.popup.SBOkPopup;
    import com.sbi.popup.SBStandardPopup;
@@ -491,6 +493,29 @@ package
          return _loc6_;
       }
       
+      // "xdi": [.., .., kind, rows as JSON]. items the staff made while the
+      // game runs (the server's lib/customitems.js): "clothing" or "den" def
+      // rows, as in the item packs, each with its name.
+      public static function onItemDefs(param1:Object) : void
+      {
+         try
+         {
+            var _loc2_:Array = JSON.parse(String(param1[3])) as Array;
+            if(String(param1[2]) == "den")
+            {
+               DenXtCommManager.addDenItemDefs(_loc2_);
+            }
+            else
+            {
+               ItemXtCommManager.addItemDefs(_loc2_);
+            }
+         }
+         catch(e:Error)
+         {
+            GlobalErrorCatch.reportToServer("item defs: " + e + "\n" + e.getStackTrace());
+         }
+      }
+
       // "xtl": [.., .., text]. A plain message box; what a chat command says.
       public static function showMessage(param1:Object) : void
       {
