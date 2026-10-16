@@ -159,7 +159,7 @@ package gui
             "type":TOGGLE_TYPE_JOIN,
             "frame":"itemFinder",
             "iconFrame":"redeemCode",
-            "labelLabel":"Item Finder",
+            "labelLabel":"Item Giver",
             "btnLabel":"Open"
          },{
             "type":TOGGLE_TYPE_JOIN,
@@ -218,11 +218,15 @@ package gui
             "frame":"redeemCode",
             "labelTxt":24819,
             "btnTxt":24820
+         /* the game's "World" row (choose a server) is out: there is one
+            world, this server does not answer the list it asks for (rm),
+            and the picker then waited behind its spinner for ever.
          },{
             "type":TOGGLE_TYPE_JOIN,
             "frame":"world",
             "labelTxt":6395,
             "btnTxt":6366
+         */
          },{
             "type":TOGGLE_TYPE_TOGGLE_BTN,
             "frame":"nameBadge",

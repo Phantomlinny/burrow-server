@@ -18,6 +18,7 @@ const reports = require("./lib/reports.js");
 const roomInfo = require("./lib/roominfo.js");
 const support = require("./lib/support.js");
 const sfs = require("./lib/sfs.js");
+const stats = require("./lib/stats.js");
 const world = require("./lib/world.js");
 
 // files this server makes are its own to read: accounts, logs, the cache.
@@ -43,6 +44,7 @@ const main = async () => {
   modlog.load();
   masterpieces.load();
   retention.load();
+  stats.load(() => world.players().length);
   panel.load();
   await http.start();
   await sfs.start(world);
@@ -51,6 +53,7 @@ const main = async () => {
 
 // stopped on purpose: what is waiting to be written is written first.
 const stop = code => {
+  stats.flush();
   try {
     accounts.flush();
   }

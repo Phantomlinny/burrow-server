@@ -126,9 +126,11 @@ package gui
          }
       }
       
+      // free typing in the chat bar (0) and on Jammer Walls (2), whose posts
+      // go through each reader's own filter (playerWall.PostMessage).
       public function isAllowedFreeChat() : Boolean
       {
-         return _useType == 0 && (gMainFrame.userInfo.sgChatType == 1 && LocalizationManager.currentLanguage == LocalizationManager.accountLanguage && LocalizationManager.currentLanguage == LocalizationManager.LANG_ENG);
+         return (_useType == 0 || _useType == 2) && (gMainFrame.userInfo.sgChatType == 1 && LocalizationManager.currentLanguage == LocalizationManager.accountLanguage && LocalizationManager.currentLanguage == LocalizationManager.LANG_ENG);
       }
       
       public function loadDictionaryBlob() : void

@@ -17,6 +17,11 @@ package loader
    public class MediaHelper
    {
       
+      // a report to the server at each step of every media load: it was for
+      // finding a Wine decoding fault, and at 300 players it was most of the
+      // web traffic. failures are still reported.
+      private static const TRACE_LOADS:Boolean = false;
+      
       private var _id:uint;
       
       private var _callback:Function;
@@ -51,7 +56,7 @@ package loader
          _loader = new Loader();
          MediaFileServer.instance.addEventListener("OnNewData",handleMediaData);
          MediaFileServer.instance.addEventListener("progress",onLoadProgress);
-         GlobalErrorCatch.reportToServer("media " + _id + " requested");
+         if(TRACE_LOADS) GlobalErrorCatch.reportToServer("media " + _id + " requested");
          MediaFileServer.instance.requestFile(_id);
       }
       
@@ -81,7 +86,7 @@ package loader
          {
             return;
          }
-         GlobalErrorCatch.reportToServer("media " + _id + " data success=" + param1.success + " length=" + (param1.data ? param1.data.length : -1));
+         if(TRACE_LOADS) GlobalErrorCatch.reportToServer("media " + _id + " data success=" + param1.success + " length=" + (param1.data ? param1.data.length : -1));
          if(param1.success)
          {
             MediaFileServer.instance.removeEventListener("OnNewData",handleMediaData);
@@ -188,7 +193,7 @@ package loader
          param1.target.removeEventListener("complete",onBytesLoaded);
          param1.target.removeEventListener("OnLoadProgress",onLoadProgress);
          _loadProgressFunc = null;
-         GlobalErrorCatch.reportToServer("media " + _id + " decoded, waitingForSharedLibrary=" + Boolean(_mc.hasOwnProperty("__rslPreloader") && _mc.__rslPreloader));
+         if(TRACE_LOADS) GlobalErrorCatch.reportToServer("media " + _id + " decoded, waitingForSharedLibrary=" + Boolean(_mc.hasOwnProperty("__rslPreloader") && _mc.__rslPreloader));
          if(_mc.hasOwnProperty("__rslPreloader") && _mc.__rslPreloader)
          {
             _mc.addEventListener("enterFrame",onFrame);
@@ -204,7 +209,7 @@ package loader
       {
          if(_mc.__rslPreloader == null)
          {
-            GlobalErrorCatch.reportToServer("media " + _id + " shared library ready");
+            if(TRACE_LOADS) GlobalErrorCatch.reportToServer("media " + _id + " shared library ready");
             _mc.removeEventListener("enterFrame",onFrame);
             if(_callback != null)
             {

@@ -339,6 +339,16 @@
         </section>
 
         <section>
+          <h2>Playtime</h2>
+          <p id="playtime-text"></p>
+          <div class="switch">
+            <div class="what"><b>Show on my card</b><span class="hint">At the top of the Bio tab, for anyone who opens your card in the game.</span></div>
+            <button id="playtime-public" type="button" aria-pressed="false">Private</button>
+          </div>
+          <p class="status" id="playtime-status" role="status"></p>
+        </section>
+
+        <section>
           <h2>Discord</h2>
           <p id="badges" hidden></p>
           <form id="discord-form">
@@ -610,6 +620,7 @@
           [account.online ? "Playing now" : account.lastSeen ? when(account.lastSeen) : "Not played yet", "Last seen"],
           [when(account.createdAt), "Created"],
           [account.logins.toLocaleString(), "Logins"],
+          [played(account.playtime), "Playtime"],
           [`${account.animals}${ANIMALS[account.animalType] ? ` · ${ANIMALS[account.animalType]} in use` : ""}`, "Animals"],
           [account.pets.toLocaleString(), "Pets"],
           [account.items.toLocaleString(), "Clothing"],
@@ -637,6 +648,12 @@
           row.append(text, button);
           return row;
         }));
+
+        $("playtime-text").textContent = `You have played for ${played(account.playtime)}.`;
+        $("playtime-public").textContent = account.playtimePublic ? "Public" : "Private";
+        $("playtime-public").setAttribute("aria-pressed", String(account.playtimePublic));
+        $("playtime-public").setAttribute("aria-label", `Show playtime on my card: ${account.playtimePublic ? "public" : "private"}`);
+        $("playtime-public").disabled = false;
 
         if (document.activeElement !== $("bio-text")) {
           $("bio-text").value = account.bio;
@@ -1147,6 +1164,26 @@
         return done;
       });
       $("forget-devices").addEventListener("click", () => act({action: "forgetDevices"}, "two-step-status"));
+
+      // time played, in the largest units that say it: "3 days 4 hours".
+      const played = seconds => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor(seconds % 86400 / 3600);
+        const minutes = Math.floor(seconds % 3600 / 60);
+        const unit = (count, name) => `${count.toLocaleString()} ${name}${count === 1 ? "" : "s"}`;
+        if (days > 0) {
+          return hours > 0 ? `${unit(days, "day")} ${unit(hours, "hour")}` : unit(days, "day");
+        }
+        if (hours > 0) {
+          return minutes > 0 ? `${unit(hours, "hour")} ${unit(minutes, "minute")}` : unit(hours, "hour");
+        }
+        return unit(minutes, "minute");
+      };
+      $("playtime-public").addEventListener("click", async () => {
+        $("playtime-public").disabled = true;
+        await act({action: "playtimePublic", on: !account.playtimePublic}, "playtime-status");
+        $("playtime-public").disabled = false;
+      });
 
       const bioCount = () => {
         $("bio-count").textContent = `${[...$("bio-text").value.trim()].length} / ${account ? account.bioLimit : 200}`;

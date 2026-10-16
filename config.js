@@ -114,7 +114,9 @@ module.exports = {
   // game no longer open to SWFs from other addresses.
   // 40: the chat filter's window laid out again.
   // 41: the game's text says "Burrow" where it said Animal Jam.
-  buildVersion: env.AJ_BUILD_VERSION || "41",
+  // 48: the item giver (the item finder renamed) with previews and hex colours;
+  // 49 and 50: its link to a colour picker.
+  buildVersion: env.AJ_BUILD_VERSION || "55",
   // what the official CDN is asked for; not ours to change.
   upstreamBuildVersion: "3",
 
@@ -147,7 +149,7 @@ module.exports = {
   // are written into both pages. the emails and the host's country are
   // placeholders until set; the operator is, at the owner's word, said to
   // be in the EU without a name or a country.
-  termsVersion: "2026-10-13",
+  termsVersion: "2026-10-17",
   legalEmail: env.AJ_LEGAL_EMAIL || "legal@burrow.moe",
   adminEmail: env.AJ_ADMIN_EMAIL || "admin@burrow.moe",
   operator: env.AJ_OPERATOR || "an individual based in the European Union",

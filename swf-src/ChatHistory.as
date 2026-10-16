@@ -479,7 +479,9 @@ package gui
          }
          else
          {
-            chatMsgText.maxChars = 70;
+            // 150 here, where the original stopped at 70. the server takes
+            // up to config.maxChatLength.
+            chatMsgText.maxChars = 150;
          }
       }
       

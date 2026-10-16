@@ -365,8 +365,19 @@ package gui
          var _loc1_:* = null;
          DarkenManager.showLoadingSpiral(false);
          KeepAlive.stopKATimer(avEditor);
-         removeListeners();
-         if(avEditor.tradeBtnUp && avEditor.tradeBtnUp.visible)
+         // the editor can be destroyed (leaving the room) before its artwork
+         // came, or after setting it up threw halfway (#1009, #2025 below)
+         if(avEditor)
+         {
+            try
+            {
+               removeListeners();
+            }
+            catch(e:Error)
+            {
+            }
+         }
+         if(avEditor && avEditor.tradeBtnUp && avEditor.tradeBtnUp.visible)
          {
             if(_itemTradeWindows)
             {
@@ -394,7 +405,10 @@ package gui
          }
          if(_avatarEditorView)
          {
-            avEditor.charBox.removeChild(_avatarEditorView);
+            if(_avatarEditorView.parent)
+            {
+               _avatarEditorView.parent.removeChild(_avatarEditorView);
+            }
             _avatarEditorView.destroy();
             _avatarEditorView = null;
             _itemIdsOn = null;
@@ -480,8 +494,14 @@ package gui
          }
          _spirals = null;
          AvatarManager.showAvtAndChatLayers(true);
-         DarkenManager.unDarken(avEditor);
-         _guiLayer.removeChild(avEditor);
+         if(avEditor)
+         {
+            DarkenManager.unDarken(avEditor);
+            if(avEditor.parent)
+            {
+               avEditor.parent.removeChild(avEditor);
+            }
+         }
       }
       
       public function get onCloseCallback() : Function
@@ -1222,7 +1242,10 @@ package gui
             avEditor.colorsTabUp.visible = false;
             avEditor.eyesTabUp.visible = false;
             avEditor.patternTabUp.visible = true;
-            avEditor.colorTableBlock.patternsAndEyes.specialAvtIconCont.visible = _worldAvatar.customAvId != -1;
+            // special animals get the pattern colour table too, in place of
+            // their icon: any colour, as for the others. the arrows still
+            // step through their preset colours.
+            avEditor.colorTableBlock.patternsAndEyes.specialAvtIconCont.visible = false;
             if(avEditor.colorTableBlock.patternsAndEyes.contains(_colorTableEyes))
             {
                avEditor.colorTableBlock.patternsAndEyes.removeChild(_colorTableEyes);
@@ -1232,27 +1255,7 @@ package gui
             {
                avEditor.colorTableBlock.patternsAndEyes.removeChild(_colorTableEyes);
             }
-            if(_worldAvatar.customAvId != -1)
-            {
-               if(_customAvtIcon)
-               {
-                  avEditor.colorTableBlock.patternsAndEyes.specialAvtIconCont.addChild(_customAvtIcon);
-               }
-               else
-               {
-                  _loc2_ = gMainFrame.userInfo.getAvatarDefByAvType(_worldAvatar.customAvId,true) as CustomAvatarDef;
-                  if(_loc2_)
-                  {
-                     _loadingSpiral = new LoadingSpiral(avEditor.colorTableBlock.patternsAndEyes.specialAvtIconCont,avEditor.colorTableBlock.patternsAndEyes.width * 0.5,avEditor.colorTableBlock.patternsAndEyes.height * 0.5);
-                     _loadingMediaHelper = new MediaHelper();
-                     _loadingMediaHelper.init(_loc2_.iconRefId,onCustomIconLoaded);
-                  }
-               }
-            }
-            else
-            {
-               avEditor.colorTableBlock.patternsAndEyes.addChild(_colorTablePatterns);
-            }
+            avEditor.colorTableBlock.patternsAndEyes.addChild(_colorTablePatterns);
             if(_patterns.length > 0)
             {
                if(_patterns.length <= 1 && _worldAvatar.customAvId == -1)
@@ -1352,12 +1355,8 @@ package gui
             {
                if(_loc2_)
                {
-                  if(_loc2_.patternRefIds.length > 1)
-                  {
-                     avEditor.colorsTabUp.activateGrayState(true);
-                     avEditor.colorsTabDnBtn.activateGrayState(true);
-                     openTab(2);
-                  }
+                  // the colours tab stays open to special animals with several
+                  // patterns (it was greyed out, the pattern tab opened instead).
                   _loc5_ = _loc2_.patternRefIds.indexOf(_loc1_.getAccItem(_loc4_).defId);
                   if(_loc5_ != -1)
                   {

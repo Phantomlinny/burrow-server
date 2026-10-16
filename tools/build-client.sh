@@ -12,6 +12,12 @@
 # decompiler gets two of that class's functions wrong, so the class cannot
 # be compiled from its source. 4839 is that method body's place in the
 # untouched client.
+#
+# gui.BulletinBoard cannot be compiled from its source either (its media
+# callback comes out as loops that do not do what the bytecode does), so two
+# of its methods are replaced as P-code: the tutorial and "what's new" video
+# lists return at once when empty, as this server sends them (they threw).
+# 3830 and 3832 are those method bodies' places in the untouched client.
 set -e
 cd "$(dirname "$(readlink -f "$0")")/.."
 out=${1:-swf/ajclient.swf}
@@ -52,13 +58,39 @@ set -- \
   avatar.AvatarWorldView AvatarWorldView.as \
   room.RoomManagerWorld RoomManagerWorld.as \
   gskinner.motion.GTween GTween.as \
-  playerWall.PostMessage PostMessage.as
+  playerWall.PostMessage PostMessage.as \
+  shop.BundleShop BundleShop.as \
+  gui.GenericListGuiManager GenericListGuiManager.as \
+  gui.DenSwitcher DenSwitcher.as \
+  gui.PetCreator PetCreator.as \
+  gui.NGFactManager NGFactManager.as \
+  game.distanceChallenge.DistanceChallenge DistanceChallenge.as \
+  buddy.BuddyList BuddyList.as \
+  Party.PartyPopup PartyPopup.as \
+  gui.ECardInbox ECardInbox.as \
+  game.SoundManager SoundManager.as \
+  com.sbi.graphics.LayerAnim LayerAnim.as \
+  com.sbi.graphics.LayerBitmap LayerBitmap.as \
+  ecard.ECard ECard.as \
+  game.ArtStudioKit ArtStudioKit.as \
+  game.artStudioPainting.ArtStudioPainting ArtStudioPainting.as \
+  game.artStudioGridDrawing.ArtStudioGridDrawing ArtStudioGridDrawing.as
+# not in the game: added before the replace (game.ArtStudioKit is Strawberry
+# Jam's, shared by its two art studio painters)
+NEW_CLASSES="game.ArtStudioKit"
 args=""
 while [ $# -gt 0 ]; do
   args="$args $1 swf-src/$2"
   shift 2
 done
+# classes the game never had (NEW_CLASSES) are added empty first
+# (tools/AddClass.java), for the replace to fill in from swf-src/
+base=$(mktemp --suffix=.swf)
+trap 'rm -f "$base"' EXIT
+java -cp "tools/ffdec/lib/*" tools/AddClass.java swf/ajclient.before-finder.swf "$base" $NEW_CLASSES
 # shellcheck disable=SC2086
-java -jar tools/ffdec/ffdec-cli.jar -replace swf/ajclient.before-finder.swf "$out" \
-  gui.EmoticonUtility swf-src/EmoticonUtility.cinit.pcode 4839 $args | grep -v "^Replac\|EXPERIMENTAL" || true
+java -jar tools/ffdec/ffdec-cli.jar -replace "$base" "$out" \
+  gui.EmoticonUtility swf-src/EmoticonUtility.cinit.pcode 4839 \
+  gui.BulletinBoard swf-src/BulletinBoard.onTutorialGLReceived.pcode 3830 \
+  gui.BulletinBoard swf-src/BulletinBoard.onWhatsNewVideosLoaded.pcode 3832 $args | grep -v "^Replac\|EXPERIMENTAL" || true
 ls -l "$out"

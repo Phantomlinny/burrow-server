@@ -3,6 +3,9 @@ package
    import avatar.AvatarManager;
    import avatar.AvatarWorldView;
    import com.sbi.debug.DebugUtility;
+   import com.sbi.graphics.PaletteHelper;
+   import den.DenXtCommManager;
+   import item.ItemXtCommManager;
    import den.DenItem;
    import item.Item;
    import com.sbi.loader.ResourceStack;
@@ -30,6 +33,7 @@ package
    import flash.external.ExternalInterface;
    import flash.system.Capabilities;
    import flash.system.Security;
+   import flash.system.System;
    import flash.ui.Mouse;
    import flash.utils.Dictionary;
    import flash.utils.Timer;
@@ -85,6 +89,17 @@ package
       private var _finderKind:int;
       
       private var _finderColourInput:TextField;
+      
+      // the items drawn on the rows shown, by row number
+      private var _finderIcons:Object = {};
+      
+      // a hex colour typed, as a local colour id for the previews only
+      // (PaletteHelper.customColors): the server makes the real one on Give
+      private var _finderHexKey:String = "";
+      
+      private var _finderHexId:uint = 0;
+      
+      private var _finderHexCount:uint = 0;
       
       public function AJClient()
       {
@@ -291,7 +306,7 @@ package
          }
          catch(e:Error)
          {
-            GlobalErrorCatch.reportToServer((param1 == 1 ? "chat filter: " : "item finder: ") + e + "\n" + e.getStackTrace());
+            GlobalErrorCatch.reportToServer((param1 == 1 ? "chat filter: " : "item giver: ") + e + "\n" + e.getStackTrace());
          }
       }
       
@@ -1202,10 +1217,14 @@ package
          _filterOwnEntries = filterEntries(filterOwn);
       }
       
-      // "xfa": the account has never chosen; the window is put to it once.
+      // "xfa": the account has never chosen; the rules are put to it first,
+      // then the window.
       public static function onFilterAsk(param1:Object) : void
       {
-         openTool(1);
+         openRules(function():void
+         {
+            openTool(1);
+         });
       }
       
       // is the word at `param2` of the plain words `param1` (and those after
@@ -1477,6 +1496,137 @@ package
          drawChatFilter();
       }
       
+      // the server's rules, word for word as the owner gave them
+      private static const RULES_HTML:String = "<font size=\"16\" color=\"#563421\"><b>[1] Be Respectful / Have Common Sense</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>This is quite self explanatory. Be kind, treat people how you would want to be treated. If someone is uncomfortable with something you are saying and or doing, please respect that of them and do not argue against it, even if it may seem ridiculous in your eyes.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>[2] No Direct Harassment / Bullying</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>If you are being disrespectful towards another person, Moderators have every right to punish you. Please don't be an asshole. Thank you.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>[3] Keep Personal Information for Yourself.</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>As friendly that people may seem on this platform, never share personal identifying details with ANYONE. This leads to a lot of unsafe situations. Please be safe and responsible with the information you give to other people.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>[4] Keep Drama OUT</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>If you have personal issues with another person, it is not our responsibility unless said person is confirmed to be problematic towards something against the rules of our server. Please do not bring arguments into our public chat, you will be muted until things clear up. Keep it in DMS.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>[5] No NSFW!</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>NSFW and Suggestive Content are entirely banned from the server, period. We do not want to be a place that allows predatory behavior to fester. If you are unsure of what specific details this goes under, feel free to ask in a ticket.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>[8] Report Any Issues</b></font><br><font size=\"13\" color=\"#6E4A2E\"><b>Issues can be anything from harassment, a person you are uncomfortable with, bugs, etc. Moderators are always happy to help!</b></font><br><br><font size=\"13\" color=\"#6E4A2E\"><b>Burrow gives players more freedom than the original game, including free chat. If you do not want to see certain content you may utilise the client side chat filter and block players, which has an option to completely hide them on your side.</b></font><br><br><font size=\"13\" color=\"#6E4A2E\"><b>These options are found in the in-game settings or player cards.</b></font><br><br><font size=\"16\" color=\"#563421\"><b>burrow.moe/terms</b></font>";
+      
+      private var _rulesWin:Sprite;
+      
+      private var _rulesText:TextField;
+      
+      // what to do once the rules are closed (the chat filter, the first time)
+      private static var _rulesThen:Function;
+      
+      // the rules, in the game's rules popup (its frame and text style), with
+      // room for all of them: the text scrolls with the wheel or the arrows.
+      // the game's own rules popup (GuiManager.displayRulesPopup) opens this.
+      private function buildRules() : void
+      {
+         var _loc1_:MovieClip = GETDEFINITIONBYNAME("ReportRulesPopupSkin");
+         var _loc2_:MovieClip = GETDEFINITIONBYNAME("ReportRulesPopupContent");
+         var _loc3_:int = 1;
+         var _loc4_:Sprite = new Sprite();
+         var _loc5_:MovieClip = null;
+         _rulesWin = new Sprite();
+         _rulesWin.graphics.beginFill(0,0.45);
+         _rulesWin.graphics.drawRect(0,0,900,550);
+         _rulesWin.graphics.endFill();
+         _loc4_.x = 450;
+         _loc4_.y = 275;
+         _rulesWin.addChild(_loc4_);
+         _loc4_.addChild(_loc1_);
+         _loc2_.x = _loc1_.c.x;
+         _loc2_.y = _loc1_.c.y;
+         _loc4_.addChild(_loc2_);
+         _loc1_.bx.addEventListener("mouseDown",onRulesCloseClick);
+         while(_loc3_ <= 5)
+         {
+            _loc2_["ruleTxt" + _loc3_].visible = false;
+            _loc2_["ruleBodyTxt" + _loc3_].visible = false;
+            _loc3_++;
+         }
+         _loc2_.titleTxt.text = "Burrow Rules";
+         _rulesText = _loc2_.ruleBodyTxt1;
+         _rulesText.visible = true;
+         _rulesText.multiline = true;
+         _rulesText.wordWrap = true;
+         _rulesText.mouseWheelEnabled = true;
+         _rulesText.selectable = false;
+         _rulesText.x = -245;
+         _rulesText.y = -158;
+         _rulesText.width = 462;
+         _rulesText.height = 338;
+         _rulesText.htmlText = RULES_HTML;
+         _loc5_ = GETDEFINITIONBYNAME("arrow_r_btnContOld");
+         _loc5_.rotation = -90;
+         _loc5_.x = 236;
+         _loc5_.y = -136;
+         _loc5_.name = "up";
+         _loc5_.addEventListener("mouseDown",onRulesArrow);
+         _loc2_.addChild(_loc5_);
+         _loc5_ = GETDEFINITIONBYNAME("arrow_r_btnContOld");
+         _loc5_.rotation = 90;
+         _loc5_.x = 236;
+         _loc5_.y = 160;
+         _loc5_.name = "down";
+         _loc5_.addEventListener("mouseDown",onRulesArrow);
+         _loc2_.addChild(_loc5_);
+         _rulesWin.addEventListener("mouseDown",onFinderMouse);
+         _rulesWin.addEventListener("mouseUp",onFinderMouse);
+         _rulesWin.addEventListener("click",onFinderMouse);
+         _rulesWin.addEventListener("mouseWheel",onFinderMouse);
+         _rulesWin.visible = false;
+         addChild(_rulesWin);
+      }
+      
+      private function showRules(param1:Boolean) : void
+      {
+         if(_rulesWin == null)
+         {
+            buildRules();
+         }
+         _rulesWin.visible = param1;
+         if(param1)
+         {
+            _rulesText.scrollV = 1;
+            setChildIndex(_rulesWin,numChildren - 1);
+         }
+      }
+      
+      private function onRulesArrow(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         _rulesText.scrollV += param1.currentTarget.name == "up" ? -4 : 4;
+      }
+      
+      private function onRulesCloseClick(param1:MouseEvent) : void
+      {
+         var _loc2_:Function = _rulesThen;
+         param1.stopPropagation();
+         showRules(false);
+         _rulesThen = null;
+         if(_loc2_ != null)
+         {
+            _loc2_();
+         }
+      }
+      
+      // the rules window, then `param1` once it is closed
+      public static function openRules(param1:Function = null) : void
+      {
+         if(_toolsInstance == null)
+         {
+            return;
+         }
+         try
+         {
+            _rulesThen = param1;
+            _toolsInstance.showRules(true);
+         }
+         catch(e:Error)
+         {
+            GlobalErrorCatch.reportToServer("rules: " + e + "\n" + e.getStackTrace());
+         }
+      }
+      
+      public static function closeRules() : void
+      {
+         if(_toolsInstance != null && _toolsInstance._rulesWin != null)
+         {
+            _rulesThen = null;
+            _toolsInstance.showRules(false);
+         }
+      }
+      
       private function showChatFilter(param1:Boolean) : void
       {
          if(_filterWin == null)
@@ -1666,7 +1816,7 @@ package
             _loc2_["ruleBodyTxt" + _loc3_].visible = false;
             _loc3_++;
          }
-         _loc2_.titleTxt.text = "Item Finder";
+         _loc2_.titleTxt.text = "Item Giver";
          _finderStatus = _loc2_.ruleBodyTxt1;
          _finderStatus.visible = true;
          _finderStatus.wordWrap = false;
@@ -1683,6 +1833,7 @@ package
          _finderPageLabel.width = 200;
          _finderPageLabel.height = 24;
          _finderPageLabel.text = "";
+         _loc2_.addChild(finderLink(_loc2_.ruleBodyTxt3,"Colour picker",FINDER_COLOUR_PICKER,60,154,150));
          _finderInputBar = finderSearchBar(-247,-160,212,"Name or id",null,60,true);
          _finderInput = _finderInputBar.searchTxt;
          _loc2_.addChild(_finderInputBar);
@@ -1692,8 +1843,9 @@ package
          finderButtonText(_finderKindButton,"All items");
          _finderKindButton.addEventListener("mouseDown",onFinderKindClick);
          _loc2_.addChild(_finderKindButton);
-         _finderColourBar = finderSearchBar(93,-160,156,"Colour ID","0-9",10,false);
+         _finderColourBar = finderSearchBar(93,-160,156,"Colour ID or #hex","0-9a-fA-F# ,",31,false);
          _finderColourInput = _finderColourBar.searchTxt;
+         _finderColourInput.addEventListener("change",onFinderColourTyped);
          _loc2_.addChild(_finderColourBar);
          _finderRows = new Sprite();
          _finderRows.x = 0;
@@ -1715,6 +1867,62 @@ package
          _finder.addEventListener("mouseWheel",onFinderMouse);
          _finder.visible = false;
          addChild(_finder);
+      }
+      
+      // made by players for working out custom colours
+      private static const FINDER_COLOUR_PICKER:String = "https://aj-color-picker.carrd.co/";
+      
+      // `param1` (a text field of the artwork's, for its font) as a link at
+      // param4, param5, right-aligned in param6. the game's webview may open
+      // no window, so the page asks the client to open it in the system
+      // browser (ajOpenPage in public/game.html); clients before 1.1.2 drop
+      // that, so the address is copied as well.
+      private function finderLink(param1:TextField, param2:String, param3:String, param4:Number, param5:Number, param6:Number) : Sprite
+      {
+         var _loc7_:Sprite = new Sprite();
+         var _loc8_:TextFormat = param1.getTextFormat();
+         _loc8_.align = "right";
+         _loc8_.underline = true;
+         param1.parent.removeChild(param1);
+         param1.visible = true;
+         param1.wordWrap = false;
+         param1.selectable = false;
+         param1.x = 0;
+         param1.y = 0;
+         param1.width = param6;
+         param1.height = 24;
+         param1.defaultTextFormat = _loc8_;
+         param1.text = param2;
+         param1.setTextFormat(_loc8_);
+         _loc7_.addChild(param1);
+         _loc7_.x = param4;
+         _loc7_.y = param5;
+         _loc7_.buttonMode = true;
+         _loc7_.useHandCursor = true;
+         _loc7_.mouseChildren = false;
+         _loc7_.addEventListener("mouseDown",function(param1:MouseEvent):void
+         {
+            param1.stopPropagation();
+            try
+            {
+               System.setClipboard(param3);
+            }
+            catch(e:Error)
+            {
+            }
+            try
+            {
+               if(ExternalInterface.available)
+               {
+                  ExternalInterface.call("ajOpenPage",param3);
+               }
+            }
+            catch(e:Error)
+            {
+            }
+            _finderStatus.text = "Link copied.";
+         });
+         return _loc7_;
       }
       
       private function showItemFinder(param1:Boolean) : void
@@ -1753,6 +1961,16 @@ package
             return;
          }
          var _loc2_:Boolean = _finder != null && _finder.visible;
+         // the rules: Esc closes them as their X does
+         if(_rulesWin != null && _rulesWin.visible)
+         {
+            if(param1.keyCode == 27)
+            {
+               onRulesCloseClick(new MouseEvent("mouseDown"));
+            }
+            param1.stopImmediatePropagation();
+            return;
+         }
          // the chat filter's window: Esc leaves it as its X does, Enter
          // saves, and no key gets past it to the game.
          if(_filterWin != null && _filterWin.visible)
@@ -1870,6 +2088,17 @@ package
          {
             _finderRows.removeChildAt(0);
          }
+         for each(var _loc6_:Object in _finderIcons)
+         {
+            try
+            {
+               _loc6_.destroy();
+            }
+            catch(e:Error)
+            {
+            }
+         }
+         _finderIcons = {};
          var _loc5_:int = Math.max(1,Math.ceil(_finderResults.length / 6));
          _loc2_ = _finderPage * 6;
          while(_loc2_ < _finderResults.length && _loc2_ < _finderPage * 6 + 6)
@@ -1886,12 +2115,13 @@ package
             _loc4_ = GETDEFINITIONBYNAME("buyBtnCont");
             _loc4_.scaleX = 0.8;
             _loc4_.scaleY = 0.8;
-            _loc4_.x = 160;
+            _loc4_.x = 152;
             _loc4_.y = _loc3_.y;
             _loc4_.name = "give" + _loc2_;
             finderButtonText(_loc4_,"Give");
             _loc4_.addEventListener("mouseDown",onFinderGiveClick);
             _finderRows.addChild(_loc4_);
+            _finderRows.addChild(finderPreview(_loc1_,_loc2_,226,_loc3_.y));
             _loc2_++;
          }
          _finderPageLabel.text = _finderResults.length == 0 ? "" : "Page " + (_finderPage + 1) + " of " + _loc5_;
@@ -1926,6 +2156,7 @@ package
          {
             _loc3_.colorIndex = (int(_loc3_.colorIndex) + 1) % int(_loc3_.colors);
             _loc2_.currTxt.text = finderRowText(_loc3_);
+            recolourFinderPreview(int(_loc2_.name.substr(3)));
          }
       }
       
@@ -1945,6 +2176,11 @@ package
          };
          if(_finderColourInput.text.length > 0 && _loc2_.kind != "den")
          {
+            if(_finderColourInput.text.indexOf("#") >= 0 ? finderHexColours(_finderColourInput.text) == null : !/^\s*[0-9]+\s*$/.test(_finderColourInput.text))
+            {
+               _finderStatus.text = "Colour: an id, or #RRGGBB";
+               return;
+            }
             _loc5_.color = _finderColourInput.text;
          }
          _loc3_.data = JSON.stringify(_loc5_);
@@ -1954,6 +2190,163 @@ package
          _loc4_.addEventListener("securityError",onFinderFailed);
          _finderStatus.text = "Adding " + _loc2_.name + "...";
          _loc4_.load(_loc3_);
+      }
+      
+      // one to four "#RRGGBB" (spaces or commas between) as the four colour
+      // bands' RGB values, the last filling the rest; null if it is not that.
+      // the server reads the box the same way (lib/admin.js).
+      private static function finderHexColours(param1:String) : Array
+      {
+         var _loc2_:String = param1.replace(/^\s+|\s+$/g,"");
+         var _loc3_:Array = null;
+         var _loc4_:Array = [];
+         var _loc5_:int = 0;
+         if(!/^#[0-9a-f]{6}([\s,]+#[0-9a-f]{6}){0,3}$/i.test(_loc2_))
+         {
+            return null;
+         }
+         _loc3_ = _loc2_.split(/[\s,]+/);
+         while(_loc5_ < 4)
+         {
+            _loc4_.push(uint(parseInt(String(_loc3_[Math.min(_loc5_,_loc3_.length - 1)]).substr(1),16)));
+            _loc5_++;
+         }
+         return _loc4_;
+      }
+      
+      // the colour a clothing row is drawn in: the box's colour id or hex
+      // colour, else the item's own colour that the row is on
+      private function finderPreviewColour(param1:Object) : uint
+      {
+         var _loc2_:String = _finderColourInput == null ? "" : _finderColourInput.text.replace(/^\s+|\s+$/g,"");
+         var _loc3_:Array = null;
+         var _loc4_:Object = null;
+         if(_loc2_.length > 0 && _loc2_.indexOf("#") >= 0)
+         {
+            _loc3_ = finderHexColours(_loc2_);
+            if(_loc3_ != null)
+            {
+               if(_loc3_.join(",") != _finderHexKey)
+               {
+                  // a new id each time, so no drawing keeps the old palette;
+                  // 0xFDFFFF00 and up is far past what the server hands out
+                  _finderHexKey = _loc3_.join(",");
+                  _finderHexId = uint(0xFDFFFF00 + (_finderHexCount++ & 0xFF));
+                  PaletteHelper.customColors[_finderHexId] = _loc3_;
+               }
+               return _finderHexId;
+            }
+         }
+         else if(/^[0-9]+$/.test(_loc2_))
+         {
+            return uint(Number(_loc2_));
+         }
+         _loc4_ = ItemXtCommManager.getItemDef(int(param1.id));
+         if(_loc4_ == null || _loc4_.colors == null || _loc4_.colors.length == 0)
+         {
+            return 0;
+         }
+         return uint(_loc4_.colors[Math.min(int(param1.colorIndex),_loc4_.colors.length - 1)]);
+      }
+      
+      // the row's item as the game draws it in a shop, in a box at the row's end
+      private function finderPreview(param1:Object, param2:int, param3:Number, param4:Number) : Sprite
+      {
+         var _loc5_:Sprite = new Sprite();
+         var _loc6_:Sprite = new Sprite();
+         var _loc7_:Matrix = new Matrix();
+         var _loc8_:* = null;
+         var _loc9_:Sprite = null;
+         _loc5_.x = param3;
+         _loc5_.y = param4;
+         _loc5_.mouseEnabled = false;
+         _loc5_.mouseChildren = false;
+         _loc5_.graphics.beginFill(7160624);
+         _loc5_.graphics.drawRoundRect(-19,-19,38,38,14,14);
+         _loc5_.graphics.endFill();
+         _loc5_.graphics.beginFill(10115109);
+         _loc5_.graphics.drawRoundRect(-18,-18,36,36,12,12);
+         _loc5_.graphics.endFill();
+         _loc7_.createGradientBox(32,32,Math.PI / 2,-16,-16);
+         _loc5_.graphics.beginGradientFill("linear",[11459790,15261660,16250099],[1,1,1],[0,127,255],_loc7_);
+         _loc5_.graphics.drawRoundRect(-16,-16,32,32,10,10);
+         _loc5_.graphics.endFill();
+         _loc5_.addChild(_loc6_);
+         try
+         {
+            if(param1.kind == "den")
+            {
+               if(DenXtCommManager.getDenItemDef(int(param1.id)) == null)
+               {
+                  return _loc5_;
+               }
+               _loc8_ = new DenItem();
+               DenItem(_loc8_).initShopItem(int(param1.id),0);
+            }
+            else
+            {
+               if(ItemXtCommManager.getItemDef(int(param1.id)) == null)
+               {
+                  return _loc5_;
+               }
+               _loc8_ = new Item();
+               Item(_loc8_).init(int(param1.id),0,finderPreviewColour(param1),null,true);
+            }
+            // fitted to the box once drawn, which may be before the icon is
+            // handed back when its picture was loaded already
+            _loc8_.imageLoadedCallback = function():void
+            {
+               var _loc1_:Number = 0;
+               if(_loc6_.numChildren > 0)
+               {
+                  _loc6_.scaleX = _loc6_.scaleY = 1;
+                  _loc1_ = Math.max(_loc6_.width,_loc6_.height);
+                  if(_loc1_ > 0)
+                  {
+                     _loc6_.scaleX = _loc6_.scaleY = Math.min(1,30 / _loc1_);
+                  }
+               }
+            };
+            _loc9_ = _loc8_.icon;
+            if(_loc9_ != null)
+            {
+               _loc6_.addChild(_loc9_);
+               if(_loc8_.isIconLoaded)
+               {
+                  _loc8_.imageLoadedCallback();
+               }
+            }
+            _finderIcons[param2] = _loc8_;
+         }
+         catch(e:Error)
+         {
+            GlobalErrorCatch.reportToServer("item giver preview " + param1.kind + " " + param1.id + ": " + e);
+         }
+         return _loc5_;
+      }
+      
+      private function recolourFinderPreview(param1:int) : void
+      {
+         var _loc2_:Item = _finderIcons[param1] as Item;
+         if(_loc2_ != null && _finderResults[param1] != null)
+         {
+            _loc2_.color = finderPreviewColour(_finderResults[param1]);
+            _loc2_.icon;
+         }
+      }
+      
+      // the previews follow the colour box once what is in it reads as a
+      // colour, or is emptied
+      private function onFinderColourTyped(param1:Event) : void
+      {
+         var _loc2_:String = _finderColourInput.text.replace(/^\s+|\s+$/g,"");
+         if(_loc2_.length == 0 || /^[0-9]+$/.test(_loc2_) || finderHexColours(_loc2_) != null)
+         {
+            for(var _loc3_:String in _finderIcons)
+            {
+               recolourFinderPreview(int(_loc3_));
+            }
+         }
       }
       
       private function onFinderGiveDone(param1:Event) : void

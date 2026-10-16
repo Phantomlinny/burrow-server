@@ -192,7 +192,7 @@ package gui
                            if(_loc4_.masteryCounter >= 100)
                            {
                               _inventoryMC.bMastery.visible = true;
-                              _inventoryMC.bMastery.icon.gotoAndStop(PetManager.petNameForDefId(_loc4_.defId) + "1");
+                              showMasteryIcon(PetManager.petNameForDefId(_loc4_.defId) + "1");
                               if((_loc4_.uBits >> 8 & 0x0F) > 0)
                               {
                                  _inventoryMC.bMastery.mouse.visible = false;
@@ -227,6 +227,21 @@ package gui
             {
                onChecklistBtn(null);
             }
+         }
+      }
+      
+      // the mastery badge has a frame per pet that had a mastery item; this
+      // server lets any pet reach 100, and a missing frame threw (#2109) and
+      // left the rest of the inventory unset.
+      private function showMasteryIcon(param1:String) : void
+      {
+         try
+         {
+            _inventoryMC.bMastery.icon.gotoAndStop(param1);
+         }
+         catch(e:Error)
+         {
+            _inventoryMC.bMastery.visible = false;
          }
       }
       
@@ -490,7 +505,7 @@ package gui
                if(_loc5_.masteryCounter >= 100)
                {
                   _inventoryMC.bMastery.visible = true;
-                  _inventoryMC.bMastery.icon.gotoAndStop(PetManager.petNameForDefId(_loc5_.defId) + "1");
+                  showMasteryIcon(PetManager.petNameForDefId(_loc5_.defId) + "1");
                   if((_loc5_.uBits >> 8 & 0x0F) > 0)
                   {
                      _inventoryMC.bMastery.mouse.visible = false;

@@ -261,19 +261,25 @@
         <button role="tab" data-tab="requests" aria-selected="false">Requests<span id="request-count"></span></button>
         <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
         <button role="tab" data-tab="bans" aria-selected="false">Bans</button>
+        <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
       </nav>
 
       <div data-view="players">
         <section>
           <div class="toolbar">
+            <select id="player-search-by" aria-label="Search by">
+              <option value="name">By name</option>
+              <option value="address">By IP address</option>
+            </select>
             <input id="player-search" type="search" placeholder="Search" aria-label="Search players">
             <span class="hint" id="online-count"></span>
           </div>
           <div class="table-wrap"><table>
-            <thead><tr><th>Name</th><th>State</th><th>Where</th><th>Last seen</th></tr></thead>
+            <thead><tr><th>Name</th><th>State</th><th>Where</th><th id="players-when">Last seen</th></tr></thead>
             <tbody id="players"></tbody>
           </table></div>
           <div class="empty" id="no-players" hidden>No players match.</div>
+          <p class="hint" id="address-hint" hidden>Players who signed in from this address, or from addresses starting with it, in the last 90 days. Each search is written in the moderator log.</p>
         </section>
         <section id="detail" hidden>
           <h2 id="detail-name"></h2>
@@ -314,6 +320,10 @@
           <h3 style="margin:16px 0 4px" id="history-title" hidden>Ban history</h3>
           <ul id="player-history"></ul>
         </section>
+      </div>
+
+      <div data-view="stats" hidden>
+<!--stats-view-->
       </div>
 
       <div data-view="chat" hidden>
@@ -456,6 +466,13 @@
         }
         return "under a minute";
       };
+      // time played: "3d 4h", "2h 15m", "40m".
+      const played = seconds => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor(seconds % 86400 / 3600);
+        const minutes = Math.floor(seconds % 3600 / 60);
+        return days > 0 ? `${days.toLocaleString()}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+      };
       const left = seconds => (seconds === -1 ? "Until lifted" : seconds ? `${duration(seconds)} left` : "—");
 
       let check = null; // the captcha (public/captcha.js), once the sign-in is shown
@@ -515,10 +532,12 @@
           const row = el("tr", undefined, player.username === selected ? "pick selected" : "pick");
           const stateCell = el("td");
           stateCell.append(...stateTags(player).flatMap(tag => [tag, " "]));
-          row.append(el("td", player.username), stateCell, el("td", player.room || "—"), el("td", player.online ? "Now" : when(player.lastSeen)));
+          row.append(el("td", player.username), stateCell, el("td", player.room || "—"),
+            el("td", player.matchedAt ? when(player.matchedAt) : player.online ? "Now" : when(player.lastSeen)));
           row.addEventListener("click", () => select(player.username === selected ? null : player.username));
           return row;
         }));
+        $("no-players").textContent = "No players match.";
         $("no-players").hidden = players.length > 0;
       };
 
@@ -546,6 +565,7 @@
           ["Where", player.online ? player.room : "Offline"],
           ["Last seen", player.online ? "Now" : when(player.lastSeen)],
           ["Joined", when(player.createdAt)],
+          ["Playtime", played(player.playtime || 0)],
           ["Ban", player.banned === 0 ? "—" : `${left(player.banned)} · ${player.banReason}`],
           ["Chat", player.silenced === 0 ? "—" : `Silenced: ${left(player.silenced).toLowerCase()}`],
           ["Reports waiting", String(player.openReports)],
@@ -623,7 +643,16 @@
         }
       });
 
-      $("player-search").addEventListener("input", () => refresh());
+      // by address, asked once typing stops: each search is written down.
+      let searchWait = null;
+      $("player-search").addEventListener("input", () => {
+        clearTimeout(searchWait);
+        searchWait = setTimeout(refresh, $("player-search-by").value === "address" ? 700 : 0);
+      });
+      $("player-search-by").addEventListener("change", () => {
+        $("player-search").placeholder = $("player-search-by").value === "address" ? "203.0.113.7, or the start of one" : "Search";
+        refresh();
+      });
 
       const chatUrl = before => `chat?username=${encodeURIComponent(chatQuery.username)}&room=${encodeURIComponent(chatQuery.room)}`
         + `&text=${encodeURIComponent(chatQuery.text)}&before=${before}`;
@@ -874,11 +903,24 @@
           $("online-count").textContent = `${counts.data.online} playing`;
         }
         if (shown === "players") {
-          const result = await api(`players?q=${encodeURIComponent($("player-search").value.trim())}`);
-          if (result.ok) {
-            players = result.data.players;
+          const byAddress = $("player-search-by").value === "address";
+          const query = $("player-search").value.trim();
+          $("players-when").textContent = byAddress ? "Last from address" : "Last seen";
+          $("address-hint").hidden = !byAddress;
+          if (byAddress && query === "") {
+            players = [];
             renderPlayers();
-            await loadDetail();
+          }
+          else {
+            const result = await api(`players?q=${encodeURIComponent(query)}${byAddress ? "&by=address" : ""}`);
+            players = result.ok ? result.data.players : [];
+            renderPlayers();
+            if (!result.ok && byAddress) {
+              $("no-players").textContent = said(result);
+            }
+            if (result.ok) {
+              await loadDetail();
+            }
           }
         }
         else if (shown === "chat") {
@@ -904,6 +946,9 @@
           if (result.ok) {
             renderMasterpieces(result.data);
           }
+        }
+        else if (shown === "stats") {
+          await window.statsView.load(api);
         }
         else if (shown === "bans") {
           const result = await api("bans");

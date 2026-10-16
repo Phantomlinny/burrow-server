@@ -1635,29 +1635,22 @@ package gui
          }
       }
       
+      // the game's rules popup is this server's rules (AJClient.openRules)
       public static function displayRulesPopup(param1:Boolean, param2:Function = null) : void
       {
          if(param1)
          {
-            if(_rulesPopup)
+            AJClient.openRules(param2 == null ? null : function():void
             {
-               _rulesPopup.destroy();
-               _rulesPopup = null;
-            }
-            _rulesPopup = new SBPopup(guiLayer,GETDEFINITIONBYNAME("ReportRulesPopupSkin"),GETDEFINITIONBYNAME("ReportRulesPopupContent"),true,true,false,false,true);
-            _rulesPopup.x = 900 * 0.5;
-            _rulesPopup.y = 550 * 0.5;
-            if(param2 != null)
-            {
-               _rulesPopup.closeBtn.addEventListener("mouseDown",param2,false,0,true);
-            }
+               param2(new MouseEvent("mouseDown"));
+            });
          }
-         else if(_rulesPopup)
+         else
          {
-            _rulesPopup.destroy();
-            _rulesPopup = null;
+            AJClient.closeRules();
          }
       }
+
       
       public static function openJammerCentral() : void
       {
@@ -2456,7 +2449,15 @@ package gui
             {
                guiLayer.removeChild(_avatarCreator);
             }
-            _avatarCreator.destroy();
+            // the last one may have been destroyed already by the way it was
+            // closed, which left this pointing at it (#1009 in its destroy)
+            try
+            {
+               _avatarCreator.destroy();
+            }
+            catch(e:Error)
+            {
+            }
          }
          _avatarCreator = new GuiAvatarCreationAssets();
          _avatarCreator.initFromWorld(param1,param2,param3,param4,false,param5);

@@ -583,7 +583,11 @@ package shop
             _denPreviewManager.destroy();
             _denPreviewManager = null;
          }
-         removeListeners();
+         // a shop replaced before its artwork came has none to unhook (#1009)
+         if(_shop)
+         {
+            removeListeners();
+         }
          if(_shopItemArray && _shopItemArray.length > 0)
          {
             _loc1_ = 0;
@@ -621,6 +625,12 @@ package shop
          TutorialPopups.closeTutorialTextPopup();
          _spirals = null;
          _closeCallback = null;
+         if(_shop == null)
+         {
+            _shopToSell = null;
+            _shopWithPreview = null;
+            return;
+         }
          if(_shop.buyPopup.visible)
          {
             DarkenManager.unDarken(_shop.buyPopup);

@@ -204,7 +204,7 @@ package
             {
                NPCView.disguiseDefId = 0;
                GlobalErrorCatch.reportToServer("while handling server message \"" + param1.obj[0] + "\": " + e + "\n" + e.getStackTrace());
-               throw e;
+               // not thrown on: the global catch only reported it a second time
             }
             NPCView.disguiseDefId = 0;
          }

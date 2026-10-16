@@ -666,6 +666,8 @@ package buddy
       {
          var _loc2_:Function = null;
          var _loc1_:int = 0;
+         // first, so that nothing below that throws can leave it set
+         AvatarManager.buddyCardAvatarView = null;
          if(_closeCallback != null)
          {
             _loc2_ = _closeCallback;
@@ -751,7 +753,11 @@ package buddy
          {
             _banCard = null;
          }
-         _popupLayer.removeChild(_buddyCardMC);
+         // a card destroyed twice, or before it was shown (#2007)
+         if(_buddyCardMC && _buddyCardMC.parent)
+         {
+            _buddyCardMC.parent.removeChild(_buddyCardMC);
+         }
          _buddyCardMC = null;
          AvatarManager.buddyCardAvatarView = null;
          if(_playerAvatars)
@@ -1829,6 +1835,10 @@ package buddy
             }
             _mainAvatarView.destroy();
             _mainAvatarView = null;
+            // left pointing at the destroyed view, its userName is null and
+            // AvatarManager.avatarCreateResponse throws for every player
+            // who comes into the room after (before their clothes go on).
+            AvatarManager.buddyCardAvatarView = null;
          }
       }
       
@@ -2398,7 +2408,8 @@ package buddy
          _loc3_ = 0;
          while(_loc3_ < _views.length)
          {
-            if(_views[_loc3_] == param1.mediaHelper)
+            // the card closed before the game icons came (#1009)
+            if(_views[_loc3_] == param1.mediaHelper && _pvpItemWindows != null && _loc3_ < _pvpItemWindows.bg.numChildren)
             {
                _loc2_ = MovieClip(_pvpItemWindows.bg.getChildAt(_loc3_));
                param1 = param1.getChildAt(0) as MovieClip;
@@ -3235,7 +3246,8 @@ package buddy
       
       public function get currBuddyCardUserName() : String
       {
-         if(_currUserName != "")
+         // null until a card was first filled in (#1009)
+         if(_currUserName)
          {
             return _currUserName.toLowerCase();
          }

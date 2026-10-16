@@ -76,6 +76,14 @@
         window.ipc.sendToHost("fps", count);
       }
 
+      // an address the SWF wants open (AJClient.finderLink): the client opens
+      // it in the system browser, being a webview that may open no window.
+      function ajOpenPage(url) {
+        if (/^https:\/\//.test(String(url))) {
+          window.ipc.sendToHost("openPage", String(url));
+        }
+      }
+
       function ajPrint(imageData) {
         window.ipc.sendToHost("printImage", imageData);
       }

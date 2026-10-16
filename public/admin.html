@@ -245,6 +245,7 @@
       <nav role="tablist">
         <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
         <button role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
+        <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
         <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
         <button role="tab" data-tab="support" aria-selected="false">Requests<span id="support-count"></span></button>
         <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
@@ -274,9 +275,17 @@
         </div>
       </div>
 
+      <div data-view="stats" hidden>
+<!--stats-view-->
+      </div>
+
       <div data-view="accounts" hidden>
         <section>
           <div class="toolbar">
+            <select id="account-search-by" aria-label="Search by">
+              <option value="name">By name</option>
+              <option value="address">By IP address</option>
+            </select>
             <input id="account-search" type="search" placeholder="Search" aria-label="Search accounts">
             <select id="account-filter" aria-label="Which accounts">
               <option value="all">All</option>
@@ -284,7 +293,15 @@
               <option value="banned">Banned</option>
             </select>
           </div>
-          <div class="table-wrap"><table>
+          <div id="address-view" hidden>
+            <p class="hint">Accounts that signed in from this address, or from addresses starting with it, in the last 90 days.</p>
+            <p class="status" id="address-status" role="status"></p>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>State</th><th>Addresses</th><th>Last from there</th></tr></thead>
+              <tbody id="address-results"></tbody>
+            </table></div>
+          </div>
+          <div class="table-wrap" id="account-list"><table>
             <thead><tr><th>Name</th><th>State</th><th>Created</th><th>Last login</th><th>Last seen</th><th class="num">Logins</th><th class="num">Animals</th><th class="num">Items</th></tr></thead>
             <tbody id="accounts"></tbody>
           </table></div>
@@ -744,8 +761,61 @@
         return tags.length ? tags : [el("span", "Offline", "hint")];
       };
 
+      // time played: "3d 4h", "2h 15m", "40m".
+      const played = seconds => {
+        const days = Math.floor(seconds / 86400);
+        const hours = Math.floor(seconds % 86400 / 3600);
+        const minutes = Math.floor(seconds % 3600 / 60);
+        return days > 0 ? `${days.toLocaleString()}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+      };
+
+      // by IP address: the server looks through the sign-in histories.
+      let addressFound = null; // {query, players} or null
+      const searchByAddress = async () => {
+        const query = $("account-search").value.trim();
+        if (query === "") {
+          addressFound = null;
+          setStatus($("address-status"), "");
+          renderAccounts();
+          return;
+        }
+        const result = await api(`address-search?q=${encodeURIComponent(query)}`);
+        if (query !== $("account-search").value.trim()) {
+          return; // typed on meanwhile
+        }
+        addressFound = result.ok ? {query, players: result.data.players} : null;
+        setStatus($("address-status"), result.ok ? (result.data.players.length ? "" : "Nobody signed in from there.") : result.data.error || "That did not work.", !result.ok);
+        renderAccounts();
+      };
+
+      const renderAddressResults = () => {
+        const found = addressFound ? addressFound.players : [];
+        $("address-results").replaceChildren(...found.map(entry => {
+          const account = accounts.find(one => one.username === entry.username);
+          const row = el("tr", undefined, entry.username === selected ? "pick selected" : "pick");
+          const nameCell = el("td");
+          const pick = el("button", entry.username);
+          pick.type = "button";
+          nameCell.append(pick);
+          const stateCell = el("td");
+          if (account) {
+            stateCell.append(...accountState(account).flatMap(tag => [tag, " "]));
+          }
+          row.addEventListener("click", () => select(entry.username));
+          row.append(nameCell, stateCell, el("td", entry.addresses.map(one => one.address).join(", ")), el("td", when(entry.lastAt)));
+          return row;
+        }));
+      };
+
       const renderAccounts = () => {
-        const query = $("account-search").value.trim().toLowerCase();
+        const byAddress = $("account-search-by").value === "address";
+        $("address-view").hidden = !byAddress;
+        $("account-list").hidden = byAddress;
+        if (byAddress) {
+          renderAddressResults();
+          $("no-accounts").hidden = true;
+        }
+        const query = byAddress ? "" : $("account-search").value.trim().toLowerCase();
         const filter = $("account-filter").value;
         const shown = accounts
           .filter(account => account.username.toLowerCase().includes(query))
@@ -769,11 +839,13 @@
             el("td", account.items.toLocaleString(), "num"));
           return row;
         }));
-        $("no-accounts").hidden = shown.length > 0;
+        if (!byAddress) {
+          $("no-accounts").hidden = shown.length > 0;
+        }
         const current = accounts.find(account => account.username === selected);
         $("detail").hidden = !current;
         if (current) {
-          $("detail-name").textContent = `${current.username} · ${current.gems.toLocaleString()} gems`;
+          $("detail-name").textContent = `${current.username} · ${current.gems.toLocaleString()} gems · played ${played(current.playtime || 0)}${current.playtimePublic ? " (public)" : ""}`;
         }
       };
 
@@ -979,7 +1051,26 @@
         }
       });
 
-      $("account-search").addEventListener("input", renderAccounts);
+      let addressWait = null;
+      $("account-search").addEventListener("input", () => {
+        if ($("account-search-by").value === "address") {
+          clearTimeout(addressWait);
+          addressWait = setTimeout(searchByAddress, 400);
+        }
+        else {
+          renderAccounts();
+        }
+      });
+      $("account-search-by").addEventListener("change", () => {
+        const byAddress = $("account-search-by").value === "address";
+        $("account-search").placeholder = byAddress ? "203.0.113.7, or the start of one" : "Search";
+        if (byAddress) {
+          searchByAddress();
+        }
+        else {
+          renderAccounts();
+        }
+      });
       $("account-filter").addEventListener("change", renderAccounts);
 
       const act = async (username, action, extra, statusElement) => {
@@ -1377,6 +1468,9 @@
             badges = result.data.badges || [];
             renderAccounts();
           }
+        }
+        else if (tab === "stats") {
+          await window.statsView.load(api);
         }
         else if (tab === "reports") {
           result = await api(`reports?handled=${$("report-filter").value}`);
