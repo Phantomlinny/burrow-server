@@ -1,0 +1,29 @@
+{
+  "server": [
+    "ajcontent.akamaized.net",
+    "burrow.moe",
+    "challenges.cloudflare.com",
+    "play.burrow.moe",
+    "www.cloudflare.com",
+    "www.w3.org"
+  ],
+  "swf": [
+    "academy.animaljam.com",
+    "adobe.com",
+    "buddy.animaljam.com",
+    "crypto.hurlant.com",
+    "dailyexplorer.animaljam.com",
+    "dev-content.animaljam.com",
+    "jump.animaljam.com",
+    "ns.adobe.com",
+    "purl.org",
+    "shop.animaljam.com",
+    "ssl.google-analytics.com",
+    "wac.6a16.edgecastcdn.net",
+    "www.adobe.com",
+    "www.animaljam.com",
+    "www.google-analytics.com",
+    "www.osmf.org",
+    "www.w3.org"
+  ]
+}
