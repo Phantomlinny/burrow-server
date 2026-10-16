@@ -149,7 +149,7 @@ const run = async () => {
   assert.strictEqual(await owned(), before + 3);
   say(a, roomId, "!help"); // gone: the list is at /commands
   assert.strictEqual((await a.untilXt("uc"))[3], "!help");
-  assert.match(await (await fetch(`${BASE}/commands`)).text(), /!outfit save NAME/);
+  assert.match(await (await fetch(`${BASE}/commands`)).text(), /!outfit save <i>NAME<\/i>/); // the page sets what to type in italics
 
   // --- den undo, mail, music
   say(a, roomId, "!den undo");

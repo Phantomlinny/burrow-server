@@ -45,7 +45,7 @@ const wall = async body => (await postJson(`${BASE}/wall`, body)).json();
 
 const run = async () => {
   const registerJson = body => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({avatarType: 1, agreed: true, ...body})});
-  for (const username of ["Ann", "Ben", "Cat"]) {
+  for (const username of ["Ann", "Ben", "Cat", "Scout"]) {
     assert.strictEqual((await registerJson({username, password: "Password01"})).status, 200);
   }
 
@@ -84,6 +84,30 @@ const run = async () => {
   const {client: b, login: benLogin} = await arrive("Ben", "Password01");
   await a.untilXt("ac");
   await a.nextXt("il");
+
+  // the shop's name and stalls come from its room file (lib/roominfo.js),
+  // read the first time anyone goes in; until then the name is made from its
+  // path. a scout goes in first and comes back until the file has been read,
+  // so that what follows does not depend on what an earlier run left in the
+  // cache. (the scout never enters the township, so a and b see nothing.)
+  const scoutAuth = await (await postJson(`${BASE}/authenticate`, {username: "Scout", password: "Password01"})).json();
+  const scout = new harness.GameClient(GAME_PORT);
+  await scout.connect();
+  assert.strictEqual((await scout.logIn("Scout", scoutAuth.auth_token)).status, "1");
+  let scoutRoom = 1;
+  for (let tries = 0; ; tries++) {
+    scout.xt("rj", scoutRoom, "jamaa_township.clothes_shop#1", 1, 0, 0);
+    const there = await scout.untilXt("rj");
+    if (there[14] === "Jam Mart Clothing") {
+      break;
+    }
+    assert.ok(tries < 40, `the shop's room file was never read (still "${there[14]}")`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    scout.xt("rj", there[4], "sarepia.room_main#1", 1, 0, 0);
+    scoutRoom = (await scout.untilXt("rj"))[4];
+  }
+  scout.socket.destroy();
+  await new Promise(resolve => setTimeout(resolve, 300)); // gone before Ben walks in
 
   // --- a shop's title is its room's name, as the id of the string that says so
   b.xt("rj", roomId, "jamaa_township.clothes_shop#1", 1, 0, 0);

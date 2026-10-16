@@ -100,6 +100,11 @@ class GameClient {
         this.varUpdates.push(fields);
         continue;
       }
+      // the chat filter settings ("xfl", after every login) and the one-time
+      // question which filter to use ("xfa", on the first room) come unasked.
+      if ((fields[0] === "xfl" || fields[0] === "xfa") && cmd !== fields[0]) {
+        continue;
+      }
       if (this.unasked(fields)) {
         continue;
       }
@@ -165,8 +170,12 @@ const withServer = async (name, httpPort, gamePort, run) => {
     throw err;
   }
   finally {
+    // on Windows the database stays locked until the process has gone, so
+    // wait for it before throwing its files away.
+    const exited = server.exitCode !== null ? Promise.resolve() : new Promise(resolve => server.once("exit", resolve));
     server.kill();
-    fs.rmSync(dataDir, {recursive: true, force: true});
+    await exited;
+    fs.rmSync(dataDir, {recursive: true, force: true, maxRetries: 10, retryDelay: 200});
   }
 };
 

@@ -621,14 +621,16 @@ const run = async () => {
 
   // --- the custom client's login choices: honoured for that session only
   assert.strictEqual((await (await fetch(`${BASE}/flashvars`)).json()).loginChoices, true);
-  const chosen = await (await postJson(`${BASE}/authenticate`, {username: "Carol", password: "Password03",
+  // (a fresh account: Carol is banned by now, and a banned account's
+  // sign-in is refused with "account_banned", so it gets no token.)
+  assert.strictEqual((await registerJson({username: "Erin", password: "Password05"})).status, 200);
+  const chosen = await (await postJson(`${BASE}/authenticate`, {username: "Erin", password: "Password05",
     login_choices: {accountType: 0, isGuide: true, membershipDays: 12, isModerator: "yes"}})).json();
-  // (Carol is banned from the game by now, so only the web side is checked.)
   assert.strictEqual((await (await fetch(`${BASE}/player`, {headers: {Authorization: `Bearer ${chosen.auth_token}`}})).json()).game_account_type, 0);
-  a.xt("ag", denId, "Carol", 0);
+  a.xt("ag", denId, "Erin", 0);
   assert.deepStrictEqual((await a.untilXt("ag")).slice(5, 7), ["0", "1"]); // account type, guide
-  await postJson(`${BASE}/authenticate`, {username: "Carol", password: "Password03"}); // and back to normal
-  a.xt("ag", denId, "Carol", 0);
+  await postJson(`${BASE}/authenticate`, {username: "Erin", password: "Password05"}); // and back to normal
+  a.xt("ag", denId, "Erin", 0);
   assert.deepStrictEqual((await a.untilXt("ag")).slice(5, 7), ["2", "0"]);
 
   // --- custom colours: an id for four RGB values, announced to everyone

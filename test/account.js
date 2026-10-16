@@ -219,7 +219,9 @@ const run = async () => {
   assert.strictEqual((await mine("me", undefined, ben)).status, 401);
   assert.strictEqual((await authenticate("Ben", "Password01")).status, 401);
   assert.ok(!(await panel("accounts", undefined, admin)).data.accounts.some(account => account.username === "Ben"));
-  assert.strictEqual((await register("Ben", 5)).status, 200); // the name is free again
+  // the name is held for a while (lib/accounts.js, NAME_HELD_DAYS): the
+  // players Ben met still know him by it.
+  assert.deepStrictEqual(await (await register("Ben", 5)).json(), {error: "username_taken"});
   b2.socket.destroy();
   a.socket.destroy();
   b.socket.destroy();
