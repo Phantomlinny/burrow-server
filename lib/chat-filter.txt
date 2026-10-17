@@ -1,6 +1,7 @@
 # The server's chat filter (lib/chatfilter.js): typed chat, Jam-a-Gram
-# messages and Jammer Wall posts. A message that breaks a rule here reaches
-# nobody, and its sender is told it was not sent. Players cannot turn this
+# messages, Jammer Wall posts and bios. A message that breaks a rule here
+# reaches nobody, and its sender is told it was not sent (a bio is not
+# saved, and one saved before is not shown). Players cannot turn this
 # off (unlike the client's own filter). It is read again when this file
 # changes: no restart needed.
 #
