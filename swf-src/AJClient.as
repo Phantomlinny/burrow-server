@@ -2086,7 +2086,9 @@ package
          moderateButton("summon","Bring here",-160,72,"player.summon");
          moderateButton("goto","Go to them",0,72,"player.goto");
          moderateButton("kick","Disconnect",160,72,"player.kick");
-         moderateButton("warnings","Warnings",0,132,"player.warn");
+         // their warnings, and taking back the latest (one given by mistake)
+         moderateButton("warnings","Warnings",-80,132,"player.warn");
+         moderateButton("unwarn","Take back warning",80,132,"player.warn");
          _moderate.addEventListener("mouseDown",onFinderMouse);
          _moderate.addEventListener("mouseUp",onFinderMouse);
          _moderate.addEventListener("click",onFinderMouse);
