@@ -100,9 +100,10 @@ class GameClient {
         this.varUpdates.push(fields);
         continue;
       }
-      // the chat filter settings ("xfl", after every login) and the one-time
-      // question which filter to use ("xfa", on the first room) come unasked.
-      if ((fields[0] === "xfl" || fields[0] === "xfa") && cmd !== fields[0]) {
+      // the chat filter settings ("xfl", after every login), the one-time
+      // question which filter to use ("xfa", on the first room) and the
+      // buddy list with when each was last seen ("bl", "xls": at login) come unasked.
+      if ((fields[0] === "xfl" || fields[0] === "xfa" || fields[0] === "bl" || fields[0] === "xls") && cmd !== fields[0]) {
         continue;
       }
       if (this.unasked(fields)) {

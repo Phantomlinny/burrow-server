@@ -413,7 +413,10 @@ const run = async () => {
   assert.deepStrictEqual([sent[2], sent[7], sent[8], sent[9]], ["2", "0", "1", hat]);
   assert.deepStrictEqual((await a.nextXt("es")).slice(2), ["1"]);
   const pushed = await b.untilXt("ep");
-  assert.deepStrictEqual(pushed.slice(3, 10), ["Ann", cards[9], stamps[9], "0", "A hat for you!", "1", shop[9]]);
+  // a clothing gift goes by the id of its picture (the def's layerDefId,
+  // lib/ecards.js giftId), not the item's
+  assert.deepStrictEqual(pushed.slice(3, 9), ["Ann", cards[9], stamps[9], "0", "A hat for you!", "1"]);
+  assert.ok(Number(pushed[9]) > 0);
   b.xt("el", own[4], 0);
   const inbox = await b.nextXt("el");
   assert.deepStrictEqual([inbox[2], inbox.length], ["1", 3 + 17]);

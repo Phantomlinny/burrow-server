@@ -383,12 +383,13 @@ const run = async () => {
   const moved = await c.nextXt("rp");
   assert.deepStrictEqual([moved[4], moved[5]], ["2", newDenDef]); // room type 2 = den, then the den type
   assert.deepStrictEqual((await c.nextXt("ds")).slice(2, 3), ["0"]); // the furniture stayed in the first den
-  assert.deepStrictEqual((await a.nextXt("ds")).slice(2, 3), ["0"]);
+  // the owner is also sent the den's items ("di") on a switch
+  assert.deepStrictEqual((await a.untilXt("ds")).slice(2, 3), ["0"]);
   a.xt("dc", denId, 0);
   await a.nextXt("dc");
   await c.nextXt("rp");
   assert.deepStrictEqual((await c.nextXt("ds")).slice(2, 3), ["1"]);
-  await a.nextXt("ds");
+  await a.untilXt("ds");
   a.xt("dp", denId, 0, 0);
   {
     const stranger = new GameClient();
@@ -411,7 +412,7 @@ const run = async () => {
   assert.deepStrictEqual([gone[2], gone[5], ...gone.slice(7)], ["2", "Alice", "0", "1", tradedInv]);
 
   // --- item finder: search by name and id, give to a connected player
-  assert.match(await (await fetch(`${BASE}/shop`)).text(), /Item finder/);
+  assert.match(await (await fetch(`${BASE}/shop`)).text(), /Item giver/);
   const found = await (await fetch(`${BASE}/api/search?q=top+hat&kind=clothing`)).json();
   assert.ok(found.total > 0 && found.results.every(item => /top/i.test(item.name) && /hat/i.test(item.name)));
   const hat = found.results[0];
