@@ -285,6 +285,10 @@ module.exports = {
   idleTimeoutMs: 15 * 60000, // the client sends a keep-alive far more often
   tokenLifetimeDays: 30, // login tokens kept by the launcher's "remember me"
   maxChatLength: 300,
+  // warnings (lib/moderation.js warn): the Nth one within `days` also
+  // silences the player for that many minutes, [[N, minutes], ...]. a
+  // longer silence already on them stays. steps [] turns it off.
+  warningSilence: {days: 30, steps: [[3, 60], [5, 24 * 60]]},
   // days typed chat and whispers are kept for the moderator panel's chat
   // history (lib/chatlog.js); 0 keeps none.
   chatLogDays: env.AJ_CHAT_LOG_DAYS === undefined ? 30 : Math.max(0, Number(env.AJ_CHAT_LOG_DAYS) || 0),

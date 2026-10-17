@@ -195,11 +195,13 @@ const run = async () => {
   say(mira.client, ann.roomId, "!warnings Ann");
   assert.match(await nextBox(mira.client), /^Ann has 2 warnings\. Latest: \S+ behavior by Mira; \S+ bullying by Mira \(called names\)$/);
   // the client's staff window ("xmd"): the same commands, one field each
+  // the third warning in 30 days also silences for an hour (config.warningSilence)
   mira.client.xt("xmd", ann.roomId, "warn", "Ann", "personal");
   assert.deepStrictEqual((await ann.client.untilXt("fd")).slice(2, 4), ["fw", "3"]);
-  assert.strictEqual(await nextBox(mira.client), "Ann warned (personal): warning 3.");
+  assert.deepStrictEqual((await ann.client.untilXt("fd")).slice(2, 4), ["fs", "60"]);
+  assert.strictEqual(await nextBox(mira.client), "Ann warned (personal): warning 3. Silenced for 60 minutes, for that many warnings.");
   mira.client.xt("xmd", ann.roomId, "message", "Ann", "hello there");
-  assert.deepStrictEqual((await ann.client.untilXt("fd")).slice(2, 4), ["fp", "hello there"]);
+  assert.deepStrictEqual((await untilPopup(ann.client, "fp")).slice(2, 4), ["fp", "hello there"]);
   assert.strictEqual(await nextBox(mira.client), "Shown to Ann.");
   mira.client.xt("xmd", ann.roomId, "ban", "Ann"); // not one the window has: nothing
   // and from a player, nothing at all: Ann warns Mira
@@ -236,6 +238,25 @@ const run = async () => {
   const pipPage = (await modPage("/mod/api/player?username=Pip")).data;
   assert.strictEqual(pipPage.warnings, 1);
   assert.deepStrictEqual([pipPage.warningList[0].reason, pipPage.warningList[0].note, pipPage.warningList[0].by], ["scamming", "fake trade", "Mira"]);
+  assert.strictEqual(pipPage.warningList[0].seen, true);
+
+  // warnings while away (Ann was disconnected): kept for her next visit;
+  // the fifth in 30 days silences for a day; one is taken back
+  assert.match((await modPage("/mod/api/act", {username: "Ann", action: "warn", reason: "bullying"})).data.ok,
+    /^Ann warned \(bullying\): warning 4\. They are offline: they will see it when they next play\.$/);
+  assert.match((await modPage("/mod/api/act", {username: "Ann", action: "warn", reason: "behavior"})).data.ok,
+    /warning 5\. .*silenced them for 1 day\.$/);
+  assert.strictEqual((await modPage("/mod/api/act", {username: "Ann", action: "unwarn"})).data.ok, "Took back Ann's latest warning (behavior).");
+  const annAway = (await modPage("/mod/api/player?username=Ann")).data;
+  assert.strictEqual(annAway.warnings, 4);
+  assert.strictEqual(annAway.warningList[0].seen, false);
+  const annBack = await arrive("Ann", people.Ann, SAREPIA);
+  assert.deepStrictEqual((await untilPopup(annBack.client, "fw")).slice(2, 4), ["fw", "1"]); // the bullying one
+  assert.strictEqual((await modPage("/mod/api/player?username=Ann")).data.warningList[0].seen, true);
+  say(mira.client, ann.roomId, "!unwarn Ann");
+  assert.strictEqual(await nextBox(mira.client), "Took back Ann's latest warning (bullying).");
+  say(mira.client, ann.roomId, "!unwarn Mira");
+  assert.strictEqual(await nextBox(mira.client), "That is you.");
 
   // the panel's summon brings Pip to Mira (now in Sarepia)
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "summon"})).data.ok || "", /^Pip was brought to /);
@@ -244,7 +265,8 @@ const run = async () => {
   // everything above is in the moderators' log, the in-game ones marked so
   const log = (await admin("/admin/api/moderators")).data.log.map(entry => `${entry.by} ${entry.action} ${entry.target}`);
   for (const line of ["Mira summon (in game) Pip", "Hal silence (in game) Pip", "Mira goto (in game) Ann", "Mira warn (in game) Ann",
-    "Mira message (in game) Ann", "Mira kick (in game) Ann", "Mira warn Pip", "Mira summon Pip"]) {
+    "Mira message (in game) Ann", "Mira kick (in game) Ann", "Mira warn Pip", "Mira summon Pip", "Mira warn Ann", "Mira unwarn Ann",
+    "Mira unwarn (in game) Ann"]) {
     assert.ok(log.includes(line), `missing from the log: ${line}\n${log.join("\n")}`);
   }
 
@@ -256,7 +278,7 @@ const run = async () => {
   assert.strictEqual(strings[11134], "--Message From Moderator--\n\n");
   assert.ok(!strings[11135].includes("\\n"));
 
-  for (const {client} of [mira, hal, pip]) {
+  for (const {client} of [mira, hal, pip, annBack]) {
     client.socket.destroy();
   }
 };

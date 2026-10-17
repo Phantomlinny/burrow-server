@@ -316,6 +316,7 @@
                 </select>
                 <input id="warn-note" maxlength="200" placeholder="Note for staff (optional)" aria-label="Note">
                 <button type="button" data-action="warn">Warn</button></div>
+              <div class="row" style="margin-top:8px"><button type="button" data-action="unwarn">Take back latest</button></div>
             </div>
             <div class="action">
               <h3>Message</h3>
@@ -647,7 +648,7 @@
         const warnings = player.warningList || [];
         $("warnings-title").hidden = warnings.length === 0;
         $("player-warnings").replaceChildren(...warnings.map(entry => el("li", [when(entry.at), WARNING_REASONS[entry.reason] || entry.reason,
-          entry.note, entry.by && `by ${entry.by}`].filter(Boolean).join(" · "))));
+          entry.note, entry.by && `by ${entry.by}`, entry.seen === false && "not seen yet"].filter(Boolean).join(" · "))));
         $("history-title").hidden = player.history.length === 0;
         $("player-history").replaceChildren(...player.history.map(entry => el("li", [when(entry.at), HISTORY[entry.action] || entry.action,
           entry.action === "ban" ? (entry.seconds === -1 ? "for good" : duration(entry.seconds)) : "", entry.reason, entry.by && `by ${entry.by}`]
@@ -657,7 +658,7 @@
       const select = username => {
         selected = username;
         setStatus($("detail-status"), "");
-        for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text"]) {
+        for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text", "warn-note"]) {
           $(id).value = "";
         }
         renderPlayers();
@@ -685,6 +686,7 @@
       const CONFIRM = {
         banAddress: name => `Ban the address ${name} last signed in from, for good?`,
         rejectName: name => `Reject the username ${name}? They are signed out and must pick another.`,
+        unwarn: name => `Take back ${name}'s latest warning?`,
       };
 
       $("detail").addEventListener("click", async event => {
@@ -1159,7 +1161,7 @@
       const ACTION_PERMISSIONS = {
         ban: "player.ban", banReason: "player.ban", unban: "player.ban",
         silence: "chat.silence", unsilence: "chat.silence",
-        kick: "player.kick", message: "player.warn", warn: "player.warn",
+        kick: "player.kick", message: "player.warn", warn: "player.warn", unwarn: "player.warn",
         rejectName: "player.names", acceptName: "player.names", clearBio: "player.names",
         banAddress: "address.ban", summon: "player.summon", goto: "player.goto",
       };
