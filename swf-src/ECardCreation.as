@@ -737,7 +737,8 @@ package gui
             return;
          }
          gMainFrame.stage.focus = null;
-         loadValentinesPopup();
+         // Burrow: no secret valentines, so no popup asking which to send
+         sendECard(param1);
       }
       
       private function sendMailBtnOverHandler(param1:MouseEvent) : void
