@@ -98,6 +98,10 @@ module.exports = {
   // cached in cacheDir. set AJ_OFFLINE=1 to serve from the cache only.
   upstreamContent: env.AJ_UPSTREAM || "https://ajcontent.akamaized.net/",
   offline: env.AJ_OFFLINE === "1",
+  // the client's device ids (lib/devices.js): a sign-in without them (a
+  // client from before 1.3.0, the official launcher, or one that left them
+  // out) is refused. AJ_REQUIRE_DEVICE=0 lets them in, unknown.
+  requireDevice: env.AJ_REQUIRE_DEVICE !== "0",
   deployVersion: env.AJ_DEPLOY_VERSION || "1830",
   // older builds the CDN still serves, asked in turn for a room file the
   // current build has dropped. 1828 is the last with the Summer Carnival.

@@ -158,6 +158,8 @@
       tbody tr:last-child td { border-bottom: 0; }
       tbody tr.selected td { background: var(--raised); }
       tbody tr.pick { cursor: pointer; }
+      .device-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+      button.link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; font-weight: 400; }
       .empty { color: var(--muted); padding: 8px 0; }
       .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
       .toolbar input[type="search"] { flex: 1; min-width: 180px; }
@@ -193,11 +195,26 @@
       .report .typed { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
       .report pre { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
       .report .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .chat-list { margin: 0; padding: 0; list-style: none; }
+      .chat-list li { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+      .chat-list li:last-child { border-bottom: 0; }
+      .chat-list li.this { background: var(--raised); border-radius: 10px; }
+      .chat-time { flex: none; width: 128px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+      .chat-who { flex: none; max-width: 190px; padding: 0; border: 0; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+      .chat-who:hover { background: none; text-decoration: underline; }
+      .chat-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+      .chat-room { display: block; color: var(--muted); font-size: 12px; }
+      .chat-more { flex: none; padding: 2px 10px 3px; font-size: 12px; }
+      #timeline { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
       .paintings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
       .painting { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
       .painting img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
       .painting h3 { margin: 8px 0 2px; }
       .painting .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .painting img { cursor: zoom-in; }
+      .preview { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.85); cursor: zoom-out; }
+      .preview[hidden] { display: none; }
+      .preview img { max-width: 100%; max-height: 100%; border-radius: 10px; background: #fff; }
       textarea { width: 100%; resize: vertical; }
       .send-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
       #owned { margin-top: 16px; }
@@ -245,6 +262,7 @@
       <nav role="tablist">
         <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
         <button role="tab" data-tab="accounts" aria-selected="false">Accounts</button>
+        <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
         <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
         <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
         <button role="tab" data-tab="support" aria-selected="false">Requests<span id="support-count"></span></button>
@@ -285,6 +303,7 @@
             <select id="account-search-by" aria-label="Search by">
               <option value="name">By name</option>
               <option value="address">By IP address</option>
+              <option value="device">By hardware ID</option>
             </select>
             <input id="account-search" type="search" placeholder="Search" aria-label="Search accounts">
             <select id="account-filter" aria-label="Which accounts">
@@ -294,10 +313,9 @@
             </select>
           </div>
           <div id="address-view" hidden>
-            <p class="hint">Accounts that signed in from this address, or from addresses starting with it, in the last 90 days.</p>
             <p class="status" id="address-status" role="status"></p>
             <div class="table-wrap"><table>
-              <thead><tr><th>Name</th><th>State</th><th>Addresses</th><th>Last from there</th></tr></thead>
+              <thead><tr><th>Name</th><th>State</th><th id="found-what">Addresses</th><th id="found-when">Last from there</th></tr></thead>
               <tbody id="address-results"></tbody>
             </table></div>
           </div>
@@ -306,6 +324,7 @@
             <tbody id="accounts"></tbody>
           </table></div>
           <div class="empty" id="no-accounts" hidden>No accounts match.</div>
+          <p class="hint" id="account-more" hidden></p>
 
           <div id="detail" hidden>
             <h2 id="detail-name"></h2>
@@ -355,7 +374,9 @@
                 <div class="row" style="margin-top:8px">
                   <button type="button" data-action="ban" class="danger">Ban</button>
                   <button type="button" data-action="banReason">Save reason</button>
-                  <button type="button" data-action="unban">Lift</button></div>
+                  <button type="button" data-action="unban">Lift</button>
+                  <button type="button" data-action="banDevices" class="danger">Hardware ban</button>
+                  <button type="button" data-action="unbanDevices">Lift hardware ban</button></div>
                 <div id="ban-record"></div>
               </div>
               <div class="action">
@@ -368,6 +389,14 @@
                 <h3>Message</h3>
                 <div class="row"><input id="message-text" maxlength="200" placeholder="Text" aria-label="Message">
                   <button type="button" data-action="message">Send</button></div>
+              </div>
+              <div class="action">
+                <h3>Look into</h3>
+                <p class="hint" id="look-facts"></p>
+                <div class="buttons">
+                  <button type="button" id="open-chat">Chat history</button>
+                  <button type="button" id="open-paintings">Paintings</button>
+                </div>
               </div>
               <div class="action">
                 <h3>Gems</h3>
@@ -404,8 +433,66 @@
                 </div>
               </div>
             </div>
+            <h2 style="margin-top:20px">Other accounts</h2>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Name</th><th>State</th><th>Same hardware</th><th class="num">Same addresses</th></tr></thead>
+              <tbody id="alts"></tbody>
+            </table></div>
+            <div class="empty" id="no-alts" hidden>None found.</div>
+            <h2 style="margin-top:20px">Hardware IDs</h2>
+            <div class="table-wrap"><table>
+              <thead><tr><th>Kind</th><th>Id</th><th>First seen</th><th>Last seen</th><th class="num">Other accounts</th><th>State</th></tr></thead>
+              <tbody id="device-ids"></tbody>
+            </table></div>
+            <div class="empty" id="no-device-ids" hidden>None.</div>
+            <h2 style="margin-top:20px">Jam-a-Grams and wall posts</h2>
+            <div class="toolbar">
+              <select id="mail-kind" aria-label="Which">
+                <option value="jamagram">Jam-a-Grams</option>
+                <option value="wall">Jammer Wall posts</option>
+              </select>
+              <select id="mail-direction" aria-label="Sent or received">
+                <option value="">Sent and received</option>
+                <option value="sent">Sent by them</option>
+                <option value="received">Sent to them</option>
+              </select>
+            </div>
+            <ul id="mail-lines" class="chat-list"></ul>
+            <div class="empty" id="no-mail" hidden>Nothing kept.</div>
+            <button type="button" id="mail-older" hidden>Older</button>
+            <h2 style="margin-top:20px">Timeline</h2>
+            <ul id="timeline"></ul>
+            <div class="empty" id="no-timeline" hidden>Nothing yet.</div>
             <div id="owned"></div>
           </div>
+        </section>
+      </div>
+
+      <div data-view="chat" hidden>
+        <section>
+          <form id="chat-form" class="toolbar">
+            <input id="chat-player" maxlength="100" placeholder="Player" autocomplete="off" spellcheck="false" aria-label="Player">
+            <input id="chat-room" maxlength="100" placeholder="Room" autocomplete="off" spellcheck="false" aria-label="Room">
+            <input id="chat-text" maxlength="100" placeholder="Words" autocomplete="off" aria-label="Words" style="flex:1">
+            <select id="chat-kind" aria-label="What">
+              <option value="">Everything</option>
+              <option value="chat">Chat</option>
+              <option value="whisper">Whispers</option>
+              <option value="jamagram">Jam-a-Grams</option>
+              <option value="wall">Wall posts</option>
+              <option value="notsent">Stopped by the filter</option>
+            </select>
+            <input id="chat-until" type="datetime-local" aria-label="From this time back">
+            <button class="primary" type="submit">Search</button>
+          </form>
+          <p class="status" id="chat-status" role="status"></p>
+          <div id="context-box" hidden>
+            <div class="toolbar"><h2 style="margin:0;flex:1" id="context-title"></h2><button type="button" id="context-close">Close</button></div>
+            <ul class="chat-list" id="chat-context"></ul>
+          </div>
+          <ul class="chat-list" id="chat-lines"></ul>
+          <div class="empty" id="no-chat" hidden>Nothing here.</div>
+          <div class="send-row"><button type="button" id="chat-older" hidden>Older</button></div>
         </section>
       </div>
 
@@ -490,6 +577,31 @@
           </table></div>
           <div class="empty" id="no-addresses" hidden>No address is banned.</div>
         </section>
+        <section>
+          <h2>Hardware bans</h2>
+          <p class="status" id="device-status" role="status"></p>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Banned with</th><th>Reason</th><th>By</th><th>Since</th><th>Accounts</th><th>Ids</th><th></th></tr></thead>
+            <tbody id="device-bans"></tbody>
+          </table></div>
+          <div class="empty" id="no-device-bans" hidden>No hardware bans.</div>
+        </section>
+        <section>
+          <h2>Hardware alerts</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>When</th><th>Player</th><th>What</th><th>Detail</th></tr></thead>
+            <tbody id="device-alerts"></tbody>
+          </table></div>
+          <div class="empty" id="no-device-alerts" hidden>Nothing yet.</div>
+        </section>
+        <section>
+          <h2>Stopped most by the filter</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Player</th><th class="num">Stopped</th><th>Last</th><th></th></tr></thead>
+            <tbody id="filter-hits"></tbody>
+          </table></div>
+          <div class="empty" id="no-filter-hits" hidden>Nobody.</div>
+        </section>
       </div>
 
       <div data-view="messages" hidden>
@@ -519,12 +631,15 @@
             <select id="masterpiece-filter" aria-label="Which masterpieces">
               <option value="waiting">Waiting</option>
               <option value="approved">Approved</option>
+              <option value="all">All</option>
             </select>
+            <input id="masterpiece-creator" type="search" maxlength="100" placeholder="Maker's username" autocomplete="off" spellcheck="false" aria-label="Maker's username">
           </div>
           <label class="check"><input id="masterpiece-review" type="checkbox"> Review new masterpieces</label>
           <p class="status" id="masterpiece-status" role="status"></p>
           <div class="paintings" id="masterpieces"></div>
           <div class="empty" id="no-masterpieces" hidden>Nothing here.</div>
+          <div class="preview" id="preview" hidden><img id="preview-img" alt=""></div>
         </section>
       </div>
 
@@ -592,7 +707,9 @@
       const MAX_LOG_LINES = 2000;
 
       let state = null; // {needsSetup, needsSetupCode, signedIn}
-      let accounts = [];
+      let accounts = []; // the rows the search found (at most a page)
+      let accountTotal = 0; // how many matched in all
+      let current = null; // the open account's row, fetched on its own
       let badges = []; // {id, label}: the badges an account's card can show
       let selected = null; // username whose actions are shown
       let tab = "overview";
@@ -631,6 +748,18 @@
       };
 
       const when = seconds => (seconds ? new Date(seconds * 1000).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}) : "never");
+      const said = result => result.data.ok || result.data.error || "That did not work.";
+      // a button that does something, and cannot be pressed again until it is done.
+      const btn = (label, onClick, className) => {
+        const node = el("button", label, className);
+        node.type = "button";
+        node.addEventListener("click", async () => {
+          node.disabled = true;
+          await onClick();
+          node.disabled = false;
+        });
+        return node;
+      };
 
       const duration = seconds => {
         const units = [[86400, "day"], [3600, "hour"], [60, "minute"]];
@@ -740,6 +869,9 @@
         if (account.silenced) {
           tags.push(el("span", "Silenced", "tag bad"));
         }
+        if (account.deviceBanned) {
+          tags.push(el("span", "Hardware banned", "tag bad"));
+        }
         if (account.locked) {
           tags.push(el("span", "Locked", "tag bad"));
         }
@@ -769,9 +901,10 @@
         return days > 0 ? `${days.toLocaleString()}d ${hours}h` : hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
       };
 
-      // by IP address: the server looks through the sign-in histories.
-      let addressFound = null; // {query, players} or null
+      // by IP address (the sign-in histories) or hardware ID (lib/devices.js).
+      let addressFound = null; // {query, by, players} or null
       const searchByAddress = async () => {
+        const by = $("account-search-by").value;
         const query = $("account-search").value.trim();
         if (query === "") {
           addressFound = null;
@@ -779,11 +912,11 @@
           renderAccounts();
           return;
         }
-        const result = await api(`address-search?q=${encodeURIComponent(query)}`);
-        if (query !== $("account-search").value.trim()) {
+        const result = await api(`${by}-search?q=${encodeURIComponent(query)}`);
+        if (query !== $("account-search").value.trim() || by !== $("account-search-by").value) {
           return; // typed on meanwhile
         }
-        addressFound = result.ok ? {query, players: result.data.players} : null;
+        addressFound = result.ok ? {query, by, players: result.data.players} : null;
         setStatus($("address-status"), result.ok ? (result.data.players.length ? "" : "Nobody signed in from there.") : result.data.error || "That did not work.", !result.ok);
         renderAccounts();
       };
@@ -802,25 +935,30 @@
             stateCell.append(...accountState(account).flatMap(tag => [tag, " "]));
           }
           row.addEventListener("click", () => select(entry.username));
-          row.append(nameCell, stateCell, el("td", entry.addresses.map(one => one.address).join(", ")), el("td", when(entry.lastAt)));
+          if (!account && entry.online) {
+            stateCell.append(el("span", "Online", "tag"));
+          }
+          row.append(nameCell, stateCell, el("td", entry.addresses ? entry.addresses.map(one => one.address).join(", ") : entry.kinds.map(kind => KIND_NAMES[kind] || kind).join(", ")),
+            el("td", when(entry.lastAt)));
           return row;
         }));
       };
 
       const renderAccounts = () => {
-        const byAddress = $("account-search-by").value === "address";
+        const searchBy = $("account-search-by").value;
+        const byAddress = searchBy !== "name";
         $("address-view").hidden = !byAddress;
+        $("found-what").textContent = searchBy === "device" ? "Ids matched" : "Addresses";
+        $("found-when").textContent = searchBy === "device" ? "Last used" : "Last from there";
         $("account-list").hidden = byAddress;
         if (byAddress) {
           renderAddressResults();
           $("no-accounts").hidden = true;
         }
-        const query = byAddress ? "" : $("account-search").value.trim().toLowerCase();
-        const filter = $("account-filter").value;
-        const shown = accounts
-          .filter(account => account.username.toLowerCase().includes(query))
-          .filter(account => filter === "all" || (filter === "online" ? account.online : account.banned !== 0))
-          .sort((a, b) => Number(b.online) - Number(a.online) || a.username.localeCompare(b.username));
+        // found and put in order by the server (exact name first).
+        const shown = byAddress ? [] : accounts;
+        $("account-more").hidden = byAddress || accountTotal <= shown.length;
+        $("account-more").textContent = `Showing ${shown.length} of ${accountTotal.toLocaleString()}. Type more of the name to narrow it down.`;
         $("accounts").replaceChildren(...shown.map(account => {
           const row = el("tr", undefined, account.username === selected ? "pick selected" : "pick");
           const stateCell = el("td");
@@ -842,10 +980,11 @@
         if (!byAddress) {
           $("no-accounts").hidden = shown.length > 0;
         }
-        const current = accounts.find(account => account.username === selected);
         $("detail").hidden = !current;
         if (current) {
           $("detail-name").textContent = `${current.username} · ${current.gems.toLocaleString()} gems · played ${played(current.playtime || 0)}${current.playtimePublic ? " (public)" : ""}`;
+          $("look-facts").textContent = `Stopped by the filter: ${current.stoppedThisWeek} in the last 7 days · Hardware IDs: `
+            + `${current.devicesKnown || "none yet"} · Paintings: ${current.paintings}`;
         }
       };
 
@@ -944,7 +1083,6 @@
       };
 
       const fillCard = () => {
-        const current = accounts.find(account => account.username === selected);
         $("badge-boxes").replaceChildren(...badges.map(badge => {
           const label = el("label", undefined, "check");
           const box = el("input");
@@ -961,16 +1099,151 @@
         $("moderator-toggle").textContent = current && current.moderator ? "Remove moderator" : "Make moderator";
       };
 
-      const select = username => {
-        selected = selected === username ? null : username;
+      // the open account's own row, whatever the search shows.
+      const loadCurrent = async () => {
+        const username = selected;
+        if (!username) {
+          current = null;
+          return;
+        }
+        const result = await api(`account?username=${encodeURIComponent(username)}`);
+        if (username !== selected) {
+          return;
+        }
+        current = result.ok ? result.data.account : null;
+        badges = result.ok ? result.data.badges : badges;
+        if (!current) {
+          selected = null;
+        }
+      };
+
+      // an account to open, from this page or another: its row, card and records.
+      const openAccount = async username => {
+        selected = username;
+        current = null;
         setStatus($("detail-status"), "");
         for (const id of ["new-name", "new-password", "ban-hours", "silence-hours", "message-text", "gems-amount", "gift-value", "gift-text"]) {
           $(id).value = "";
         }
+        hashArg = username;
+        setHash();
+        await loadCurrent();
         renderAccounts();
         fillCard();
         loadOwned();
         loadBanRecord();
+        loadExtras();
+      };
+      // every account that used a hardware ID: the account list, searched by it.
+      const searchDevice = id => {
+        $("account-search-by").value = "device";
+        $("account-search").placeholder = "Hardware ID, or the start of one";
+        $("account-search").value = id;
+        showTab("accounts");
+        searchByAddress();
+        window.scrollTo(0, 0);
+      };
+
+      // from another page.
+      const openAccountTab = username => {
+        hashArg = username;
+        showTab("accounts");
+        openAccount(username);
+      };
+
+      // the player's Jam-a-Grams or wall posts, sent and received
+      // (lib/chatlog.js): asked with the rest of the extras, and a page more
+      // with Older. "(not sent)" in front is one the filter stopped.
+      let mailLines = [];
+      const loadMail = async older => {
+        const username = selected;
+        if (!username) {
+          return;
+        }
+        const before = older && mailLines.length ? mailLines[mailLines.length - 1].id : 0;
+        const result = await api(`chat?username=${encodeURIComponent(username)}&kind=${$("mail-kind").value}`
+          + `&direction=${$("mail-direction").value}&before=${before}`);
+        if (username !== selected) {
+          return;
+        }
+        const lines = result.ok ? result.data.lines : [];
+        mailLines = older ? [...mailLines, ...lines] : lines;
+        $("mail-lines").replaceChildren(...mailLines.map(line => lineNode(line, true)));
+        $("no-mail").hidden = mailLines.length > 0;
+        $("mail-older").hidden = !(result.ok && result.data.more);
+      };
+      $("mail-kind").addEventListener("change", () => loadMail(false));
+      $("mail-direction").addEventListener("change", () => loadMail(false));
+      $("mail-older").addEventListener("click", () => loadMail(true));
+
+      // other accounts the same person may have, and what happened to them:
+      // asked when an account is opened and after an action, not every few
+      // seconds (finding alts looks through every account).
+      const KIND_NAMES = {os: "system id", board: "board", disk: "disk", install: "client id", mac: "network card"};
+      const TIMELINE_NAMES = {ban: "Ban", staff: "Staff", report: "Report", alert: "Alert"};
+      const loadExtras = async () => {
+        const username = selected;
+        $("alts").replaceChildren();
+        $("device-ids").replaceChildren();
+        $("mail-lines").replaceChildren();
+        $("timeline").replaceChildren();
+        if (!username) {
+          return;
+        }
+        loadMail(false);
+        const [alts, timeline] = await Promise.all([api(`alts?username=${encodeURIComponent(username)}`), api(`timeline?username=${encodeURIComponent(username)}`)]);
+        if (username !== selected) {
+          return;
+        }
+        const altList = alts.ok ? alts.data.alts : [];
+        $("alts").replaceChildren(...altList.map(alt => {
+          const row = el("tr", undefined, "pick");
+          const stateCell = el("td");
+          if (alt.online) {
+            stateCell.append(el("span", "Online", "tag"), " ");
+          }
+          if (alt.banned !== 0) {
+            stateCell.append(el("span", alt.banned === -1 ? "Banned" : `Banned ${duration(alt.banned)}`, "tag bad"), " ");
+          }
+          if (alt.deviceBanned) {
+            stateCell.append(el("span", "Hardware banned", "tag bad"));
+          }
+          row.append(el("td", alt.username), stateCell,
+            el("td", alt.devices.length ? `${alt.devices.map(kind => KIND_NAMES[kind] || kind).join(", ")}${alt.weak ? " (weak)" : ""}` : "—"),
+            el("td", alt.addresses ? String(alt.addresses) : "—", "num"));
+          row.addEventListener("click", () => openAccount(alt.username));
+          return row;
+        }));
+        $("no-alts").hidden = altList.length > 0;
+        const ids = alts.ok ? alts.data.ids : [];
+        $("device-ids").replaceChildren(...ids.map(entry => {
+          const row = el("tr", undefined, "pick");
+          row.title = "Every account that used this id";
+          row.append(el("td", KIND_NAMES[entry.kind] || entry.kind), el("td", entry.id, "device-id"), el("td", when(entry.first)), el("td", when(entry.last)),
+            el("td", String(entry.others), "num"), el("td", !entry.banned ? "—" : entry.kind === "mac" ? "Banned (alerts only)" : "Banned"));
+          row.addEventListener("click", () => searchDevice(entry.id));
+          return row;
+        }));
+        $("no-device-ids").hidden = ids.length > 0;
+        const events = timeline.ok ? timeline.data.events : [];
+        $("timeline").replaceChildren(...events.map(entry => el("li", [when(entry.at), TIMELINE_NAMES[entry.kind] || entry.kind, entry.text, entry.by && `by ${entry.by}`]
+          .filter(Boolean).join(" · "))));
+        $("no-timeline").hidden = events.length > 0;
+      };
+
+      const select = username => {
+        if (selected === username) {
+          selected = null;
+          current = null;
+          hashArg = "";
+          setHash();
+          renderAccounts();
+          loadOwned();
+          loadBanRecord();
+          loadExtras();
+          return;
+        }
+        openAccount(username);
       };
 
       const GIFT_PLACEHOLDERS = {gems: "Amount", diamonds: "Amount", tickets: "Amount", clothing: "Item id", den: "Item id",
@@ -997,9 +1270,9 @@
           case "password": return {password: $("new-password").value};
           case "lastSeen": return {when: Math.floor(new Date($("last-seen").value).getTime() / 1000)};
           case "ban": return {hours: numberFrom("ban-hours"), reason: $("ban-reason").value};
-          case "banReason": return {reason: $("ban-reason").value};
+          case "banReason": case "banDevices": return {reason: $("ban-reason").value};
           case "silence": return {hours: numberFrom("silence-hours")};
-          case "moderator": return {on: !(accounts.find(account => account.username === selected) || {}).moderator};
+          case "moderator": return {on: !(current || {}).moderator};
           case "message": return {text: $("message-text").value};
           case "gems": return {amount: numberFrom("gems-amount")};
           case "gift": return giftBody();
@@ -1031,6 +1304,12 @@
         if (action === "delete" && !window.confirm(`Delete ${selected} and everything they own? This cannot be undone.`)) {
           return;
         }
+        if (action === "unbanDevices" && !window.confirm(`Lift the hardware bans on ${selected}?`)) {
+          return;
+        }
+        if (action === "banDevices" && !window.confirm(`Hardware ban ${selected}? Everyone on their hardware is put out.`)) {
+          return;
+        }
         button.disabled = true;
         const result = await api("account", {username: selected, action, ...actionBody(action)});
         button.disabled = false;
@@ -1048,30 +1327,40 @@
           fillCard();
           loadOwned();
           loadBanRecord();
+          loadExtras();
         }
       });
 
+      // the server searches, once typing stops for a moment.
       let addressWait = null;
       $("account-search").addEventListener("input", () => {
-        if ($("account-search-by").value === "address") {
-          clearTimeout(addressWait);
-          addressWait = setTimeout(searchByAddress, 400);
+        clearTimeout(addressWait);
+        addressWait = setTimeout($("account-search-by").value !== "name" ? searchByAddress : refresh, $("account-search-by").value !== "name" ? 400 : 250);
+      });
+      // Enter opens the account of exactly that name, when there is one.
+      $("account-search").addEventListener("keydown", async event => {
+        if (event.key !== "Enter" || $("account-search-by").value !== "name") {
+          return;
         }
-        else {
-          renderAccounts();
+        clearTimeout(addressWait);
+        await refresh();
+        const wanted = $("account-search").value.trim().toLowerCase();
+        const exact = accounts.find(account => account.username.toLowerCase() === wanted);
+        if (exact && exact.username !== selected) {
+          openAccount(exact.username);
         }
       });
       $("account-search-by").addEventListener("change", () => {
-        const byAddress = $("account-search-by").value === "address";
-        $("account-search").placeholder = byAddress ? "203.0.113.7, or the start of one" : "Search";
+        const byAddress = $("account-search-by").value !== "name";
+        $("account-search").placeholder = {address: "203.0.113.7, or the start of one", device: "Hardware ID, or the start of one"}[$("account-search-by").value] || "Search";
         if (byAddress) {
           searchByAddress();
         }
         else {
-          renderAccounts();
+          refresh();
         }
       });
-      $("account-filter").addEventListener("change", renderAccounts);
+      $("account-filter").addEventListener("change", () => refresh());
 
       const act = async (username, action, extra, statusElement) => {
         const result = await api("account", {username, action, ...extra});
@@ -1079,9 +1368,91 @@
         return result.ok;
       };
 
-      const renderReports = data => {
+      // ---- the Chat page: what players typed, sent and posted (lib/chatlog.js).
+      let chatQuery = null; // {username, room, text, kind, until}
+      let chatLines = [];
+      const chatUrl = before => `chat?username=${encodeURIComponent(chatQuery.username)}&room=${encodeURIComponent(chatQuery.room)}`
+        + `&text=${encodeURIComponent(chatQuery.text)}&kind=${chatQuery.kind || ""}&until=${chatQuery.until || 0}&before=${before}`;
+      // where a line was said: a room, or who it went to.
+      const placeOf = line => (line.kind === "whisper" ? `Whisper to ${line.to}` : line.kind === "jamagram" ? `Jam-a-Gram to ${line.to}`
+        : line.kind === "wall" ? `On ${line.to}'s wall` : line.room);
+      const lineNode = (line, inContext = false) => {
+        const item = el("li", undefined, inContext && line.marked ? "this" : "");
+        const who = btn(line.username, () => openAccountTab(line.username), "chat-who");
+        const text = el("span", undefined, "chat-text");
+        text.append(line.text || "(no words)", el("span", placeOf(line), "chat-room"));
+        item.append(el("span", when(line.at), "chat-time"), who, text);
+        if (!inContext) {
+          item.append(btn("Around", () => showContext(line.id), "chat-more"));
+        }
+        return item;
+      };
+      const loadChat = async older => {
+        if (!chatQuery) {
+          chatQuery = {username: "", room: "", text: "", kind: "", until: 0};
+        }
+        const before = older && chatLines.length ? chatLines[chatLines.length - 1].id : 0;
+        const result = await api(chatUrl(before));
+        if (!result.ok) {
+          setStatus($("chat-status"), said(result), true);
+          return;
+        }
+        chatLines = older ? [...chatLines, ...result.data.lines] : result.data.lines;
+        setStatus($("chat-status"), result.data.days > 0 ? `Kept ${result.data.days} days.` : "Chat is not being kept.");
+        $("chat-lines").replaceChildren(...chatLines.map(line => lineNode(line)));
+        $("no-chat").hidden = chatLines.length > 0;
+        $("chat-older").hidden = !result.data.more;
+      };
+      const showContext = async id => {
+        const result = await api(`chat/around?id=${id}`);
+        if (!result.ok) {
+          setStatus($("chat-status"), said(result), true);
+          return;
+        }
+        const {line, lines} = result.data;
+        $("context-title").textContent = line.kind === "chat" ? line.room : `${line.username} and ${line.to}`;
+        $("chat-context").replaceChildren(...lines.map(entry => lineNode({...entry, marked: entry.id === line.id}, true)));
+        $("context-box").hidden = false;
+        $("context-box").scrollIntoView({block: "nearest"});
+      };
+      $("context-close").addEventListener("click", () => {
+        $("context-box").hidden = true;
+      });
+      $("chat-form").addEventListener("submit", event => {
+        event.preventDefault();
+        const until = $("chat-until").value ? Math.floor(new Date($("chat-until").value).getTime() / 1000) : 0;
+        chatQuery = {username: $("chat-player").value.trim(), room: $("chat-room").value.trim(), text: $("chat-text").value.trim(), kind: $("chat-kind").value, until};
+        $("context-box").hidden = true;
+        loadChat(false);
+      });
+      $("chat-older").addEventListener("click", () => loadChat(true));
+      const openChat = (username, kind = "") => {
+        $("chat-player").value = username;
+        $("chat-room").value = "";
+        $("chat-text").value = "";
+        $("chat-kind").value = kind;
+        $("chat-until").value = "";
+        chatQuery = {username, room: "", text: "", kind, until: 0};
+        $("context-box").hidden = true;
+        hashArg = username;
+        showTab("chat");
+      };
+
+      // what the reported player said up to the report, once asked for: report id -> lines.
+      const reportChat = new Map();
+      let reportsShown = "";
+      let lastReports = null;
+
+      const renderReports = (data, force = false) => {
         const handled = $("report-filter").value === "1";
         $("report-count").textContent = data.open ? ` (${data.open})` : "";
+        lastReports = data;
+        // drawn again only when the list changed.
+        const shown = `${handled} ${data.reports.map(report => report.id).join(",")}`;
+        if (shown === reportsShown && !force) {
+          return;
+        }
+        reportsShown = shown;
         $("reports").replaceChildren(...data.reports.map(report => {
           const box = el("div", undefined, "report");
           box.append(el("h3", `${report.target} — ${report.reason}`),
@@ -1092,6 +1463,22 @@
           if (report.context) {
             box.append(el("pre", report.context));
           }
+          if (reportChat.has(report.id)) {
+            const lines = reportChat.get(report.id);
+            const list = el("ul", undefined, "chat-list");
+            list.append(...lines.map(line => lineNode(line, true)));
+            box.append(el("h3", `What ${report.target} said up to the report`), lines.length ? list : el("div", "Nothing kept.", "hint"));
+          }
+          const chatButton = btn(reportChat.has(report.id) ? "Hide chat" : "Chat at the time", async () => {
+            if (reportChat.has(report.id)) {
+              reportChat.delete(report.id);
+            }
+            else {
+              const result = await api(`chat?username=${encodeURIComponent(report.target)}&until=${report.createdAt + 60}&before=0`);
+              reportChat.set(report.id, result.ok ? result.data.lines.slice(0, 20).reverse() : []);
+            }
+            renderReports(lastReports, true);
+          });
           if (!handled) {
             const buttons = el("div", undefined, "buttons");
             const button = (label, run, className) => {
@@ -1112,15 +1499,18 @@
               }, "primary"),
               button("Silence 1 hour", () => act(report.target, "silence", {hours: 1}, $("report-status"))),
               button("Ban 1 day", () => act(report.target, "ban", {hours: 24}, $("report-status")), "danger"),
+              chatButton,
+              button("Chat history", async () => openChat(report.target)),
               button("Open account", async () => {
-                selected = report.target;
-                showTab("accounts");
-                loadOwned();
+                openAccountTab(report.target);
               }));
             box.append(buttons);
           }
           else {
             box.append(el("div", `Dealt with on ${when(report.handledAt)}`, "hint"));
+            const buttons = el("div", undefined, "buttons");
+            buttons.append(chatButton);
+            box.append(buttons);
           }
           return box;
         }));
@@ -1220,14 +1610,29 @@
       $("support-filter").addEventListener("change", () => refresh());
 
       let paintingsShown = "";
+      // the picture full size, over the page; a click puts it away.
+      const showPreview = src => {
+        $("preview-img").src = src;
+        $("preview").hidden = false;
+      };
+      $("preview").addEventListener("click", () => {
+        $("preview").hidden = true;
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+          $("preview").hidden = true;
+        }
+      });
+
       const renderMasterpieces = data => {
         const which = $("masterpiece-filter").value;
-        const paintings = data[which];
-        $("masterpiece-count").textContent = data.waiting.length ? ` (${data.waiting.length})` : "";
+        const marked = (list, status) => list.map(painting => ({...painting, status}));
+        const paintings = which === "all" ? [...marked(data.waiting, "waiting"), ...marked(data.approved, "approved")] : marked(data[which], which);
+        $("masterpiece-count").textContent = data.waitingCount ? ` (${data.waitingCount})` : "";
         $("masterpiece-review").checked = data.review;
         $("no-masterpieces").hidden = paintings.length > 0;
         // drawn again only when the list changed, so the pictures do not flicker.
-        const shown = `${which} ${paintings.map(painting => `${painting.id}:${painting.likes}`).join(" ")}`;
+        const shown = `${which} ${paintings.map(painting => `${painting.id}:${painting.likes}:${painting.status}`).join(" ")}`;
         if (shown === paintingsShown) {
           return;
         }
@@ -1238,8 +1643,10 @@
           picture.src = `/admin/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
           picture.alt = `Painting by ${painting.creator}`;
           picture.loading = "lazy";
+          picture.addEventListener("click", () => showPreview(picture.src));
           box.append(picture, el("h3", painting.creator),
-            el("div", `${when(painting.createdAt)}${which === "approved" ? `, ${painting.likes} like${painting.likes === 1 ? "" : "s"}` : ""}`, "hint"));
+            el("div", `${when(painting.createdAt)}${painting.status === "approved" ? `, ${painting.likes} like${painting.likes === 1 ? "" : "s"}` : ""}`
+              + `${which === "all" ? (painting.status === "waiting" ? " · waiting" : " · approved") : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
           const button = (label, action, className) => {
             const node = el("button", label, className);
@@ -1252,7 +1659,7 @@
             });
             return node;
           };
-          if (which === "waiting") {
+          if (painting.status === "waiting") {
             buttons.append(button("Approve", "approve", "primary"), button("Reject", "reject", "danger"));
           }
           else {
@@ -1261,9 +1668,7 @@
           const open = el("button", "Open account");
           open.type = "button";
           open.addEventListener("click", () => {
-            selected = painting.creator;
-            showTab("accounts");
-            loadOwned();
+            openAccountTab(painting.creator);
           });
           buttons.append(open);
           box.append(buttons);
@@ -1272,10 +1677,61 @@
       };
 
       $("masterpiece-filter").addEventListener("change", () => refresh());
+      let creatorWait = null;
+      $("masterpiece-creator").addEventListener("input", () => {
+        clearTimeout(creatorWait);
+        creatorWait = setTimeout(refresh, 250);
+      });
+      // a player's paintings, waiting and approved.
+      const openPaintings = username => {
+        $("masterpiece-creator").value = username;
+        $("masterpiece-filter").value = "all";
+        hashArg = username;
+        showTab("masterpieces");
+      };
       $("masterpiece-review").addEventListener("change", async () => {
         const result = await api("masterpiece", {action: "review", on: $("masterpiece-review").checked});
         setStatus($("masterpiece-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
       });
+
+      // a hardware ban's accounts and ids, each one a link.
+      const deviceAccounts = names => {
+        const cell = el("td");
+        cell.style.whiteSpace = "normal";
+        cell.append(...(names.length ? names.flatMap((name, index) => {
+          const link = el("button", name, "link");
+          link.type = "button";
+          link.addEventListener("click", () => openAccountTab(name));
+          return index ? [", ", link] : [link];
+        }) : ["—"]));
+        return cell;
+      };
+      const openBanIds = new Set();
+      const deviceIds = ban => {
+        const cell = el("td");
+        const shown = openBanIds.has(ban.id);
+        const toggle = el("button", shown ? `Hide ${ban.ids.length}` : `Show ${ban.ids.length}`, "link");
+        toggle.type = "button";
+        toggle.addEventListener("click", () => {
+          if (openBanIds.has(ban.id)) {
+            openBanIds.delete(ban.id);
+          }
+          else {
+            openBanIds.add(ban.id);
+          }
+          refresh();
+        });
+        cell.append(toggle);
+        if (shown) {
+          for (const entry of ban.ids) {
+            const link = el("button", `${KIND_NAMES[entry.kind] || entry.kind} ${entry.id}`, "link device-id");
+            link.type = "button";
+            link.addEventListener("click", () => searchDevice(entry.id));
+            cell.append(el("br"), link);
+          }
+        }
+        return cell;
+      };
 
       const renderBans = data => {
         const left = seconds => (seconds === -1 ? "Until lifted" : seconds ? `${duration(seconds)} left` : "—");
@@ -1319,6 +1775,42 @@
           return row;
         }));
         $("no-addresses").hidden = data.addresses.length > 0;
+        $("device-bans").replaceChildren(...data.devices.map(ban => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(btn("Unban", async () => {
+            if (!window.confirm(`Lift the hardware ban made with ${ban.username}?`)) {
+              return;
+            }
+            const result = await api("device", {id: ban.id});
+            setStatus($("device-status"), said(result), !result.ok);
+            refresh();
+          }), " ", btn("Open account", async () => openAccountTab(ban.username)));
+          row.append(el("td", ban.username || "—"), el("td", ban.reason), el("td", ban.by || "—"), el("td", when(ban.createdAt)),
+            deviceAccounts(ban.accounts), deviceIds(ban), buttons);
+          return row;
+        }));
+        $("no-device-bans").hidden = data.devices.length > 0;
+        $("device-alerts").replaceChildren(...data.alerts.map(entry => {
+          const row = el("tr", undefined, "pick");
+          const detail = el("td", entry.detail);
+          detail.style.whiteSpace = "normal";
+          row.append(el("td", when(entry.at)), el("td", entry.username), el("td", entry.name), detail);
+          row.addEventListener("click", () => openAccountTab(entry.username));
+          return row;
+        }));
+        $("no-device-alerts").hidden = data.alerts.length > 0;
+      };
+
+      const renderFilterHits = list => {
+        $("filter-hits").replaceChildren(...list.map(entry => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(btn("Lines", async () => openChat(entry.username, "notsent")), " ", btn("Open account", async () => openAccountTab(entry.username)));
+          row.append(el("td", entry.username), el("td", String(entry.count), "num"), el("td", when(entry.last)), buttons);
+          return row;
+        }));
+        $("no-filter-hits").hidden = list.length > 0;
       };
 
       $("address-form").addEventListener("submit", async event => {
@@ -1454,6 +1946,21 @@
         if (!state || !state.signedIn) {
           return;
         }
+        // what waits, on the tabs and in the page's title (for when it is in
+        // another tab).
+        const counts = await api("counts");
+        if (counts.ok) {
+          $("report-count").textContent = counts.data.reports ? ` (${counts.data.reports})` : "";
+          $("support-count").textContent = counts.data.support ? ` (${counts.data.support})` : "";
+          $("masterpiece-count").textContent = counts.data.masterpieces ? ` (${counts.data.masterpieces})` : "";
+          const waiting = counts.data.reports + counts.data.support + counts.data.masterpieces;
+          document.title = waiting ? `(${waiting}) Server admin` : "Server admin";
+        }
+        // out of sight, only that; the rest when it is back.
+        if (document.hidden) {
+          timer = setTimeout(refresh, REFRESH_MS);
+          return;
+        }
         let result = null;
         if (tab === "overview") {
           result = await api("overview");
@@ -1462,10 +1969,13 @@
           }
         }
         else if (tab === "accounts") {
-          result = await api("accounts");
+          const query = $("account-search-by").value !== "name" ? "" : $("account-search").value.trim();
+          result = await api(`accounts?q=${encodeURIComponent(query)}&filter=${$("account-filter").value}`);
           if (result.ok) {
             accounts = result.data.accounts;
+            accountTotal = result.data.total;
             badges = result.data.badges || [];
+            await loadCurrent();
             renderAccounts();
           }
         }
@@ -1485,7 +1995,7 @@
           }
         }
         else if (tab === "masterpieces") {
-          result = await api("masterpieces");
+          result = await api(`masterpieces?creator=${encodeURIComponent($("masterpiece-creator").value.trim())}`);
           if (result.ok) {
             renderMasterpieces(result.data);
           }
@@ -1498,11 +2008,7 @@
               const open = el("button", "Open account");
               open.type = "button";
               open.addEventListener("click", () => {
-                selected = mod.username;
-                showTab("accounts");
-                fillCard();
-                loadOwned();
-                loadBanRecord();
+                openAccountTab(mod.username);
               });
               const cell = el("td");
               cell.append(open);
@@ -1521,9 +2027,21 @@
           }
         }
         else if (tab === "bans") {
+          const hits = api("filterhits");
           result = await api("bans");
           if (result.ok) {
             renderBans(result.data);
+          }
+          const hitsResult = await hits;
+          if (hitsResult.ok) {
+            renderFilterHits(hitsResult.data.players);
+          }
+        }
+        else if (tab === "chat") {
+          // only the first page keeps itself up to date: older pages stay as they were read.
+          if (!chatQuery || chatLines.length <= 100) {
+            await loadChat(false);
+            result = {ok: true};
           }
         }
         else if (tab === "messages") {
@@ -1552,8 +2070,48 @@
         }
       };
 
+      // the page's address follows what is shown ("#accounts/John",
+      // "#chat/John"), for links to paste, and for Back.
+      let hashArg = "";
+      let applyingHash = false;
+      const setHash = () => {
+        const wanted = `#${tab}${hashArg ? `/${encodeURIComponent(hashArg)}` : ""}`;
+        if (location.hash !== wanted) {
+          history[applyingHash ? "replaceState" : "pushState"](null, "", wanted);
+        }
+      };
+      const applyHash = () => {
+        const [name, arg] = location.hash.slice(1).split("/");
+        if (![...document.querySelectorAll("nav button")].some(button => button.dataset.tab === name)) {
+          return false;
+        }
+        const value = arg ? decodeURIComponent(arg) : "";
+        applyingHash = true;
+        if (name === "accounts" && value) {
+          openAccountTab(value);
+        }
+        else if (name === "chat" && value) {
+          openChat(value);
+        }
+        else if (name === "masterpieces" && value) {
+          openPaintings(value);
+        }
+        else {
+          hashArg = "";
+          showTab(name);
+        }
+        applyingHash = false;
+        return true;
+      };
+      window.addEventListener("popstate", () => {
+        if (state && state.signedIn) {
+          applyHash();
+        }
+      });
+
       const showTab = name => {
         tab = name;
+        setHash();
         for (const button of document.querySelectorAll("nav button")) {
           button.setAttribute("aria-selected", String(button.dataset.tab === name));
         }
@@ -1564,13 +2122,23 @@
       };
 
       for (const button of document.querySelectorAll("nav button")) {
-        button.addEventListener("click", () => showTab(button.dataset.tab));
+        button.addEventListener("click", () => {
+          hashArg = "";
+          showTab(button.dataset.tab);
+        });
       }
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          refresh();
+        }
+      });
 
       const showPanel = () => {
         $("gate").hidden = true;
         $("panel").hidden = false;
-        showTab(tab);
+        if (!applyHash()) {
+          showTab(tab);
+        }
       };
 
       const start = async () => {

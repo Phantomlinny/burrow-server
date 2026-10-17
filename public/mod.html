@@ -160,6 +160,8 @@
       tbody tr:last-child td { border-bottom: 0; }
       tbody tr.selected td { background: var(--raised); }
       tbody tr.pick { cursor: pointer; }
+      .device-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+      button.link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; font-weight: 400; }
       .empty { color: var(--muted); padding: 8px 0; }
       .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
       .toolbar input[type="search"] { flex: 1; min-width: 180px; }
@@ -200,6 +202,10 @@
       .painting img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
       .painting h3 { margin: 8px 0 2px; }
       .painting .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+      .painting img { cursor: zoom-in; }
+      .preview { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, 0.85); cursor: zoom-out; }
+      .preview[hidden] { display: none; }
+      .preview img { max-width: 100%; max-height: 100%; border-radius: 10px; background: #fff; }
       textarea { width: 100%; resize: vertical; }
       .send-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
       #owned { margin-top: 16px; }
@@ -215,7 +221,8 @@
       .logo { display: block; height: 72px; margin: 0 0 12px; }
       .mark { height: 34px; flex: none; }
       #chat-lines { margin: 0; padding: 0; list-style: none; }
-      #chat-lines li, #chat-context li { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+      .report-chat { margin: 0 0 8px; padding: 0; list-style: none; }
+      #chat-lines li, #chat-context li, .report-chat li { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--line); }
       #chat-lines li:last-child, #chat-context li:last-child { border-bottom: 0; }
       .chat-time { flex: none; width: 128px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
       .chat-who { flex: none; max-width: 190px; padding: 0; border: 0; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; }
@@ -226,7 +233,7 @@
       #chat-context { margin: 0; padding: 0; list-style: none; }
       #chat-context li.this { background: var(--raised); border-radius: 10px; }
       #player-facts { margin-bottom: 14px; }
-      #player-history { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
+      #timeline { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
       .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
     </style>
   </head>
@@ -270,6 +277,7 @@
             <select id="player-search-by" aria-label="Search by">
               <option value="name">By name</option>
               <option value="address">By IP address</option>
+              <option value="device">By hardware ID</option>
             </select>
             <input id="player-search" type="search" placeholder="Search" aria-label="Search players">
             <span class="hint" id="online-count"></span>
@@ -279,7 +287,8 @@
             <tbody id="players"></tbody>
           </table></div>
           <div class="empty" id="no-players" hidden>No players match.</div>
-          <p class="hint" id="address-hint" hidden>Players who signed in from this address, or from addresses starting with it, in the last 90 days. Each search is written in the moderator log.</p>
+          <p class="hint" id="players-more" hidden></p>
+          <p class="hint" id="address-hint" hidden>Searches by address are logged.</p>
         </section>
         <section id="detail" hidden>
           <h2 id="detail-name"></h2>
@@ -294,14 +303,17 @@
                 <button type="button" data-action="ban" class="danger">Ban</button>
                 <button type="button" data-action="banReason">Save reason</button>
                 <button type="button" data-action="unban">Lift</button>
-                <button type="button" data-action="banAddress" class="danger">Ban address</button></div>
+                <button type="button" data-action="banAddress" class="danger">Ban address</button>
+                <button type="button" data-action="banDevices" class="danger">Hardware ban</button>
+                <button type="button" data-action="unbanDevices">Lift hardware ban</button></div>
             </div>
             <div class="action">
               <h3>Chat</h3>
               <div class="row"><input id="silence-hours" type="number" min="0" placeholder="Hours (0 = until lifted)" aria-label="Silence length in hours">
                 <button type="button" data-action="silence">Silence</button>
                 <button type="button" data-action="unsilence">Lift</button></div>
-              <div class="row" style="margin-top:8px"><button type="button" id="open-chat">Chat history</button></div>
+              <div class="row" style="margin-top:8px"><button type="button" id="open-chat">Chat history</button>
+                <button type="button" id="open-paintings">Paintings</button></div>
             </div>
             <div class="action">
               <h3>Message</h3>
@@ -317,8 +329,36 @@
                 <button type="button" data-action="clearBio">Clear bio</button></div>
             </div>
           </div>
-          <h3 style="margin:16px 0 4px" id="history-title" hidden>Ban history</h3>
-          <ul id="player-history"></ul>
+          <h3 style="margin:16px 0 4px">Other accounts</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Name</th><th>State</th><th>Same hardware</th><th class="num">Same addresses</th></tr></thead>
+            <tbody id="alts"></tbody>
+          </table></div>
+          <div class="empty" id="no-alts" hidden>None found.</div>
+          <h3 style="margin:16px 0 4px">Hardware IDs</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Kind</th><th>Id</th><th>First seen</th><th>Last seen</th><th class="num">Other accounts</th><th>State</th></tr></thead>
+            <tbody id="device-ids"></tbody>
+          </table></div>
+          <div class="empty" id="no-device-ids" hidden>None.</div>
+          <h3 style="margin:16px 0 4px">Jam-a-Grams and wall posts</h3>
+          <div class="toolbar">
+            <select id="mail-kind" aria-label="Which">
+              <option value="jamagram">Jam-a-Grams</option>
+              <option value="wall">Jammer Wall posts</option>
+            </select>
+            <select id="mail-direction" aria-label="Sent or received">
+              <option value="">Sent and received</option>
+              <option value="sent">Sent by them</option>
+              <option value="received">Sent to them</option>
+            </select>
+          </div>
+          <ul id="mail-lines" class="report-chat"></ul>
+          <div class="empty" id="no-mail" hidden>Nothing kept.</div>
+          <button type="button" id="mail-older" hidden>Older</button>
+          <h3 style="margin:16px 0 4px">Timeline</h3>
+          <ul id="timeline"></ul>
+          <div class="empty" id="no-timeline" hidden>Nothing yet.</div>
         </section>
       </div>
 
@@ -332,6 +372,15 @@
             <input id="chat-player" maxlength="100" placeholder="Player" autocomplete="off" spellcheck="false" aria-label="Player">
             <input id="chat-room" maxlength="100" placeholder="Room" autocomplete="off" spellcheck="false" aria-label="Room">
             <input id="chat-text" maxlength="100" placeholder="Words" autocomplete="off" aria-label="Words" style="flex:1">
+            <select id="chat-kind" aria-label="What">
+              <option value="">Everything</option>
+              <option value="chat">Chat</option>
+              <option value="whisper">Whispers</option>
+              <option value="jamagram">Jam-a-Grams</option>
+              <option value="wall">Wall posts</option>
+              <option value="notsent">Stopped by the filter</option>
+            </select>
+            <input id="chat-until" type="datetime-local" aria-label="From this time back">
             <button class="primary" type="submit">Search</button>
           </form>
           <p class="status" id="chat-status" role="status"></p>
@@ -386,11 +435,14 @@
             <select id="masterpiece-filter" aria-label="Which masterpieces">
               <option value="waiting">Waiting</option>
               <option value="approved">On show</option>
+              <option value="all">All</option>
             </select>
+            <input id="masterpiece-creator" type="search" maxlength="100" placeholder="Maker's username" autocomplete="off" spellcheck="false" aria-label="Maker's username">
           </div>
           <p class="status" id="masterpiece-status" role="status"></p>
           <div class="paintings" id="masterpieces"></div>
           <div class="empty" id="no-masterpieces" hidden>Nothing here.</div>
+          <div class="preview" id="preview" hidden><img id="preview-img" alt=""></div>
         </section>
       </div>
 
@@ -411,6 +463,30 @@
             <tbody id="addresses"></tbody>
           </table></div>
           <div class="empty" id="no-addresses" hidden>No address is banned.</div>
+        </section>
+        <section>
+          <h2>Hardware bans</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Banned with</th><th>Reason</th><th>By</th><th>Since</th><th>Accounts</th><th>Ids</th><th></th></tr></thead>
+            <tbody id="device-bans"></tbody>
+          </table></div>
+          <div class="empty" id="no-device-bans" hidden>No hardware bans.</div>
+        </section>
+        <section>
+          <h2>Hardware alerts</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>When</th><th>Player</th><th>What</th><th>Detail</th></tr></thead>
+            <tbody id="device-alerts"></tbody>
+          </table></div>
+          <div class="empty" id="no-device-alerts" hidden>Nothing yet.</div>
+        </section>
+        <section>
+          <h2>Stopped most by the filter</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Player</th><th class="num">Stopped</th><th>Last</th><th></th></tr></thead>
+            <tbody id="filter-hits"></tbody>
+          </table></div>
+          <div class="empty" id="no-filter-hits" hidden>Nobody.</div>
         </section>
       </div>
     </div>
@@ -518,6 +594,9 @@
         if (player.silenced !== 0) {
           tags.push(el("span", "Silenced", "tag bad"));
         }
+        if (player.deviceBanned) {
+          tags.push(el("span", "Hardware banned", "tag bad"));
+        }
         if (player.nameRejected) {
           tags.push(el("span", "Name rejected", "tag bad"));
         }
@@ -541,8 +620,6 @@
         $("no-players").hidden = players.length > 0;
       };
 
-      const HISTORY = {ban: "Banned", unban: "Ban lifted", reason: "Reason changed", appeal: "Appealed",
-        appeal_approved: "Appeal approved", appeal_denied: "Appeal denied"};
       const loadDetail = async () => {
         $("detail").hidden = !selected;
         if (!selected) {
@@ -569,6 +646,9 @@
           ["Ban", player.banned === 0 ? "—" : `${left(player.banned)} · ${player.banReason}`],
           ["Chat", player.silenced === 0 ? "—" : `Silenced: ${left(player.silenced).toLowerCase()}`],
           ["Reports waiting", String(player.openReports)],
+          ["Stopped by the filter", `${player.stoppedThisWeek} in the last 7 days`],
+          ["Hardware IDs", player.devicesKnown ? String(player.devicesKnown) : "None"],
+          ["Paintings", String(player.paintings)],
           ["Appeal", player.appeal ? `${player.appeal.status} · ${player.appeal.text}` : "—"],
           ["Discord", player.discord || "—"],
           ["Bio", player.bio || "—"],
@@ -584,34 +664,115 @@
         if (document.activeElement !== $("ban-reason")) {
           $("ban-reason").value = player.banned === 0 ? "" : player.banReason;
         }
-        $("history-title").hidden = player.history.length === 0;
-        $("player-history").replaceChildren(...player.history.map(entry => el("li", [when(entry.at), HISTORY[entry.action] || entry.action,
-          entry.action === "ban" ? (entry.seconds === -1 ? "for good" : duration(entry.seconds)) : "", entry.reason, entry.by && `by ${entry.by}`]
+      };
+
+      // the player's Jam-a-Grams or wall posts, sent and received
+      // (lib/chatlog.js): asked with the rest of the extras, and a page more
+      // with Older. "(not sent)" in front is one the filter stopped.
+      let mailLines = [];
+      const loadMail = async older => {
+        const username = selected;
+        if (!username) {
+          return;
+        }
+        const before = older && mailLines.length ? mailLines[mailLines.length - 1].id : 0;
+        const result = await api(`chat?username=${encodeURIComponent(username)}&kind=${$("mail-kind").value}`
+          + `&direction=${$("mail-direction").value}&before=${before}`);
+        if (username !== selected) {
+          return;
+        }
+        const lines = result.ok ? result.data.lines : [];
+        mailLines = older ? [...mailLines, ...lines] : lines;
+        $("mail-lines").replaceChildren(...mailLines.map(line => lineNode(line, true)));
+        $("no-mail").hidden = mailLines.length > 0;
+        $("mail-older").hidden = !(result.ok && result.data.more);
+      };
+      $("mail-kind").addEventListener("change", () => loadMail(false));
+      $("mail-direction").addEventListener("change", () => loadMail(false));
+      $("mail-older").addEventListener("click", () => loadMail(true));
+
+      // other accounts the same person may have, and what happened to the
+      // player: asked when a player is opened and after an action, not every
+      // few seconds (finding alts looks through every account).
+      const KIND_NAMES = {os: "system id", board: "board", disk: "disk", install: "client id", mac: "network card"};
+      const TIMELINE_NAMES = {ban: "Ban", staff: "Staff", report: "Report", alert: "Alert"};
+      const loadExtras = async () => {
+        const username = selected;
+        if (!username) {
+          return;
+        }
+        loadMail(false);
+        const [alts, timeline] = await Promise.all([api(`alts?username=${encodeURIComponent(username)}`), api(`timeline?username=${encodeURIComponent(username)}`)]);
+        if (username !== selected) {
+          return;
+        }
+        const altList = alts.ok ? alts.data.alts : [];
+        $("alts").replaceChildren(...altList.map(alt => {
+          const row = el("tr", undefined, "pick");
+          const stateCell = el("td");
+          const tags = stateTags({...alt, silenced: 0, nameRejected: false, moderator: false, banned: alt.banned});
+          stateCell.append(...(tags.length ? tags.flatMap(tag => [tag, " "]) : ["—"]));
+          row.append(el("td", alt.username), stateCell,
+            el("td", alt.devices.length ? `${alt.devices.map(kind => KIND_NAMES[kind] || kind).join(", ")}${alt.weak ? " (weak)" : ""}` : "—"),
+            el("td", alt.addresses ? String(alt.addresses) : "—", "num"));
+          row.addEventListener("click", () => openPlayer(alt.username));
+          return row;
+        }));
+        $("no-alts").hidden = altList.length > 0;
+        const ids = alts.ok ? alts.data.ids : [];
+        $("device-ids").replaceChildren(...ids.map(entry => {
+          const row = el("tr", undefined, "pick");
+          row.title = "Every account that used this id";
+          row.append(el("td", KIND_NAMES[entry.kind] || entry.kind), el("td", entry.id, "device-id"), el("td", when(entry.first)), el("td", when(entry.last)),
+            el("td", String(entry.others), "num"), el("td", !entry.banned ? "—" : entry.kind === "mac" ? "Banned (alerts only)" : "Banned"));
+          row.addEventListener("click", () => searchDevice(entry.id));
+          return row;
+        }));
+        $("no-device-ids").hidden = ids.length > 0;
+        const events = timeline.ok ? timeline.data.events : [];
+        $("timeline").replaceChildren(...events.map(entry => el("li", [when(entry.at), TIMELINE_NAMES[entry.kind] || entry.kind, entry.text, entry.by && `by ${entry.by}`]
           .filter(Boolean).join(" · "))));
+        $("no-timeline").hidden = events.length > 0;
       };
 
       const select = username => {
         selected = username;
+        hashArg = username || "";
+        setHash();
         setStatus($("detail-status"), "");
         for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text"]) {
           $(id).value = "";
         }
         renderPlayers();
         loadDetail();
+        loadExtras();
       };
 
       // from another page: that player's box, whether or not the search shows them.
       const openPlayer = username => {
         $("player-search").value = username;
+        $("player-search-by").value = "name";
         selected = username;
+        hashArg = username;
         showTab("players");
+        loadExtras();
+      };
+
+      // every account that used a hardware ID: the player list, searched by it.
+      const searchDevice = id => {
+        $("player-search-by").value = "device";
+        $("player-search").placeholder = "Hardware ID, or the start of one";
+        $("player-search").value = id;
+        showTab("players");
+        refresh();
+        window.scrollTo(0, 0);
       };
 
       const numberFrom = id => ($(id).value.trim() === "" ? NaN : Number($(id).value));
       const actionBody = action => {
         switch (action) {
           case "ban": return {hours: numberFrom("ban-hours"), reason: $("ban-reason").value};
-          case "banReason": case "banAddress": return {reason: $("ban-reason").value};
+          case "banReason": case "banAddress": case "banDevices": return {reason: $("ban-reason").value};
           case "silence": return {hours: numberFrom("silence-hours")};
           case "message": return {text: $("message-text").value};
           default: return {};
@@ -619,6 +780,8 @@
       };
       const CONFIRM = {
         banAddress: name => `Ban the address ${name} last signed in from, for good?`,
+        banDevices: name => `Hardware ban ${name}? Everyone on their hardware is put out.`,
+        unbanDevices: name => `Lift the hardware bans on ${name}?`,
         rejectName: name => `Reject the username ${name}? They are signed out and must pick another.`,
       };
 
@@ -640,6 +803,7 @@
           $("silence-hours").value = "";
           $("message-text").value = "";
           refresh();
+          loadExtras();
         }
       });
 
@@ -647,21 +811,37 @@
       let searchWait = null;
       $("player-search").addEventListener("input", () => {
         clearTimeout(searchWait);
-        searchWait = setTimeout(refresh, $("player-search-by").value === "address" ? 700 : 0);
+        searchWait = setTimeout(refresh, $("player-search-by").value === "name" ? 250 : 700);
+      });
+      // Enter opens the player of exactly that name, when there is one.
+      $("player-search").addEventListener("keydown", async event => {
+        if (event.key !== "Enter" || $("player-search-by").value !== "name") {
+          return;
+        }
+        clearTimeout(searchWait);
+        await refresh();
+        const wanted = $("player-search").value.trim().toLowerCase();
+        const exact = players.find(player => player.username.toLowerCase() === wanted);
+        if (exact && exact.username !== selected) {
+          select(exact.username);
+        }
       });
       $("player-search-by").addEventListener("change", () => {
-        $("player-search").placeholder = $("player-search-by").value === "address" ? "203.0.113.7, or the start of one" : "Search";
+        $("player-search").placeholder = {address: "203.0.113.7, or the start of one", device: "Hardware ID, or the start of one"}[$("player-search-by").value] || "Search";
         refresh();
       });
 
       const chatUrl = before => `chat?username=${encodeURIComponent(chatQuery.username)}&room=${encodeURIComponent(chatQuery.room)}`
-        + `&text=${encodeURIComponent(chatQuery.text)}&before=${before}`;
+        + `&text=${encodeURIComponent(chatQuery.text)}&kind=${chatQuery.kind || ""}&until=${chatQuery.until || 0}&before=${before}`;
+      // where a line was said: a room, or who it went to.
+      const placeOf = line => (line.kind === "whisper" ? `Whisper to ${line.to}` : line.kind === "jamagram" ? `Jam-a-Gram to ${line.to}`
+        : line.kind === "wall" ? `On ${line.to}'s wall` : line.room);
 
       const lineNode = (line, inContext = false) => {
         const item = el("li", undefined, inContext && line.marked ? "this" : "");
         const who = button(line.username, () => openPlayer(line.username), "chat-who");
         const text = el("span", undefined, "chat-text");
-        text.append(line.text, el("span", line.whisperTo ? `Whisper to ${line.whisperTo}` : line.room, "chat-room"));
+        text.append(line.text || "(no words)", el("span", placeOf(line), "chat-room"));
         item.append(el("span", when(line.at), "chat-time"), who, text);
         if (!inContext) {
           item.append(button("Around", () => showContext(line.id), "chat-more"));
@@ -677,7 +857,7 @@
 
       const loadChat = async older => {
         if (!chatQuery) {
-          chatQuery = {username: "", room: "", text: ""};
+          chatQuery = {username: "", room: "", text: "", kind: "", until: 0};
         }
         const before = older && chatLines.length ? chatLines[chatLines.length - 1].id : 0;
         const result = await api(chatUrl(before));
@@ -697,7 +877,7 @@
           return;
         }
         const {line, lines} = result.data;
-        $("context-title").textContent = line.whisperTo ? `${line.username} and ${line.whisperTo}` : line.room;
+        $("context-title").textContent = line.kind === "chat" ? line.room : `${line.username} and ${line.to}`;
         $("chat-context").replaceChildren(...lines.map(entry => lineNode({...entry, marked: entry.id === line.id}, true)));
         $("context-box").hidden = false;
         $("context-box").scrollIntoView({block: "nearest"});
@@ -708,25 +888,41 @@
 
       $("chat-form").addEventListener("submit", event => {
         event.preventDefault();
-        chatQuery = {username: $("chat-player").value.trim(), room: $("chat-room").value.trim(), text: $("chat-text").value.trim()};
+        const until = $("chat-until").value ? Math.floor(new Date($("chat-until").value).getTime() / 1000) : 0;
+        chatQuery = {username: $("chat-player").value.trim(), room: $("chat-room").value.trim(), text: $("chat-text").value.trim(), kind: $("chat-kind").value, until};
         $("context-box").hidden = true;
         loadChat(false);
       });
       $("chat-older").addEventListener("click", () => loadChat(true));
 
-      const openChat = username => {
+      const openChat = (username, kind = "") => {
         $("chat-player").value = username;
         $("chat-room").value = "";
         $("chat-text").value = "";
-        chatQuery = {username, room: "", text: ""};
+        $("chat-kind").value = kind;
+        $("chat-until").value = "";
+        chatQuery = {username, room: "", text: "", kind, until: 0};
+        hashArg = username;
         $("context-box").hidden = true;
         showTab("chat");
       };
       $("open-chat").addEventListener("click", () => selected && openChat(selected));
+      $("open-paintings").addEventListener("click", () => selected && openPaintings(selected));
 
-      const renderReports = data => {
+      // what the reported player said up to the report, once asked for: report id -> lines.
+      const reportChat = new Map();
+      let reportsShown = "";
+      let lastReports = null;
+      const renderReports = (data, force = false) => {
         const handled = $("report-filter").value === "1";
         $("report-count").textContent = data.open ? ` (${data.open})` : "";
+        lastReports = data;
+        // drawn again only when the list changed.
+        const shown = `${handled} ${data.reports.map(report => report.id).join(",")}`;
+        if (shown === reportsShown && !force) {
+          return;
+        }
+        reportsShown = shown;
         $("reports").replaceChildren(...data.reports.map(report => {
           const box = el("div", undefined, "report");
           box.append(el("h3", `${report.target} — ${report.reason}`),
@@ -737,8 +933,24 @@
           if (report.context) {
             box.append(el("pre", report.context));
           }
+          if (reportChat.has(report.id)) {
+            const lines = reportChat.get(report.id);
+            const list = el("ul", undefined, "report-chat");
+            list.append(...lines.map(line => lineNode(line, true)));
+            box.append(el("h3", `What ${report.target} said up to the report`), lines.length ? list : el("div", "Nothing kept.", "hint"));
+          }
           const buttons = el("div", undefined, "buttons");
-          buttons.append(button("Player", () => openPlayer(report.target)), button("Chat history", () => openChat(report.target)));
+          buttons.append(button("Player", () => openPlayer(report.target)), button("Chat history", () => openChat(report.target)),
+            button(reportChat.has(report.id) ? "Hide chat" : "Chat at the time", async () => {
+              if (reportChat.has(report.id)) {
+                reportChat.delete(report.id);
+              }
+              else {
+                const result = await api(`chat?username=${encodeURIComponent(report.target)}&until=${report.createdAt + 60}&before=0`);
+                reportChat.set(report.id, result.ok ? result.data.lines.slice(0, 20).reverse() : []);
+              }
+              renderReports(lastReports, true);
+            }));
           if (handled) {
             box.append(el("div", `Dealt with on ${when(report.handledAt)}`, "hint"));
           }
@@ -755,6 +967,7 @@
         $("no-reports").hidden = data.reports.length > 0;
       };
       $("report-filter").addEventListener("change", () => refresh());
+
 
       const renderRequests = data => {
         const handled = $("request-filter").value === "1";
@@ -817,13 +1030,28 @@
       $("request-filter").addEventListener("change", () => refresh());
 
       let paintingsShown = "";
+      // the picture full size, over the page; a click puts it away.
+      const showPreview = src => {
+        $("preview-img").src = src;
+        $("preview").hidden = false;
+      };
+      $("preview").addEventListener("click", () => {
+        $("preview").hidden = true;
+      });
+      document.addEventListener("keydown", event => {
+        if (event.key === "Escape") {
+          $("preview").hidden = true;
+        }
+      });
+
       const renderMasterpieces = data => {
         const which = $("masterpiece-filter").value;
-        const paintings = data[which];
-        $("masterpiece-count").textContent = data.waiting.length ? ` (${data.waiting.length})` : "";
+        const marked = (list, status) => list.map(painting => ({...painting, status}));
+        const paintings = which === "all" ? [...marked(data.waiting, "waiting"), ...marked(data.approved, "approved")] : marked(data[which], which);
+        $("masterpiece-count").textContent = data.waitingCount ? ` (${data.waitingCount})` : "";
         $("no-masterpieces").hidden = paintings.length > 0;
         // drawn again only when the list changed, so the pictures do not flicker.
-        const shown = `${which} ${paintings.map(painting => painting.id).join(" ")}`;
+        const shown = `${which} ${paintings.map(painting => `${painting.id}:${painting.status}`).join(" ")}`;
         if (shown === paintingsShown) {
           return;
         }
@@ -834,14 +1062,16 @@
           picture.src = `/mod/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
           picture.alt = `Painting by ${painting.creator}`;
           picture.loading = "lazy";
-          box.append(picture, el("h3", painting.creator), el("div", when(painting.createdAt), "hint"));
+          picture.addEventListener("click", () => showPreview(picture.src));
+          box.append(picture, el("h3", painting.creator),
+            el("div", `${when(painting.createdAt)}${which === "all" ? (painting.status === "waiting" ? " · waiting" : " · on show") : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
           const does = (label, action, className) => button(label, async () => {
             const result = await api("masterpiece", {id: painting.id, action});
             setStatus($("masterpiece-status"), said(result), !result.ok);
             refresh();
           }, className);
-          if (which === "waiting") {
+          if (painting.status === "waiting") {
             buttons.append(does("Approve", "approve", "primary"), does("Reject", "reject", "danger"));
           }
           else {
@@ -853,6 +1083,18 @@
         }));
       };
       $("masterpiece-filter").addEventListener("change", () => refresh());
+      let creatorWait = null;
+      $("masterpiece-creator").addEventListener("input", () => {
+        clearTimeout(creatorWait);
+        creatorWait = setTimeout(refresh, 250);
+      });
+      // a player's paintings, waiting and on show.
+      const openPaintings = username => {
+        $("masterpiece-creator").value = username;
+        $("masterpiece-filter").value = "all";
+        hashArg = username;
+        showTab("masterpieces");
+      };
 
       const renderBans = data => {
         $("bans").replaceChildren(...data.accounts.map(account => {
@@ -887,6 +1129,81 @@
           return row;
         }));
         $("no-addresses").hidden = data.addresses.length > 0;
+        $("device-bans").replaceChildren(...data.devices.map(ban => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(button("Unban", async () => {
+            if (!window.confirm(`Lift the hardware ban made with ${ban.username}?`)) {
+              return;
+            }
+            const result = await api("device", {id: ban.id});
+            setStatus($("ban-status"), said(result), !result.ok);
+            refresh();
+          }), " ", button("Player", () => openPlayer(ban.username)));
+          row.append(el("td", ban.username || "—"), el("td", ban.reason), el("td", ban.by || "—"), el("td", when(ban.createdAt)),
+            deviceAccounts(ban.accounts), deviceIds(ban), buttons);
+          return row;
+        }));
+        $("no-device-bans").hidden = data.devices.length > 0;
+        $("device-alerts").replaceChildren(...data.alerts.map(entry => {
+          const row = el("tr", undefined, "pick");
+          const detail = el("td", entry.detail);
+          detail.style.whiteSpace = "normal";
+          row.append(el("td", when(entry.at)), el("td", entry.username), el("td", entry.name), detail);
+          row.addEventListener("click", () => openPlayer(entry.username));
+          return row;
+        }));
+        $("no-device-alerts").hidden = data.alerts.length > 0;
+      };
+
+      // a hardware ban's accounts and ids, each one a link.
+      const deviceAccounts = names => {
+        const cell = el("td");
+        cell.style.whiteSpace = "normal";
+        cell.append(...(names.length ? names.flatMap((name, index) => {
+          const link = el("button", name, "link");
+          link.type = "button";
+          link.addEventListener("click", () => openPlayer(name));
+          return index ? [", ", link] : [link];
+        }) : ["—"]));
+        return cell;
+      };
+      const openBanIds = new Set();
+      const deviceIds = ban => {
+        const cell = el("td");
+        const shown = openBanIds.has(ban.id);
+        const toggle = el("button", shown ? `Hide ${ban.ids.length}` : `Show ${ban.ids.length}`, "link");
+        toggle.type = "button";
+        toggle.addEventListener("click", () => {
+          if (openBanIds.has(ban.id)) {
+            openBanIds.delete(ban.id);
+          }
+          else {
+            openBanIds.add(ban.id);
+          }
+          refresh();
+        });
+        cell.append(toggle);
+        if (shown) {
+          for (const entry of ban.ids) {
+            const link = el("button", `${KIND_NAMES[entry.kind] || entry.kind} ${entry.id}`, "link device-id");
+            link.type = "button";
+            link.addEventListener("click", () => searchDevice(entry.id));
+            cell.append(el("br"), link);
+          }
+        }
+        return cell;
+      };
+
+      const renderFilterHits = list => {
+        $("filter-hits").replaceChildren(...list.map(entry => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(button("Lines", () => openChat(entry.username, "notsent")), " ", button("Player", () => openPlayer(entry.username)));
+          row.append(el("td", entry.username), el("td", String(entry.count), "num"), el("td", when(entry.last)), buttons);
+          return row;
+        }));
+        $("no-filter-hits").hidden = list.length > 0;
       };
 
       const refresh = async () => {
@@ -901,20 +1218,32 @@
           $("request-count").textContent = counts.data.requests ? ` (${counts.data.requests})` : "";
           $("masterpiece-count").textContent = counts.data.paintings ? ` (${counts.data.paintings})` : "";
           $("online-count").textContent = `${counts.data.online} playing`;
+          // what waits, in the page's title too, for when it is in another tab.
+          const waiting = counts.data.reports + counts.data.requests + counts.data.paintings;
+          document.title = waiting ? `(${waiting}) Moderators` : "Moderators";
+        }
+        // out of sight, only the counts (for the title); the rest when it is back.
+        if (document.hidden) {
+          timer = setTimeout(refresh, REFRESH_MS);
+          return;
         }
         if (shown === "players") {
-          const byAddress = $("player-search-by").value === "address";
+          const searchBy = $("player-search-by").value;
+          const byAddress = searchBy !== "name";
           const query = $("player-search").value.trim();
-          $("players-when").textContent = byAddress ? "Last from address" : "Last seen";
-          $("address-hint").hidden = !byAddress;
+          $("players-when").textContent = searchBy === "address" ? "Last from address" : searchBy === "device" ? "Last used" : "Last seen";
+          $("address-hint").hidden = searchBy !== "address";
           if (byAddress && query === "") {
             players = [];
             renderPlayers();
           }
           else {
-            const result = await api(`players?q=${encodeURIComponent(query)}${byAddress ? "&by=address" : ""}`);
+            const result = await api(`players?q=${encodeURIComponent(query)}${byAddress ? `&by=${searchBy}` : ""}`);
             players = result.ok ? result.data.players : [];
             renderPlayers();
+            const total = result.ok && result.data.total ? result.data.total : players.length;
+            $("players-more").hidden = byAddress || total <= players.length;
+            $("players-more").textContent = `Showing ${players.length} of ${total.toLocaleString()}. Type more of the name to narrow it down.`;
             if (!result.ok && byAddress) {
               $("no-players").textContent = said(result);
             }
@@ -942,7 +1271,7 @@
           }
         }
         else if (shown === "masterpieces") {
-          const result = await api("masterpieces");
+          const result = await api(`masterpieces?creator=${encodeURIComponent($("masterpiece-creator").value.trim())}`);
           if (result.ok) {
             renderMasterpieces(result.data);
           }
@@ -951,9 +1280,12 @@
           await window.statsView.load(api);
         }
         else if (shown === "bans") {
-          const result = await api("bans");
+          const [result, hits] = await Promise.all([api("bans"), api("filterhits")]);
           if (result.ok) {
             renderBans(result.data);
+          }
+          if (hits.ok) {
+            renderFilterHits(hits.data.players);
           }
         }
         if (signedIn) {
@@ -962,8 +1294,49 @@
         }
       };
 
+      // the page's address follows what is shown ("#players/John",
+      // "#chat/John"), for links to paste to other staff, and for Back.
+      let hashArg = "";
+      let applyingHash = false;
+      const setHash = () => {
+        const wanted = `#${tab}${hashArg ? `/${encodeURIComponent(hashArg)}` : ""}`;
+        if (location.hash !== wanted) {
+          history[applyingHash ? "replaceState" : "pushState"](null, "", wanted);
+        }
+      };
+      const applyHash = () => {
+        const [name, arg] = location.hash.slice(1).split("/");
+        const known = [...document.querySelectorAll("nav button")].some(one => one.dataset.tab === name);
+        if (!known) {
+          return false;
+        }
+        const value = arg ? decodeURIComponent(arg) : "";
+        applyingHash = true;
+        if (name === "players" && value) {
+          openPlayer(value);
+        }
+        else if (name === "chat" && value) {
+          openChat(value);
+        }
+        else if (name === "masterpieces" && value) {
+          openPaintings(value);
+        }
+        else {
+          hashArg = "";
+          showTab(name);
+        }
+        applyingHash = false;
+        return true;
+      };
+      window.addEventListener("popstate", () => {
+        if (signedIn) {
+          applyHash();
+        }
+      });
+
       const showTab = name => {
         tab = name;
+        setHash();
         for (const one of document.querySelectorAll("nav button")) {
           one.setAttribute("aria-selected", String(one.dataset.tab === name));
         }
@@ -973,15 +1346,25 @@
         refresh();
       };
       for (const one of document.querySelectorAll("nav button")) {
-        one.addEventListener("click", () => showTab(one.dataset.tab));
+        one.addEventListener("click", () => {
+          hashArg = "";
+          showTab(one.dataset.tab);
+        });
       }
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+          refresh();
+        }
+      });
 
       const showPanel = username => {
         signedIn = true;
         $("who").textContent = username;
         $("gate").hidden = true;
         $("panel").hidden = false;
-        showTab(tab);
+        if (!applyHash()) {
+          showTab(tab);
+        }
       };
 
       $("gate-form").addEventListener("submit", async event => {
