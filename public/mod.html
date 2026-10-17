@@ -272,7 +272,7 @@
           <div class="toolbar">
             <select id="player-search-by" aria-label="Search by">
               <option value="name">By name</option>
-              <option value="address">By IP address</option>
+              <option value="address" data-needs="address.ban">By IP address</option>
             </select>
             <input id="player-search" type="search" placeholder="Search" aria-label="Search players">
             <span class="hint" id="online-count"></span>
@@ -1180,6 +1180,12 @@
         const pages = [...document.querySelectorAll("nav button")];
         for (const page of pages) {
           page.hidden = !allowed.has(page.dataset.needs);
+        }
+        // searching by address: for the roles that ban addresses
+        const byAddress = document.querySelector('#player-search-by option[value="address"]');
+        byAddress.hidden = byAddress.disabled = !allowed.has(byAddress.dataset.needs);
+        if (byAddress.disabled && $("player-search-by").value === "address") {
+          $("player-search-by").value = "name";
         }
         const open = pages.find(page => page.dataset.tab === tab && !page.hidden) || pages.find(page => !page.hidden);
         if (open) {

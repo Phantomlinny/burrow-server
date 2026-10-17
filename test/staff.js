@@ -231,6 +231,9 @@ const run = async () => {
   assert.ok(!halMe.permissions.includes("player.ban"));
   assert.strictEqual((await halPage("/mod/api/act", {username: "Pip", action: "ban", hours: 1, reason: "x"})).data.error, "Your role cannot do that.");
   assert.match((await halPage("/mod/api/act", {username: "Mira", action: "silence", hours: 1})).data.error, /your rank or above/);
+  // searching by address (against ban evasion) is for the roles that ban addresses
+  assert.strictEqual((await halPage("/mod/api/players?by=address&q=127.0.0.")).status, 403);
+  assert.ok(Array.isArray((await modPage("/mod/api/players?by=address&q=127.0.0.")).data.players));
   // a warning from the panel, and on the player's page
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "warn", reason: "scamming", note: "fake trade"})).data.ok, /^Pip warned \(scamming\): warning 1\./);
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "warn", reason: "nonsense"})).data.error, /reason/);
