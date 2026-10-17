@@ -165,8 +165,9 @@ package
                   _loc4_ += 17;
                }
             }
-            // A player's bio, the last field of what their card is told.
-            else if(param1.obj[0] == "xbn" && param1.obj.length > 7 && String(param1.obj[2]).toLowerCase() != String(gMainFrame.server.userName).toLowerCase())
+            // A player's bio, the last field of what their card is told:
+            // their own too, so they see it as others do.
+            else if(param1.obj[0] == "xbn" && param1.obj.length > 7)
             {
                param1.obj[7] = AJClient.filterOrNote(String(param1.obj[7]));
             }
