@@ -90,30 +90,53 @@ package avatar
       
       private static const STATE_LAND:int = 6;
       
+      // the actions' animations, `land` and `water`. an animal has the art of
+      // its own set only (land or ocean animals) or of both: an action of a
+      // set (`set`) plays as that set's when the animal has it, and otherwise
+      // as the animal's own set's, so a land animal underwater still sits
+      // (gui.ActionManager). ":dance:" and ":play:" are both sets' and go by
+      // the room for an animal of both; the other set's dance and play have
+      // names of their own.
       public static var _actionLookup:Array = [{
          "name":":dance:",
          "land":23,
          "water":38,
          "flip":false
       },{
+         "name":":danceLand:",
+         "land":23,
+         "water":38,
+         "set":"land",
+         "flip":false
+      },{
+         "name":":danceSwim:",
+         "land":23,
+         "water":38,
+         "set":"water",
+         "flip":false
+      },{
          "name":":sleep:",
          "land":22,
          "water":41,
+         "set":"land",
          "flip":false
       },{
          "name":":dive:",
          "land":22,
          "water":41,
+         "set":"water",
          "flip":false
       },{
          "name":":hop:",
          "land":17,
          "water":33,
+         "set":"land",
          "flip":false
       },{
          "name":":swirl:",
          "land":17,
          "water":33,
+         "set":"water",
          "flip":false
       },{
          "name":":play:",
@@ -121,34 +144,52 @@ package avatar
          "water":39,
          "flip":false
       },{
+         "name":":playLand:",
+         "land":6,
+         "water":39,
+         "set":"land",
+         "flip":false
+      },{
+         "name":":playSwim:",
+         "land":6,
+         "water":39,
+         "set":"water",
+         "flip":false
+      },{
          "name":":sitNW:",
          "land":2,
          "water":40,
+         "set":"land",
          "flip":true
       },{
          "name":":poseLeft:",
          "land":2,
          "water":40,
+         "set":"water",
          "flip":true
       },{
          "name":":sitNE:",
          "land":2,
          "water":40,
+         "set":"land",
          "flip":false
       },{
          "name":":sitSE:",
          "land":4,
          "water":40,
+         "set":"land",
          "flip":true
       },{
          "name":":poseRight:",
          "land":2,
          "water":40,
+         "set":"water",
          "flip":false
       },{
          "name":":sitSW:",
          "land":4,
          "water":40,
+         "set":"land",
          "flip":false
       }];
       
@@ -1148,11 +1189,22 @@ package avatar
          _lastIdleAnim = getBaseIdle();
          _lastIdleFlip = false;
          var _loc2_:String = _actionMgr.getActionString(param1);
+         // the sets this animal has art for
+         var _loc5_:Boolean = _avatar == null || Utility.isLand(_avatar.enviroTypeFlag);
+         var _loc6_:Boolean = _avatar == null || Utility.isOcean(_avatar.enviroTypeFlag);
+         var _loc7_:String = null;
          for each(var _loc4_:Object in _actionLookup)
          {
             if(_loc4_.name == _loc2_)
             {
-               _loc3_ = int(_roomType == 0 ? _loc4_.land : _loc4_.water);
+               // the action's own set, if the animal has it; otherwise its
+               // only set, or with both (or neither known) the room's
+               _loc7_ = _loc4_.set;
+               if(!_loc7_ || (_loc7_ == "water" ? !_loc6_ : !_loc5_))
+               {
+                  _loc7_ = _loc5_ == _loc6_ ? (_roomType == 0 ? "land" : "water") : (_loc5_ ? "land" : "water");
+               }
+               _loc3_ = int(_loc7_ == "water" ? _loc4_.water : _loc4_.land);
                if(_loc3_ > 0)
                {
                   _lastIdleAnim = _loc3_;
@@ -1164,7 +1216,8 @@ package avatar
          }
          if(_pet && _loc2_)
          {
-            _pet.setActionByName(_loc2_);
+            // pets know ":dance:" and ":play:", not the other set's names
+            _pet.setActionByName(_loc2_.replace(/(Land|Swim):$/,":"));
          }
       }
       
