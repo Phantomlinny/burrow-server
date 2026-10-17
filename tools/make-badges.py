@@ -178,8 +178,29 @@ def sprout():
     return [(stem, False), (small, False), (large, False)]
 
 
-# id, outline, and the card disc's colours: top, bottom, rim.
+def seal_points():
+    """A round seal with eight soft scallops, as verified accounts have."""
+    steps = 96
+    return [(7.5 * (1 + 0.075 * math.cos(math.radians(8 * angle))) * math.cos(math.radians(angle)),
+             7.5 * (1 + 0.075 * math.cos(math.radians(8 * angle))) * math.sin(math.radians(angle)))
+            for angle in (360 * step / steps - 90 for step in range(steps))]
+
+
+def seal_tick():
+    return [(x * 0.52, y * 0.52 + 0.3) for x, y in tick()[0][0]]
+
+
+def verified():
+    # the seal with the tick cut out of it, so the name tag's colour shows
+    # the seal and the tag behind shows through the tick.
+    return [(seal_points(), False), (seal_tick(), True)]
+
+
+# id, outline, and the card disc's colours: top, bottom, rim. a badge whose
+# rim is None has no disc: its outline's solid pieces are shaded instead,
+# and its holes are white (the verified seal, blue with a white tick).
 BADGES = [
+    ("verified", verified, "#4cb3ff", "#1478e6", None),
     ("owner", crown, "#ffd95a", "#f0a11c", "#96600a"),
     ("moderator", shield, "#5cb2ff", "#1f6fd6", "#12458a"),
     ("contributor", wrench, "#6fd878", "#2f9e3a", "#19621f"),
@@ -262,6 +283,8 @@ def card_pixels(paths, top, bottom, rim):
     """CARD_SIZE square of (r, g, b, a): a disc shaded from `top` to
     `bottom` with a `rim`, the outline in white on it. Sixteen samples to a
     pixel."""
+    if rim is None:
+        return shape_pixels(paths, top, bottom)
     paths = fitted(paths, CARD_HALF)
     top, bottom, rim = rgb(top), rgb(bottom), rgb(rim)
     middle, fill_radius, rim_radius = CARD_SIZE / 2, 20.0, 23.0
@@ -282,6 +305,37 @@ def card_pixels(paths, top, bottom, rim):
                         colour = (255, 255, 255)
                     else:
                         shade = (y + fill_radius) / (2 * fill_radius)
+                        colour = tuple(a + (b - a) * shade for a, b in zip(top, bottom))
+                    for channel in range(3):
+                        total[channel] += colour[channel]
+                    total[3] += 1
+            row.append(tuple(round(total[c] / total[3]) if total[3] else 0 for c in range(3)) + (round(total[3] / 16 * 255),))
+        rows.append(row)
+    return rows
+
+
+def shape_pixels(paths, top, bottom):
+    """CARD_SIZE square of (r, g, b, a): the outline's solid pieces, as big
+    as the disc, shaded from `top` to `bottom`, and its holes in white."""
+    paths = fitted(paths, 23.0)
+    solid = [(points, False) for points, hole in paths if not hole]
+    holes = [(points, False) for points, hole in paths if hole]
+    top, bottom = rgb(top), rgb(bottom)
+    middle = CARD_SIZE / 2
+    rows = []
+    for py in range(CARD_SIZE):
+        row = []
+        for px in range(CARD_SIZE):
+            total = [0.0, 0.0, 0.0, 0.0]
+            for sy in range(4):
+                for sx in range(4):
+                    x, y = px + (sx + 0.5) / 4 - middle, py + (sy + 0.5) / 4 - middle
+                    if not inside(solid, x, y):
+                        continue
+                    if inside(holes, x, y):
+                        colour = (255, 255, 255)
+                    else:
+                        shade = (y + 23.0) / 46.0
                         colour = tuple(a + (b - a) * shade for a, b in zip(top, bottom))
                     for channel in range(3):
                         total[channel] += colour[channel]

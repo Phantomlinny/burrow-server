@@ -6,6 +6,7 @@
 
 const assert = require("assert");
 const {spawn} = require("child_process");
+const crypto = require("crypto");
 const fs = require("fs");
 const net = require("net");
 const os = require("os");
@@ -138,10 +139,17 @@ class GameClient {
   }
 }
 
+// what the client 1.3.0 sends about its computer (lib/devices.js), made up:
+// one computer for each username, unless a test gives its own.
+const deviceFor = name => {
+  const hash = kind => crypto.createHash("sha256").update(`test-device:${kind}:${String(name).toLowerCase()}`).digest("hex");
+  return {v: 1, ids: {os: hash("os"), install: hash("install"), disk: [hash("disk")], mac: [hash("mac")]}, notes: []};
+};
+
 const postJson = (url, body) => fetch(url, {
   method: "POST",
   headers: {"Content-Type": "application/json", "Origin": "null"},
-  body: JSON.stringify(body),
+  body: JSON.stringify(/\/authenticate$/.test(url) && body && body.device === undefined ? {...body, device: deviceFor(body.username || "")} : body),
 });
 
 // starts a server on the given ports with an empty database, runs `run`
@@ -151,7 +159,11 @@ const postJson = (url, body) => fetch(url, {
 const withServer = async (name, httpPort, gamePort, run, {dataDir: keptDir = null} = {}) => {
   const dataDir = keptDir || fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
   const server = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
-    env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1"},
+    env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1",
+      // everyone arrives in the township, as the tests expect
+      AJ_SPAWN_ROOMS: process.env.AJ_SPAWN_ROOMS || "jamaa_township.room_main",
+      // and in the one world
+      AJ_WORLDS: process.env.AJ_WORLDS || "1"},
     stdio: ["ignore", "pipe", "inherit"],
   });
   let output = "";
@@ -184,4 +196,4 @@ const withServer = async (name, httpPort, gamePort, run, {dataDir: keptDir = nul
   }
 };
 
-module.exports = {GameClient, postJson, withServer};
+module.exports = {deviceFor, GameClient, postJson, withServer};

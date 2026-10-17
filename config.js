@@ -98,6 +98,12 @@ module.exports = {
   // cached in cacheDir. set AJ_OFFLINE=1 to serve from the cache only.
   upstreamContent: env.AJ_UPSTREAM || "https://ajcontent.akamaized.net/",
   offline: env.AJ_OFFLINE === "1",
+  // the client's device ids (lib/devices.js): with AJ_REQUIRE_DEVICE=1, a
+  // sign-in without them (a client from before 1.3.0, the official
+  // launcher, or one that left them out) is refused. off for now, while
+  // players update to 1.3.0: they are let in, and an account seen on banned
+  // hardware before is still kept out.
+  requireDevice: env.AJ_REQUIRE_DEVICE === "1",
   deployVersion: env.AJ_DEPLOY_VERSION || "1830",
   // older builds the CDN still serves, asked in turn for a room file the
   // current build has dropped. 1828 is the last with the Summer Carnival.
@@ -116,7 +122,7 @@ module.exports = {
   // 41: the game's text says "Burrow" where it said Animal Jam.
   // 48: the item giver (the item finder renamed) with previews and hex colours;
   // 49 and 50: its link to a colour picker.
-  buildVersion: env.AJ_BUILD_VERSION || "57",
+  buildVersion: env.AJ_BUILD_VERSION || "60",
   // what the official CDN is asked for; not ours to change.
   upstreamBuildVersion: "3",
 
@@ -246,8 +252,21 @@ module.exports = {
     {room: "appondale.room_museum", shown: "appondale.room_museum_ant", months: [2, 4, 6, 8, 10, 12]},
   ],
   startupRoom: "jamaa_township.room_main",
-  shards: [{id: 1, name: "Aldan"}],
-  maxUsersPerRoom: 80,
+  // where a player who does not start in their den arrives: one of these at
+  // random, of those that are not full (lib/world.js). AJ_SPAWN_ROOMS: a
+  // list of its own, comma-separated (the tests' is the township alone).
+  spawnRooms: env.AJ_SPAWN_ROOMS ? env.AJ_SPAWN_ROOMS.split(",").map(room => room.trim()).filter(Boolean)
+    : ["jamaa_township.room_main", "sarepia.room_main", "crystal_sands.room_main", "coral_canyons.room_main",
+      "mountains_of_shivveer.room_main", "appondale.room_main", "lost_temple_of_zios.room_main", "aussie.room_main", "balloosh.room_main"],
+  // the worlds, each its own copy of every land (rooms are "path#world";
+  // dens and parties are everyone's). a player arrives in one at random and
+  // can switch in the settings menu (gui.ServerSelector). the game names
+  // world N after the Nth name of its own list (551 Aldan, 552 Congo...,
+  // generic list 16), so the names here are only for the panels and logs.
+  // AJ_WORLDS: how many (the tests' is one).
+  shards: ["Aldan", "Congo", "Draa", "Grande", "Kama", "Nile", "Pecos", "Ramu", "Tigris", "Zambezi"]
+    .slice(0, Math.min(10, Math.max(1, Number(env.AJ_WORLDS) || 2))).map((name, i) => ({id: i + 1, name})),
+  maxUsersPerRoom: 40,
   // everything in every shop for nothing (AJ_FREE_SHOPS=1). off unless
   // asked for: what the game's shops make of a price of 0 has not been seen.
   freeShops: env.AJ_FREE_SHOPS === "1",

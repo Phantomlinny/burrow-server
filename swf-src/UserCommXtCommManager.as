@@ -536,7 +536,7 @@ package avatar
             }
             else
             {
-               _loc5_ = _actionMgr.matchActionString(_loc3_);
+               _loc5_ = _actionMgr.matchActionString(_loc3_,true);
                if(_loc5_)
                {
                   sendAvatarAction(_loc5_);

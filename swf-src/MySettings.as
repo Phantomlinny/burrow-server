@@ -218,15 +218,13 @@ package gui
             "frame":"redeemCode",
             "labelTxt":24819,
             "btnTxt":24820
-         /* the game's "World" row (choose a server) is out: there is one
-            world, this server does not answer the list it asks for (rm),
-            and the picker then waited behind its spinner for ever.
          },{
+            // the world picker (gui.ServerSelector): the server's worlds,
+            // config.shards, listed by the server's answer to "rm"
             "type":TOGGLE_TYPE_JOIN,
             "frame":"world",
             "labelTxt":6395,
             "btnTxt":6366
-         */
          },{
             "type":TOGGLE_TYPE_TOGGLE_BTN,
             "frame":"nameBadge",

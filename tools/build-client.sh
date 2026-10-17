@@ -33,6 +33,7 @@ set -- \
   gui.ReportAPlayer ReportAPlayer.as \
   gui.ECardCreation ECardCreation.as \
   gui.GuiManager GuiManager.as \
+  gui.ActionManager ActionManager.as \
   gui.PlayerSearch PlayerSearch.as \
   avatar.NPCView NPCView.as \
   gui.ChatHistory ChatHistory.as \

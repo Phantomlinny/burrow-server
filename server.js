@@ -5,6 +5,7 @@ require("./lib/log.js"); // first, so everything printed reaches the admin panel
 const fs = require("fs");
 const accounts = require("./lib/accounts.js");
 const bans = require("./lib/bans.js");
+const devices = require("./lib/devices.js");
 const chatlog = require("./lib/chatlog.js");
 const modlog = require("./lib/modlog.js");
 const retention = require("./lib/retention.js");
@@ -42,6 +43,7 @@ const main = async () => {
   reports.load();
   support.load();
   bans.load();
+  devices.load();
   chatlog.load();
   modlog.load();
   masterpieces.load();
