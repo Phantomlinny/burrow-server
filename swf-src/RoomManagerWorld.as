@@ -145,6 +145,9 @@ package room
       
       private var _shardId:int;
       
+      // whether the worlds' names were asked for (chosenLoginFinished)
+      private static var _askedWorldNames:Boolean;
+      
       public var _gotNewShardId:Boolean;
       
       private var _forceInvisMode:Boolean;
@@ -2603,6 +2606,17 @@ package room
       {
          if(_mainBackObj == null)
          {
+            // the worlds' names (generic list 16), which the game asked for on
+            // its world screen at login: this server has none, and without
+            // them the settings menu's World row and the world picker
+            // (ServerSelector) have no names, and the picker never opens.
+            // asked once: with the names in, fillNamesArray asks for the
+            // world list instead, whose answer needs the picker open.
+            if(!_askedWorldNames)
+            {
+               _askedWorldNames = true;
+               ServerSelector.fillNamesArray();
+            }
             if(!gMainFrame.userInfo.avtDefsCached)
             {
                if(ItemXtCommManager.itemDefsHaveLoaded)

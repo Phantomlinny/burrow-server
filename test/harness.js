@@ -151,7 +151,11 @@ const postJson = (url, body) => fetch(url, {
 const withServer = async (name, httpPort, gamePort, run) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
   const server = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
-    env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1"},
+    env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1",
+      // everyone arrives in the township, as the tests expect
+      AJ_SPAWN_ROOMS: process.env.AJ_SPAWN_ROOMS || "jamaa_township.room_main",
+      // and in the one world
+      AJ_WORLDS: process.env.AJ_WORLDS || "1"},
     stdio: ["ignore", "pipe", "inherit"],
   });
   let output = "";
