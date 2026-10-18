@@ -274,11 +274,9 @@ module.exports = {
   // can switch in the settings menu (gui.ServerSelector). the game names
   // world N after the Nth name of its own list (551 Aldan, 552 Congo...,
   // generic list 16), so the names here are only for the panels and logs.
-  // AJ_WORLDS: how many. A local server starts with one shared world so two
-  // players in the same land can always see one another; set AJ_WORLDS=2 or
-  // more to opt into separate copies of every land.
+  // AJ_WORLDS: how many (the tests' is one).
   shards: ["Aldan", "Congo", "Draa", "Grande", "Kama", "Nile", "Pecos", "Ramu", "Tigris", "Zambezi"]
-    .slice(0, Math.min(10, Math.max(1, Number(env.AJ_WORLDS) || 1))).map((name, i) => ({id: i + 1, name})),
+    .slice(0, Math.min(10, Math.max(1, Number(env.AJ_WORLDS) || 2))).map((name, i) => ({id: i + 1, name})),
   maxUsersPerRoom: 40,
   // everything in every shop for nothing (AJ_FREE_SHOPS=1). off unless
   // asked for: what the game's shops make of a price of 0 has not been seen.
