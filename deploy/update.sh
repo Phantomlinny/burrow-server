@@ -27,8 +27,12 @@ for file in $(git diff --name-only "$old" "$new" -- '*.js'); do
   fi
 done
 
-# public/ is read from disk on every request; the rest is loaded once, at start
-if git diff --name-only "$old" "$new" | grep -qvE '^(public/|client-updates/|test/|tools/|deploy/|[^/]+\.md$|\.gitignore$)'; then
+# public/ is read from disk on every request; the rest is loaded once, at start.
+# the list is taken whole first: piped straight into grep -q, a long one (a
+# push of many files) had git cut off mid-write ("Broken pipe"), which
+# pipefail read as nothing to restart for.
+changed=$(git diff --name-only "$old" "$new")
+if grep -qvE '^(public/|client-updates/|test/|tools/|deploy/|[^/]+\.md$|\.gitignore$)' <<<"$changed"; then
   systemctl restart "$service"
   echo "updated $old -> $new, restarted $service"
 else
