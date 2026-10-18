@@ -247,9 +247,12 @@
         const date = new Date(at * 1000);
         return hourly ? date.toLocaleTimeString([], {hour: "numeric"}) : date.toLocaleDateString([], {month: "short", day: "numeric"});
       };
+      // a day as "Sun, Oct 18, 2026". (weekday cannot go with dateStyle:
+      // the browser throws, and no graph of a week or more was drawn.)
       const bucketLong = at => {
         const date = new Date(at * 1000);
-        return hourly ? date.toLocaleString([], {weekday: "short", hour: "numeric", minute: "2-digit"}) : date.toLocaleDateString([], {weekday: "short", dateStyle: "medium"});
+        return hourly ? date.toLocaleString([], {weekday: "short", hour: "numeric", minute: "2-digit"})
+          : date.toLocaleDateString([], {weekday: "short", year: "numeric", month: "short", day: "numeric"});
       };
       const names = series.map(bucket => bucketName(bucket.at));
       byId("stats-online").replaceChildren(lines(
