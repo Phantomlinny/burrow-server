@@ -2,8 +2,10 @@
   "server": [
     "ajcontent.akamaized.net",
     "burrow.moe",
+    "cdn.jsdelivr.net",
     "challenges.cloudflare.com",
     "play.burrow.moe",
+    "vision.googleapis.com",
     "www.cloudflare.com",
     "www.w3.org"
   ],
