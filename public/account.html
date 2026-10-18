@@ -136,6 +136,14 @@
       input:not([type="checkbox"]), textarea { width: 100%; }
       textarea { min-height: 110px; resize: vertical; }
       .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+      /* their own custom items: a card each, its picture on the left */
+      .my-items { display: grid; gap: 10px; margin-top: 10px; }
+      .my-item { display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: center; padding: 10px; border: 1px solid var(--line); border-radius: 14px; }
+      .my-item .art { width: 72px; height: 72px; border-radius: 10px; background: var(--raised, #1a1a1a); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 11px; text-align: center; }
+      .my-item .art img { max-width: 100%; max-height: 100%; image-rendering: auto; }
+      .my-item .row { margin-top: 6px; }
+      .my-item input[type="text"] { flex: 1; min-width: 140px; }
+      .my-item input[type="file"] { display: none; }
       .captcha { margin-top: 12px; }
       .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
       .tile { padding: 12px 14px 11px; border: 1px solid var(--line); border-radius: 18px; }
@@ -301,6 +309,14 @@
               </table>
             </div>
           </details>
+        </section>
+
+        <section>
+          <h2>My items</h2>
+          <p class="hint" id="my-items-hint"></p>
+          <div class="my-items" id="my-items"></div>
+          <p class="hint" id="no-my-items" hidden>You have not made any items yet. Make one in the game: Settings, then Item Maker.</p>
+          <p class="status" id="my-items-status" role="status"></p>
         </section>
 
         <section class="kept" id="rename-section" hidden>
@@ -596,6 +612,133 @@
         }
       };
 
+      // their own custom items (lib/playeritems.js): rename, a picture of its
+      // own (sent as it is to /api/itemart, which checks and cleans it), delete.
+      const renderMyItems = () => {
+        const items = account.customItems || [];
+        const limits = account.customItemLimits || {perDay: 0, inAll: 0};
+        $("my-items-hint").textContent = `Items you made in the game's Item Maker: ${items.length} of ${limits.inAll}, up to ${limits.perDay} a day. `
+          + "A picture (any kind: one too big is made smaller) is shown as the item's icon, and for a den item in the den, once a moderator has checked it. "
+          + (account.picturesStopped ? "A moderator has turned off picture uploads for your account." : "Pictures must suit everyone: one turned away counts against you.");
+        $("no-my-items").hidden = items.length > 0;
+        $("my-items").replaceChildren(...items.map(item => {
+          const card = el("div", undefined, "my-item");
+          const art = el("div", item.art ? undefined : "No picture", "art");
+          if (item.art) {
+            const picture = el("img");
+            picture.src = item.art;
+            picture.alt = "";
+            art.append(picture);
+          }
+          const body = el("div");
+          body.append(el("strong", `${item.name}`), el("span", ` · ${item.kind === "den" ? "den item" : "clothing"} ${item.id}${item.artWaiting ? " · picture waiting for a moderator" : ""}`, "hint"));
+          const nameRow = el("div", undefined, "row");
+          const name = el("input");
+          name.type = "text";
+          name.maxLength = 40;
+          name.value = item.name;
+          name.setAttribute("aria-label", `New name for ${item.name}`);
+          const rename = el("button", "Rename");
+          rename.type = "button";
+          rename.addEventListener("click", () => act({action: "itemRename", kind: item.kind, id: item.id, name: name.value}, "my-items-status"));
+          nameRow.append(name, rename);
+          const artRow = el("div", undefined, "row");
+          const file = el("input");
+          file.type = "file";
+          file.accept = "image/*";
+          const choose = el("button", item.art ? "New picture" : "Add picture");
+          choose.type = "button";
+          choose.addEventListener("click", () => file.click());
+          file.addEventListener("change", () => file.files[0] && sendPicture(item, file.files[0]));
+          artRow.append(file, choose);
+          if (item.art && item.kind === "clothing") {
+            // how it is worn: the picture itself, or the item's shape painted with it
+            const look = el("select");
+            look.setAttribute("aria-label", `How ${item.name} is worn`);
+            for (const [value, text] of [["sticker", "Worn as the picture"], ["texture", "Worn as its shape, with the picture in it"]]) {
+              const option = el("option", text);
+              option.value = value;
+              look.append(option);
+            }
+            look.value = item.look || "sticker";
+            look.addEventListener("change", () => act({action: "itemLook", kind: item.kind, id: item.id, look: look.value}, "my-items-status"));
+            artRow.append(look);
+          }
+          if (item.art) {
+            const remove = el("button", "Remove picture");
+            remove.type = "button";
+            remove.addEventListener("click", () => sendPicture(item, null));
+            artRow.append(remove);
+          }
+          const del = el("button", "Delete", "danger");
+          del.type = "button";
+          del.addEventListener("click", () => {
+            if (confirm(`Delete ${item.name}? It goes from everyone who has it, and cannot be undone.`)) {
+              act({action: "itemDelete", kind: item.kind, id: item.id}, "my-items-status");
+            }
+          });
+          artRow.append(del);
+          body.append(nameRow, artRow);
+          card.append(art, body);
+          return card;
+        }));
+      };
+
+      // a picture made ready to send (lib/itemart.js): as it is when the
+      // server takes it as it is (a PNG, JPEG or GIF small enough: a GIF keeps
+      // moving), else drawn into a PNG that fits, smaller until it is small
+      // enough. any picture this browser can open will do (WebP, AVIF, BMP...).
+      // null when it cannot be read at all.
+      const PICTURE_SIDE = 512;
+      const PICTURE_BYTES = 300 * 1024;
+      const preparePicture = async file => {
+        const kept = ["image/png", "image/jpeg", "image/gif"].includes(file.type);
+        let image = null;
+        try {
+          image = await createImageBitmap(file);
+        }
+        catch (err) {
+          return kept ? file : null;
+        }
+        if (kept && file.size <= PICTURE_BYTES && image.width <= PICTURE_SIDE && image.height <= PICTURE_SIDE) {
+          image.close();
+          return file;
+        }
+        for (const side of [PICTURE_SIDE, 384, 256, 128]) {
+          const scale = Math.min(1, side / image.width, side / image.height);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+          if (blob && blob.size <= PICTURE_BYTES) {
+            image.close();
+            return blob;
+          }
+        }
+        image.close();
+        return null;
+      };
+
+      const sendPicture = async (item, chosen) => {
+        const file = chosen ? await preparePicture(chosen) : null;
+        if (chosen && !file) {
+          setStatus("my-items-status", "That picture could not be read. Try a PNG, JPEG or GIF.", true);
+          return;
+        }
+        setStatus("my-items-status", file ? "Sending the picture..." : "Taking the picture away...");
+        try {
+          const response = await fetch(`/account/api/itemart?kind=${encodeURIComponent(item.kind)}&id=${encodeURIComponent(item.id)}${file ? "" : "&remove=1"}`,
+            {method: "POST", headers: {"Content-Type": "application/octet-stream"}, body: file || new Uint8Array(0)});
+          const data = await response.json().catch(() => ({}));
+          setStatus("my-items-status", data.ok || data.error || "That did not work.", !data.ok);
+          await load();
+        }
+        catch (err) {
+          setStatus("my-items-status", "The server did not answer.", true);
+        }
+      };
+
       const render = () => {
         $("gate").hidden = true;
         $("page").hidden = false;
@@ -614,6 +757,7 @@
         if (account.nameRejected) {
           return;
         }
+        renderMyItems();
         $("lock-notice").hidden = !account.locked;
 
         const tiles = [
