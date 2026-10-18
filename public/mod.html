@@ -1295,7 +1295,7 @@
           if (handled) {
             box.append(el("div", `Dealt with on ${when(report.handledAt)}`, "hint"));
           }
-          else {
+          else if (permissions.has("player.warn")) {
             buttons.append(button("Dealt with", async () => {
               const result = await api("report", {id: report.id});
               setStatus($("report-status"), said(result), !result.ok);
@@ -1342,9 +1342,17 @@
             reply.setAttribute("aria-label", `Reply to ${appeal.username}`);
             reply.style.width = "100%";
             const buttons = el("div", undefined, "buttons");
-            buttons.append(button("Unban", () => answer({action: "appealApprove", id: appeal.accountId, reply: reply.value}), "primary"),
-              button("Deny", () => answer({action: "appealDeny", id: appeal.accountId, reply: reply.value})),
-              button("Player", () => openPlayer(appeal.username)), button("Chat history", () => openChat(appeal.username)));
+            // answering is a ban decision, and lifting an address's ban with
+            // it is for the roles that ban addresses (lib/modpanel.js).
+            const answers = permissions.has("player.ban");
+            if (answers && (!appeal.ofAddress || permissions.has("address.ban"))) {
+              buttons.append(button("Unban", () => answer({action: "appealApprove", id: appeal.accountId, reply: reply.value}), "primary"));
+            }
+            if (answers) {
+              buttons.append(button("Deny", () => answer({action: "appealDeny", id: appeal.accountId, reply: reply.value})));
+            }
+            buttons.append(button("Player", () => openPlayer(appeal.username)), button("Chat history", () => openChat(appeal.username)));
+            reply.hidden = !answers;
             box.append(reply, buttons);
             return box;
           }));
@@ -1359,7 +1367,7 @@
           if (handled) {
             box.append(el("div", `${request.status === "approved" ? "Approved" : "Denied"} on ${when(request.handledAt)}`, "hint"));
           }
-          else {
+          else if (permissions.has("player.names")) {
             const buttons = el("div", undefined, "buttons");
             buttons.append(button("Approve", () => answer({action: "approve", id: request.id}), "primary"), button("Deny", () => answer({action: "deny", id: request.id})));
             box.append(buttons);
@@ -1418,11 +1426,11 @@
             setStatus($("masterpiece-status"), said(result), !result.ok);
             refresh();
           }, className);
-          if (painting.status === "waiting") {
-            buttons.append(does("Approve", "approve", "primary"), does("Reject", "reject", "danger"));
-          }
-          else {
-            buttons.append(does("Remove", "remove", "danger"));
+          // judging paintings is for the roles that judge what players make
+          if (permissions.has("items.approve")) {
+            buttons.append(...(painting.status === "waiting"
+              ? [does("Approve", "approve", "primary"), does("Reject", "reject", "danger")]
+              : [does("Remove", "remove", "danger")]));
           }
           buttons.append(button("Player", () => openPlayer(painting.creator)));
           box.append(buttons);
@@ -1467,11 +1475,13 @@
         $("addresses").replaceChildren(...data.addresses.map(ban => {
           const row = el("tr");
           const buttons = el("td");
-          buttons.append(button("Unban", async () => {
-            const result = await api("address", {id: ban.id});
-            setStatus($("ban-status"), said(result), !result.ok);
-            refresh();
-          }));
+          if (permissions.has("address.ban")) {
+            buttons.append(button("Unban", async () => {
+              const result = await api("address", {id: ban.id});
+              setStatus($("ban-status"), said(result), !result.ok);
+              refresh();
+            }));
+          }
           row.append(el("td", ban.address), el("td", ban.reason), el("td", ban.by || "—"), el("td", when(ban.createdAt)), buttons);
           return row;
         }));
@@ -1479,14 +1489,17 @@
         $("device-bans").replaceChildren(...data.devices.map(ban => {
           const row = el("tr");
           const buttons = el("td");
-          buttons.append(button("Unban", async () => {
-            if (!window.confirm(`Lift the hardware ban made with ${ban.username}?`)) {
-              return;
-            }
-            const result = await api("device", {id: ban.id});
-            setStatus($("ban-status"), said(result), !result.ok);
-            refresh();
-          }), " ", button("Player", () => openPlayer(ban.username)));
+          if (permissions.has("address.ban")) {
+            buttons.append(button("Unban", async () => {
+              if (!window.confirm(`Lift the hardware ban made with ${ban.username}?`)) {
+                return;
+              }
+              const result = await api("device", {id: ban.id});
+              setStatus($("ban-status"), said(result), !result.ok);
+              refresh();
+            }), " ");
+          }
+          buttons.append(button("Player", () => openPlayer(ban.username)));
           row.append(el("td", ban.username || "—"), el("td", ban.reason), el("td", ban.by || "—"), el("td", when(ban.createdAt)),
             deviceAccounts(ban.accounts), deviceIds(ban), buttons);
           return row;
@@ -2108,7 +2121,8 @@
         silence: "chat.silence", unsilence: "chat.silence",
         kick: "player.kick", message: "player.warn", warn: "player.warn", unwarn: "player.warn",
         rejectName: "player.names", acceptName: "player.names", clearBio: "player.names",
-        clearWallPosts: "player.names", banAddress: "address.ban", summon: "player.summon", goto: "player.goto",
+        clearWallPosts: "player.names", banAddress: "address.ban", banDevices: "address.ban", unbanDevices: "address.ban",
+        summon: "player.summon", goto: "player.goto",
       };
       const applyPermissions = async () => {
         const result = await api("me");

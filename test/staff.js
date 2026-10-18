@@ -246,6 +246,30 @@ const run = async () => {
   // searching by address (against ban evasion) is for the roles that ban addresses
   assert.strictEqual((await halPage("/mod/api/players?by=address&q=127.0.0.")).status, 403);
   assert.ok(Array.isArray((await modPage("/mod/api/players?by=address&q=127.0.0.")).data.players));
+  // the panel's other ban decisions are for the roles that ban: a helper
+  // may not answer an appeal, judge a new name or a painting, nor place or
+  // lift a hardware ban, and is refused before anything is looked up.
+  for (const [route, body] of [
+    ["/mod/api/request", {action: "appealApprove", id: 1}], ["/mod/api/request", {action: "appealDeny", id: 1}],
+    ["/mod/api/request", {action: "approve", id: 1}], ["/mod/api/request", {action: "deny", id: 1}],
+    ["/mod/api/masterpiece", {action: "approve", id: "x"}], ["/mod/api/masterpiece", {action: "remove", id: "x"}],
+    ["/mod/api/device", {id: 1}],
+  ]) {
+    assert.strictEqual((await halPage(route, body)).status, 403, `${route} ${JSON.stringify(body)}`);
+  }
+  for (const action of ["banDevices", "unbanDevices"]) {
+    assert.strictEqual((await halPage("/mod/api/act", {username: "Pip", action, reason: "x"})).data.error, "Your role cannot do that.");
+  }
+  // a moderator's role lets them through, to the thing itself
+  assert.strictEqual((await modPage("/mod/api/request", {action: "appealApprove", id: 999999})).data.error, "No such appeal waiting.");
+  assert.strictEqual((await modPage("/mod/api/request", {action: "approve", id: 999999})).data.error, "No such request waiting.");
+  assert.strictEqual((await modPage("/mod/api/masterpiece", {action: "approve", id: "x"})).data.error, "No such painting waiting.");
+  assert.strictEqual((await modPage("/mod/api/device", {id: 999999})).data.error, "No such hardware ban.");
+  assert.strictEqual((await modPage("/mod/api/act", {username: "Pip", action: "unbanDevices"})).data.error, "None of their hardware is banned.");
+  // a report is closed by whoever may act on one, a helper too
+  assert.strictEqual((await halPage("/mod/api/report", {id: 999999})).data.error, "No such report waiting.");
+  // an action the panel does not know is refused, never let through unchecked
+  assert.strictEqual((await modPage("/mod/api/act", {username: "Pip", action: "giveEverything"})).data.error, "Unknown action.");
   // a warning from the panel, and on the player's page
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "warn", reason: "scamming", note: "fake trade"})).data.ok, /^Pip warned \(scamming\): warning 1\./);
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "warn", reason: "nonsense"})).data.error, /reason/);
@@ -364,6 +388,27 @@ const run = async () => {
   const strings = decode(zlib.inflateRawSync(Buffer.from(await (await fetch(`${BASE}/${stringsPath}`)).arrayBuffer())));
   assert.strictEqual(strings[11134], "--Message From Moderator--\n\n");
   assert.ok(!strings[11135].includes("\\n"));
+
+  // --- the account page ends the moderator panel's sessions too: a new
+  // password, or signing out everywhere, leaves no panel session behind.
+  // and a moderator does not answer their own request for a new name.
+  for (const username of ["Mira", "Hal"]) {
+    usedStep[username]++;
+  }
+  await waitForStep(Math.max(usedStep.Mira, usedStep.Hal) - 1);
+  const miraAccount = webSession();
+  assert.strictEqual((await miraAccount("/account/api/login", {username: "Mira", password: people.Mira, code: codeAt(secrets.Mira, usedStep.Mira)})).status, 200);
+  assert.ok((await miraAccount("/account/api/act", {action: "requestName", newName: "Miranda", reason: "a longer name"})).data.ok);
+  const asked = (await modPage("/mod/api/requests")).data.names.find(request => request.oldName === "Mira");
+  assert.strictEqual((await modPage("/mod/api/request", {action: "approve", id: asked.id})).data.error, "That is you.");
+  assert.strictEqual((await modPage("/mod/api/me")).status, 200);
+  assert.strictEqual((await miraAccount("/account/api/act", {action: "password", current: people.Mira, password: "KettlePass21"})).data.ok, "Password changed.");
+  assert.strictEqual((await modPage("/mod/api/me")).status, 401);
+  const halAccount = webSession();
+  assert.strictEqual((await halAccount("/account/api/login", {username: "Hal", password: people.Hal, code: codeAt(secrets.Hal, usedStep.Hal)})).status, 200);
+  assert.strictEqual((await halPage("/mod/api/me")).status, 200);
+  assert.strictEqual((await halAccount("/account/api/act", {action: "signOutEverywhere"})).data.ok, "Signed out everywhere.");
+  assert.strictEqual((await halPage("/mod/api/me")).status, 401);
 
   for (const {client} of [mira, hal, pip, annBack]) {
     client.socket.destroy();
