@@ -18,6 +18,11 @@
 # of its methods are replaced as P-code: the tutorial and "what's new" video
 # lists return at once when empty, as this server sends them (they threw).
 # 3830 and 3832 are those method bodies' places in the untouched client.
+#
+# avatar.AvatarManager's checkIfAnimatingOnTopOf is replaced as P-code too
+# (the class's loops decompile wrong): it pushed a player off another who was
+# sitting, sleeping or the like within 100 pixels, so players can sit and
+# sleep side by side now. 2394 is that method body's place.
 set -e
 cd "$(dirname "$(readlink -f "$0")")/.."
 out=${1:-swf/ajclient.swf}
@@ -103,5 +108,6 @@ java -cp "tools/ffdec/lib/*" tools/AddClass.java swf/ajclient.before-finder.swf 
 java -jar tools/ffdec/ffdec-cli.jar -replace "$base" "$out" \
   gui.EmoticonUtility swf-src/EmoticonUtility.cinit.pcode 4839 \
   gui.BulletinBoard swf-src/BulletinBoard.onTutorialGLReceived.pcode 3830 \
-  gui.BulletinBoard swf-src/BulletinBoard.onWhatsNewVideosLoaded.pcode 3832 $args | grep -v "^Replac\|EXPERIMENTAL" || true
+  gui.BulletinBoard swf-src/BulletinBoard.onWhatsNewVideosLoaded.pcode 3832 \
+  avatar.AvatarManager swf-src/AvatarManager.checkIfAnimatingOnTopOf.pcode 2394 $args | grep -v "^Replac\|EXPERIMENTAL" || true
 ls -l "$out"
