@@ -73,8 +73,14 @@ const arrive = async (username, password, room, totp, onLogin = async () => {}) 
   assert.strictEqual(login.status, "1");
   await onLogin(client);
   client.xt("rj", 1, room, 1, 0, 0);
-  const rj = await client.untilXt("rj");
+  let rj = await client.untilXt("rj");
   await client.untilXt("rp");
+  // a session's first room is always a spawn room (lib/world.js joinRoom)
+  if (rj[3] !== room) {
+    client.xt("rj", rj[4], room, 1, 0, 0);
+    rj = await client.untilXt("rj");
+    await client.untilXt("rp");
+  }
   client.xt("au", rj[4], 1, 400, 400, 14, 1);
   return {client, login, roomId: rj[4], room: rj[3]};
 };
@@ -106,7 +112,7 @@ const untilChat = async (client, text) => {
 
 const run = async () => {
   const registerJson = body => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({avatarType: 1, agreed: true, ...body})});
-  const people = {Mira: "Password11", Hal: "Password12", Pip: "Password13", Ann: "Password14"};
+  const people = {Mira: "KettlePass11", Hal: "KettlePass12", Pip: "KettlePass13", Ann: "KettlePass14"};
   for (const [username, password] of Object.entries(people)) {
     assert.strictEqual((await registerJson({username, password})).status, 200);
   }
@@ -163,6 +169,8 @@ const run = async () => {
 
   // summon: Pip is brought from Sarepia to Mira in the township
   say(mira.client, mira.roomId, "!summon Pip");
+  // ... onto the spot where Mira stands, when the room has loaded ("xgt")
+  assert.deepStrictEqual((await pip.client.untilXt("xgt")).slice(2), ["400", "400", "0"]);
   assert.strictEqual((await pip.client.untilXt("rj"))[3], TOWNSHIP);
   assert.strictEqual(await nextBox(mira.client), "Pip was brought here.");
 
@@ -179,7 +187,11 @@ const run = async () => {
 
   // goto: Mira goes to Ann in Sarepia
   say(mira.client, mira.roomId, "!goto Ann");
+  assert.deepStrictEqual((await mira.client.untilXt("xgt")).slice(2), ["400", "400", "0"]);
   assert.strictEqual((await mira.client.untilXt("rj"))[3], SAREPIA);
+  // in the same room already: straight onto her
+  say(mira.client, ann.roomId, "!goto Ann");
+  assert.deepStrictEqual((await mira.client.untilXt("xgt")).slice(2), ["400", "400", "1"]);
 
   // a warning: the game's own popup for the reason ("fw", 1 = bullying),
   // kept on the account; a message box; the count; then kick disconnects
@@ -243,6 +255,22 @@ const run = async () => {
   assert.deepStrictEqual([pipPage.warningList[0].reason, pipPage.warningList[0].note, pipPage.warningList[0].by], ["scamming", "fake trade", "Mira"]);
   assert.strictEqual(pipPage.warningList[0].seen, true);
 
+  // mod notes: for staff, never the player; removed by their writer or an admin
+  assert.strictEqual((await modPage("/mod/api/act", {username: "Pip", action: "note", text: "  talked about   trading, seemed fine "})).data.ok, "Note added.");
+  assert.match((await modPage("/mod/api/act", {username: "Pip", action: "note", text: "   "})).data.error, /Write the note first/);
+  assert.strictEqual((await halPage("/mod/api/act", {username: "Pip", action: "note", text: "keeps asking for free items"})).data.ok, "Note added.");
+  const notes = (await modPage("/mod/api/player?username=Pip")).data.notes;
+  assert.deepStrictEqual(notes.map(note => `${note.by}: ${note.text}`), ["Hal: keeps asking for free items", "Mira: talked about trading, seemed fine"]);
+  assert.match((await modPage("/mod/api/act", {username: "Pip", action: "deleteNote", id: notes[0].id})).data.error, /Only whoever wrote a note/);
+  assert.strictEqual((await halPage("/mod/api/act", {username: "Pip", action: "deleteNote", id: notes[0].id})).data.ok, "Note removed.");
+  assert.match((await halPage("/mod/api/act", {username: "Mira", action: "note", text: "x"})).data.error, /your rank or above/);
+  say(mira.client, ann.roomId, "!note Pip asked about the rules");
+  assert.strictEqual(await nextBox(mira.client), "Note on Pip added.");
+  say(mira.client, ann.roomId, "!notes Pip");
+  assert.match(await nextBox(mira.client), /^Notes on Pip: \S+ Mira: asked about the rules \| \S+ Mira: talked about trading, seemed fine$/);
+  say(mira.client, ann.roomId, "!notes Nobody");
+  assert.strictEqual(await nextBox(mira.client), "No player called Nobody.");
+
   // warnings while away (Ann was disconnected): kept for her next visit;
   // the fifth in 30 days silences for a day; one is taken back
   assert.match((await modPage("/mod/api/act", {username: "Ann", action: "warn", reason: "bullying"})).data.ok,
@@ -265,11 +293,67 @@ const run = async () => {
   assert.match((await modPage("/mod/api/act", {username: "Pip", action: "summon"})).data.ok || "", /^Pip was brought to /);
   assert.strictEqual((await pip.client.untilXt("rj"))[3], SAREPIA);
 
+  // a custom warning: the staff member's words are what the player sees
+  mira.client.xt("xmd", ann.roomId, "warn", "Pip", "custom", "no spamming please");
+  assert.deepStrictEqual((await untilPopup(pip.client, "fp")).slice(2, 4), ["fp", "Warning: no spamming please"]);
+  assert.strictEqual(await nextBox(mira.client), "Pip warned (custom): warning 2.");
+  say(mira.client, ann.roomId, "!warn Pip custom");
+  assert.match(await nextBox(mira.client), /^Use: !warn PLAYER custom TEXT/);
+  assert.match((await modPage("/mod/api/act", {username: "Pip", action: "warn", reason: "custom", note: " "})).data.error, /custom warning needs its words/);
+
+  // invisible: gone from players' screens, still seen by staff (half
+  // see-through: "xiv"), and seen moving by them; not for a helper
+  // ("ac": [.., room, id, x, y, anim, username, ...]; others' may be waiting)
+  const untilDrawn = async (client, username, x) => {
+    for (;;) {
+      const fields = await client.untilXt("ac");
+      if (fields[6] === username && fields[3] === x) {
+        return fields;
+      }
+    }
+  };
+  const untilRemoved = async (client, id) => {
+    for (;;) {
+      if ((await client.untilXt("ar"))[2] === id) {
+        return;
+      }
+    }
+  };
+  mira.client.xt("au", ann.roomId, 1, 300, 300, 14, 1);
+  const miraId = (await untilDrawn(pip.client, "Mira", "300"))[2];
+  hal.client.xt("rj", 1, SAREPIA, 1, 0, 0);
+  const halRj = await hal.client.untilXt("rj");
+  await hal.client.untilXt("rp");
+  hal.client.xt("au", halRj[4], 1, 410, 410, 14, 1);
+  await untilDrawn(hal.client, "Mira", "300");
+  say(mira.client, ann.roomId, "!invisible");
+  await untilRemoved(pip.client, miraId);
+  assert.deepStrictEqual((await hal.client.untilXt("xiv")).slice(2), [miraId, "1"]);
+  assert.deepStrictEqual((await mira.client.untilXt("xiv")).slice(2), [miraId, "1"]);
+  assert.match(await nextBox(mira.client), /^You are invisible: only staff see you/);
+  mira.client.xt("au", ann.roomId, 1, 350, 350, 14, 0);
+  for (;;) {
+    const moved = await hal.client.untilXt("au");
+    if (moved[3] === miraId) {
+      break;
+    }
+  }
+  // a helper may not: the window's request does nothing, the command is chat
+  hal.client.xt("xiv", halRj[4]);
+  say(hal.client, halRj[4], "!invisible");
+  await untilChat(pip.client, "!invisible");
+  // back again, where she walked to
+  mira.client.xt("xiv", ann.roomId);
+  assert.deepStrictEqual((await untilDrawn(pip.client, "Mira", "350")).slice(2, 5), [miraId, "350", "350"]);
+  assert.deepStrictEqual((await hal.client.untilXt("xiv")).slice(2), [miraId, "0"]);
+  assert.strictEqual(await nextBox(mira.client), "You can be seen again.");
+
   // everything above is in the moderators' log, the in-game ones marked so
   const log = (await admin("/admin/api/moderators")).data.log.map(entry => `${entry.by} ${entry.action} ${entry.target}`);
   for (const line of ["Mira summon (in game) Pip", "Hal silence (in game) Pip", "Mira goto (in game) Ann", "Mira warn (in game) Ann",
     "Mira message (in game) Ann", "Mira kick (in game) Ann", "Mira warn Pip", "Mira summon Pip", "Mira warn Ann", "Mira unwarn Ann",
-    "Mira unwarn (in game) Ann"]) {
+    "Mira unwarn (in game) Ann", "Mira went invisible (in game) ", "Mira became visible (in game) ", "Mira note Pip", "Hal deleteNote Pip",
+    "Mira note (in game) Pip"]) {
     assert.ok(log.includes(line), `missing from the log: ${line}\n${log.join("\n")}`);
   }
 

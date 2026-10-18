@@ -46,7 +46,7 @@ const wall = async body => (await postJson(`${BASE}/wall`, body)).json();
 const run = async () => {
   const registerJson = body => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({avatarType: 1, agreed: true, ...body})});
   for (const username of ["Ann", "Ben", "Cat", "Scout"]) {
-    assert.strictEqual((await registerJson({username, password: "Password01"})).status, 200);
+    assert.strictEqual((await registerJson({username, password: "KettlePass01"})).status, 200);
   }
 
   // --- the admin panel's message of the day reaches a player once their first room has loaded
@@ -62,7 +62,7 @@ const run = async () => {
   assert.strictEqual((await panel("motd", {text: "Welcome to the test server"}, admin)).status, 200);
   assert.strictEqual((await panel("messages", undefined, admin)).data.motd, "Welcome to the test server");
 
-  const {client: a, login: annLogin, roomId} = await arrive("Ann", "Password01");
+  const {client: a, login: annLogin, roomId} = await arrive("Ann", "KettlePass01");
   // "ua": the text sits where a room id usually does, then 1 = system message.
   assert.deepStrictEqual((await a.untilXt("ua")).slice(1), ["Welcome to the test server", "1"]);
   assert.strictEqual((await panel("motd", {text: ""}, admin)).status, 200);
@@ -81,7 +81,7 @@ const run = async () => {
   a.xt("pad", roomId, "Ann");
   assert.deepStrictEqual((await a.nextXt("pad")).slice(2), ["1", "1", String(annLogin.params.usableAdoptAPetDefs[0].defId), String(annLogin.params.usableAdoptAPetDefs[0].invId)]);
 
-  const {client: b, login: benLogin} = await arrive("Ben", "Password01");
+  const {client: b, login: benLogin} = await arrive("Ben", "KettlePass01");
   await a.untilXt("ac");
   await a.nextXt("il");
 
@@ -90,7 +90,7 @@ const run = async () => {
   // path. a scout goes in first and comes back until the file has been read,
   // so that what follows does not depend on what an earlier run left in the
   // cache. (the scout never enters the township, so a and b see nothing.)
-  const scoutAuth = await (await postJson(`${BASE}/authenticate`, {username: "Scout", password: "Password01"})).json();
+  const scoutAuth = await (await postJson(`${BASE}/authenticate`, {username: "Scout", password: "KettlePass01"})).json();
   const scout = new harness.GameClient(GAME_PORT);
   await scout.connect();
   assert.strictEqual((await scout.logIn("Scout", scoutAuth.auth_token)).status, "1");
@@ -200,7 +200,7 @@ const run = async () => {
   // --- name tags: the colour and badge go with a colour change, reach the room, and stay
   a.xt("gl", roomId, 110);
   const badges = await a.nextXt("gl");
-  assert.deepStrictEqual([badges[3], badges[8], badges[9], badges[70]], ["1049", "75", "1", "62"]); // every badge, in id order: the game's 62 and the thirteen the admin gives
+  assert.deepStrictEqual([badges[3], badges[8], badges[9], badges[70]], ["1049", "76", "1", "62"]); // every badge, in id order: the game's 62 and the fourteen the admin gives (verified among them)
   const tag = 6 | 11 << 8; // colour 6, the twelfth badge
   a.xt("ap", roomId, 1, 2, 3, tag);
   assert.deepStrictEqual((await a.nextXt("ap")).slice(2), ["1"]);
@@ -435,18 +435,9 @@ const run = async () => {
   b.xt("ei", own[4], 0);
   await b.nextXt("ei");
 
-  // A secret valentine: the receiver is not told who sent it, the server knows.
+  // secret valentines are off (lib/ecards.js): one asked for is refused
   a.xt("es", own[4], "Ben", cards[9], stamps[9], 2, "GUESS WHO", 0, 0, 1);
-  assert.deepStrictEqual((await a.nextXt("es")).slice(2), ["1"]);
-  const valentine = await b.nextXt("ep");
-  assert.deepStrictEqual([valentine[3], valentine[7], valentine[18]], ["", "GUESS WHO", "1"]); // no name; special type 1
-  b.xt("fr", own[4], "Secret Valentine", 14); // reported under the name the game shows
-  assert.deepStrictEqual((await b.nextXt("fr")).slice(2), ["1"]);
-  const aboutValentine = (await panel("reports", undefined, admin)).data.reports;
-  assert.deepStrictEqual([aboutValentine[0].reporter, aboutValentine[0].target, aboutValentine[0].reason], ["Ben", "Ann", "Inappropriate Jam-A-Gram"]);
-  await panel("report", {id: aboutValentine[0].id}, admin);
-  b.xt("ed", own[4], valentine[2]);
-  await b.nextXt("ed");
+  assert.deepStrictEqual((await a.nextXt("es")).slice(2), ["0"]);
 
   // --- Jammer Walls: the wallpapers a wall cannot be drawn without, and their buttons
   a.xt("gl", own[4], 314);
@@ -488,6 +479,14 @@ const run = async () => {
   assert.deepStrictEqual((await b.nextXt("wps")).slice(2), ["1"]);
   const mine = await wall({cmd: "GET", t: ownToken});
   assert.deepStrictEqual([mine.p.bg, mine.p.tag, mine.p.visits, mine.r.length], ["7", "hello there", 1, 1]); // visits are not the owner's to set
+  // the photo booth picture: its animal, its pet and what it wears, kept
+  const photo = {avatar: {id: 4, color1: 1463028479, color2: 603979776, color3: 83885823, eyes: 4, pattern: 25}, bgid: 3,
+    pet: {ts: 1792133948, lbits: 25, uBits: 0, eBits: 0}, items: [{id: 101, color: 1463028479}, {id: 202, color: 0}]};
+  b.xt("wps", own[4], JSON.stringify({pb: photo}));
+  assert.deepStrictEqual((await b.nextXt("wps")).slice(2), ["1"]);
+  assert.deepStrictEqual((await wall({cmd: "GET", t: ownToken})).p.pb, photo);
+  b.xt("wps", own[4], JSON.stringify({pb: {avatar: {deep: {deeper: 1}}}})); // but no deeper than that
+  assert.deepStrictEqual((await b.nextXt("wps")).slice(2), ["0"]);
   assert.deepStrictEqual(await wall({cmd: "CLW", t: token[3]}), {s: false}); // only the owner clears a wall
   assert.deepStrictEqual(await wall({cmd: "DEL", t: ownToken, x: put.x}), {s: true});
   assert.strictEqual((await wall({cmd: "GET", t: ownToken})).r.length, 0);
@@ -515,7 +514,7 @@ const run = async () => {
   assert.strictEqual((await panel("overview", undefined, admin)).data.stats.reports, 1);
   assert.strictEqual((await panel("report", {id: waiting.reports[0].id}, admin)).status, 200);
   assert.strictEqual((await panel("reports", undefined, admin)).data.open, 0);
-  assert.strictEqual((await panel("reports?handled=1", undefined, admin)).data.reports.length, 2); // this one and the valentine
+  assert.strictEqual((await panel("reports?handled=1", undefined, admin)).data.reports.length, 1); // this one (secret valentines, reported before, are off)
 
   // --- blocking: no chat from them, out of my party and my den, and out of sight if I say so
   a.xt("bb", own[4], "Ben");

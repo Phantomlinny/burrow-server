@@ -80,7 +80,7 @@ const arrive = async (username, password, totp, onLogin = async () => {}) => {
   client.xt("rj", 1, TOWNSHIP, 1, 0, 0);
   const rj = await client.untilXt("rj");
   await client.untilXt("rp");
-  return {client, roomId: rj[4]};
+  return {client, roomId: rj[4], token: auth.auth_token};
 };
 
 // a pack as the clients get it.
@@ -103,7 +103,7 @@ const shopList = async (client, roomId, shop) => {
   return (await client.untilXt("gl")).slice(9);
 };
 
-const people = {Dev: "Password21", Hal: "Password22", Pat: "Password23", Lou: "Password24"};
+const people = {Dev: "KettlePass21", Hal: "KettlePass22", Pat: "KettlePass23", Lou: "KettlePass24"};
 const secret = {};
 let usedStep = 0;
 let made = {};
@@ -229,10 +229,247 @@ const first = async () => {
   }
   assert.strictEqual((await dev("/mod/api/items")).data.items.length, 3);
 
+  // --- locked out of the item finder (lib/itemcontrol.js): players do not
+  // find it or take it; the owner here, and staff who may lock, still do
+  const searchAs = async (q, who) => (await (await fetch(`${BASE}/api/search?kind=clothing&q=${q}${who ? `&username=${who.name}&token=${who.token}` : ""}`)).json()).results;
+  // (as the item finder page and the client send it: no Origin of another site)
+  const giveAs = (body, token) => fetch(`${BASE}/api/give`, {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({...body, ...(token ? {token} : {})})});
+  const patAs = {name: "Pat", token: pat.token};
+  assert.ok((await searchAs(50001, patAs)).some(entry => entry.id === 50001));
+  assert.match((await dev("/mod/api/items", {action: "lock", kind: "clothing", id: 50001})).data.ok, /^Quick Hat \(clothing 50001\) is locked out of the item finder\.$/);
+  assert.match((await dev("/mod/api/items", {action: "lock", kind: "clothing", id: 50001})).data.error, /already locked/);
+  assert.ok(!(await searchAs(50001, patAs)).some(entry => entry.id === 50001));
+  const refused = await giveAs({username: "Pat", kind: "clothing", id: 50001}, pat.token);
+  assert.deepStrictEqual([refused.status, (await refused.json()).error], [403, "That item is locked out of the item finder."]);
+  assert.deepStrictEqual((await searchAs(50001)).filter(entry => entry.id === 50001).map(entry => [entry.name, entry.locked]), [["Quick Hat (locked)", true]]);
+  assert.strictEqual((await searchAs(50001, {name: "Dev", token: devGame.token})).find(entry => entry.id === 50001).name, "Quick Hat (locked)");
+  assert.deepStrictEqual((await dev("/mod/api/items")).data.locked, [{kind: "clothing", id: 50001, name: "Quick Hat"}]);
+  // the dashboards' lock finds it by name, marked locked, with the count
+  const findLock = (await dev("/mod/api/items/find?q=quick%20hat&kind=clothing")).data;
+  assert.deepStrictEqual([findLock.lockedCount, findLock.results.find(entry => entry.id === 50001)],
+    [1, {kind: "clothing", id: 50001, cost: findLock.results.find(entry => entry.id === 50001).cost, name: "Quick Hat", locked: true, custom: true}]);
+  say(devGame.client, devGame.roomId, "!locked");
+  assert.strictEqual(await nextBox(devGame.client), "Locked out of the item finder: clothing 50001 Quick Hat");
+
+  // --- taken from a player: every one of it, their game told
+  assert.strictEqual((await giveAs({username: "Pat", kind: "clothing", id: 50001, colorIndex: 0})).status, 200); // the owner, here
+  assert.strictEqual((await giveAs({username: "Pat", kind: "clothing", id: 50001, colorIndex: 0})).status, 200);
+  say(devGame.client, devGame.roomId, "!take Pat clothing 50001");
+  assert.strictEqual(await nextBox(devGame.client), "Took 2 of Quick Hat (clothing 50001) from Pat.");
+  for (;;) {
+    const changed = await pat.client.untilXt("il");
+    if (changed[2] === "2" && changed[8] === "2") { // two removed
+      break;
+    }
+  }
+  say(devGame.client, devGame.roomId, "!take Pat clothing 50001");
+  assert.strictEqual(await nextBox(devGame.client), "Pat has no Quick Hat (clothing 50001).");
+  assert.strictEqual((await giveAs({username: "Pat", kind: "den", id: 50000})).status, 200);
+  assert.match((await dev("/mod/api/items", {action: "take", username: "Pat", kind: "den", id: 50000})).data.ok, /^Took 1 of Test Chair \(den item 50000\) from Pat\.$/);
+  assert.match((await dev("/mod/api/items", {action: "unlock", kind: "clothing", id: 50001})).data.ok, /back in the item finder/);
+  assert.ok((await searchAs(50001, patAs)).some(entry => entry.id === 50001));
+
+  // --- a custom item deleted: out of the game and every inventory
+  say(devGame.client, devGame.roomId, `!item clothing ${base.id} Doomed Hat`);
+  assert.strictEqual(await nextBox(devGame.client), "Made Doomed Hat, clothing 50002. It is in the item finder now.");
+  assert.strictEqual((await giveAs({username: "Pat", kind: "clothing", id: 50002, colorIndex: 0})).status, 200);
+  assert.match((await dev("/mod/api/items", {action: "delete", kind: "clothing", id: 50002})).data.ok, /^Deleted Doomed Hat \(clothing 50002\), and took 1 from players\.$/);
+  assert.ok(!(await searchAs(50002)).some(entry => entry.id === 50002));
+  assert.strictEqual((await giveAs({username: "Pat", kind: "clothing", id: 50002, colorIndex: 0})).status, 400);
+  assert.ok(!byId(await pack(1000), 50002));
+  assert.strictEqual((await dev("/mod/api/items")).data.items.length, 3);
+
+  // --- a player's own items (lib/playeritems.js, the client's Item Maker):
+  // free, given to them, found by them only, at most five a day
+  const maker = async (...params) => {
+    pat.client.xt("xcm", pat.roomId, ...params);
+    const answer = await pat.client.untilXt("xcm");
+    return {ok: answer[2] === "1", said: answer[3], today: Number(answer[4]), inAll: Number(answer[5]), mine: JSON.parse(answer[6])};
+  };
+  assert.deepStrictEqual(await maker("info"), {ok: true, said: "", today: 5, inAll: 20, mine: []});
+  const own = await maker("make", "clothing", base.id, "Pat Hat");
+  assert.deepStrictEqual([own.ok, own.said, own.today, own.inAll], [true, "Made Pat Hat. It is in your clothing now.", 4, 19]);
+  const patHat = own.mine[0];
+  assert.deepStrictEqual([patHat.kind, patHat.name, patHat.base], ["clothing", "Pat Hat", Number(base.id)]);
+  assert.ok((await searchAs(patHat.id, patAs)).some(entry => entry.id === patHat.id));
+  const halAs = {name: "Hal", token: hal.token};
+  assert.ok(!(await searchAs(patHat.id, halAs)).some(entry => entry.id === patHat.id));
+  assert.strictEqual((await giveAs({username: "Hal", kind: "clothing", id: patHat.id, colorIndex: 0}, hal.token)).status, 403);
+  assert.ok((await searchAs(patHat.id, {name: "Dev", token: devGame.token})).some(entry => entry.id === patHat.id)); // staff who make items
+  assert.match((await maker("make", "clothing", base.id, "Admin Hat")).said, /not allowed/);
+  assert.match((await maker("make", "clothing", bodyPart.id, "Body")).said, /cannot be made into one of your own/);
+  // the base list offers only what can be copied
+  assert.ok(!(await (await fetch(`${BASE}/api/search?base=1&kind=clothing&q=${bodyPart.id}`)).json()).results.some(entry => entry.id === bodyPart.id));
+  for (let count = 2; count <= 5; count++) {
+    assert.ok((await maker("make", "den", 1, `Pat Chair ${count}`)).ok);
+  }
+  const full = await maker("make", "den", 1, "One Too Many");
+  assert.deepStrictEqual([full.ok, full.today], [false, 0]);
+  assert.match(full.said, /made 5 items today/);
+  // --- its own picture (lib/itemart.js): checked and cleaned, served, and
+  // every game told; only by its maker or staff who make items
+  const crc32 = buf => {
+    let c = ~0;
+    for (const byte of buf) {
+      c ^= byte;
+      for (let k = 0; k < 8; k++) {
+        c = (c >>> 1) ^ (0xEDB88320 & -(c & 1));
+      }
+    }
+    return (~c) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length);
+    head.write(type, 4, "latin1");
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(Buffer.concat([head.subarray(4), data])));
+    return Buffer.concat([head, data, crc]);
+  };
+  const png = (side, extra = []) => {
+    const ihdr = Buffer.alloc(13);
+    ihdr.writeUInt32BE(side, 0);
+    ihdr.writeUInt32BE(side, 4);
+    ihdr[8] = 8;
+    ihdr[9] = 2;
+    const raw = Buffer.alloc((side * 3 + 1) * side, 0x7F);
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]), chunk("IHDR", ihdr), ...extra,
+      chunk("IDAT", zlib.deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+  };
+  const upload = (who, entry, body, extra = "") => fetch(`${BASE}/api/itemart?kind=${entry.kind}&id=${entry.id}&token=${who.token}${extra}`,
+    {method: "POST", headers: {"Content-Type": "application/octet-stream"}, body}).then(response => response.json());
+  const hatEntry = (await maker("info")).mine.find(entry => entry.name === "Pat Hat");
+  // by default a player's picture waits for a moderator, even with items
+  // let in at once: nobody else is shown it, not even by its address
+  assert.match((await upload(pat, hatEntry, png(30))).ok, /waiting for a moderator/);
+  assert.strictEqual((await maker("info")).mine.find(entry => entry.kind === hatEntry.kind && entry.id === hatEntry.id).art, "");
+  assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png`)).status, 404);
+  const pendingUrl = (await admin("/admin/api/review")).data.waiting.find(entry => entry.id === hatEntry.id).artUrl;
+  assert.match(pendingUrl, /^\/admin\/api\/itemart\?kind=clothing&id=\d+&v=p[0-9a-f]{12}$/);
+  assert.strictEqual((await admin(pendingUrl)).status, 200);
+  assert.strictEqual((await fetch(`${BASE}${pendingUrl}`)).status, 404); // signed in to nothing
+  assert.match((await admin("/admin/api/review", {kind: "clothing", id: hatEntry.id, approve: true})).data.ok, /picture is shown now/);
+  assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png`)).status, 200);
+  while (!(await untilDefs(pat.client, "clothing")).some(row => row.art)) {
+    // every game is told of it waiting (no picture), then of it shown
+  }
+  // the rest of these, shown at once (the admin's switch)
+  assert.strictEqual((await admin("/admin/api/item-switches", {artApproval: false})).status, 200);
+  assert.strictEqual((await admin("/admin/api/review")).data.artApproval, false);
+  assert.match((await upload(pat, hatEntry, png(32, [chunk("tEXt", Buffer.from("Author\x00Pat at home"))]))).ok, /new picture/);
+  const told = (await untilDefs(pat.client, "clothing")).map(row => [row.id, row.art]);
+  const sameItem = entry => entry.kind === hatEntry.kind && entry.id === hatEntry.id;
+  const withArt = (await maker("info")).mine.find(sameItem);
+  assert.match(withArt.art, /^p[0-9a-f]{12}$/);
+  assert.deepStrictEqual(told, [[String(hatEntry.id), withArt.art]]);
+  const served = await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png?v=${withArt.art}`);
+  assert.deepStrictEqual([served.status, served.headers.get("content-type"), served.headers.get("x-content-type-options")], [200, "image/png", "nosniff"]);
+  const bytes = Buffer.from(await served.arrayBuffer());
+  assert.ok(!bytes.includes(Buffer.from("tEXt")) && !bytes.includes(Buffer.from("Pat at home")), "the text chunk was left in");
+  assert.match((await upload(pat, hatEntry, Buffer.from("<html><script>alert(1)</script></html>"))).error, /not a PNG, JPEG, GIF or BMP/);
+  // a GIF is kept a GIF (without its comment); a BMP is made a PNG
+  const gif = Buffer.concat([Buffer.from("GIF89a"), Buffer.from([16, 0, 16, 0, 0x80, 0, 0]), Buffer.alloc(6, 0x55),
+    Buffer.from([0x21, 0xFE, 4]), Buffer.from("Bob!"), Buffer.from([0]), Buffer.from([0x2C, 0, 0, 0, 0, 16, 0, 16, 0, 0, 2, 3, 1, 2, 3, 0, 0x3B])]);
+  assert.match((await upload(pat, hatEntry, gif)).ok, /new picture/);
+  const gifArt = (await maker("info")).mine.find(entry => entry.kind === hatEntry.kind && entry.id === hatEntry.id).art;
+  const gifServed = await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png?v=${gifArt}`);
+  assert.strictEqual(gifServed.headers.get("content-type"), "image/gif");
+  assert.ok(!Buffer.from(await gifServed.arrayBuffer()).includes(Buffer.from("Bob!")), "the GIF comment was left in");
+  const bmp = Buffer.alloc(54 + 32 * 3 * 32);
+  bmp.write("BM");
+  bmp.writeUInt32LE(bmp.length, 2);
+  bmp.writeUInt32LE(54, 10);
+  bmp.writeUInt32LE(40, 14);
+  bmp.writeInt32LE(32, 18);
+  bmp.writeInt32LE(32, 22);
+  bmp.writeUInt16LE(1, 26);
+  bmp.writeUInt16LE(24, 28);
+  assert.match((await upload(pat, hatEntry, bmp)).ok, /new picture/);
+  const bmpArt = (await maker("info")).mine.find(entry => entry.kind === hatEntry.kind && entry.id === hatEntry.id).art;
+  assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png?v=${bmpArt}`)).headers.get("content-type"), "image/png");
+  assert.match((await upload(pat, hatEntry, png(600))).error, /512 pixels/);
+  assert.match((await upload(hal, hatEntry, png(16))).error, /not one of your items/);
+  assert.match((await fetch(`${BASE}/api/itemart?kind=clothing&id=${hatEntry.id}`, {method: "POST", body: png(16)}).then(r => r.json())).error, /Sign in/);
+  // a JPEG keeps its picture and loses its EXIF (where a photo was taken)
+  const segment = (marker, data) => Buffer.concat([Buffer.from([0xFF, marker, (data.length + 2) >> 8, (data.length + 2) & 0xFF]), data]);
+  const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8]), segment(0xE0, Buffer.from("JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00", "latin1")),
+    segment(0xE1, Buffer.from("Exif\x00\x00GPS 51.5N 0.12W", "latin1")), segment(0xC0, Buffer.from([8, 0, 20, 0, 30, 1, 1, 0x11, 0])),
+    segment(0xDA, Buffer.from([1, 1, 0, 0, 0x3F, 0])), Buffer.from([0x12, 0x34, 0xFF, 0xD9])]);
+  assert.match((await upload(pat, hatEntry, jpeg)).ok, /new picture/);
+  const jpegArt = (await maker("info")).mine.find(sameItem).art;
+  const jpegBytes = Buffer.from(await (await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png?v=${jpegArt}`)).arrayBuffer());
+  assert.ok(jpegBytes.includes(Buffer.from("JFIF")) && !jpegBytes.includes(Buffer.from("GPS")), "the EXIF was left in");
+  assert.match((await upload(pat, hatEntry, Buffer.alloc(0), "&remove=1")).ok, /taken away/);
+  assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png`)).status, 404);
+  assert.match((await upload(pat, hatEntry, png(24))).ok, /new picture/); // deleted with the item, below
+  assert.match((await maker("rename", "clothing", hatEntry.id, "Party Hat")).said, /^Renamed it Party Hat\.$/);
+  // how it is worn: a sticker by default, a texture when its maker says so, every game told
+  pat.client.xt("xcm", pat.roomId, "look", "clothing", hatEntry.id, "texture");
+  assert.strictEqual((await untilDefs(pat.client, "clothing"))[0].artMode, "texture");
+  assert.strictEqual((await pat.client.untilXt("xcm"))[2], "1"); // its own answer, after every game was told
+  const wornAs = await maker("info");
+  assert.strictEqual(wornAs.mine.find(entry => entry.kind === "clothing" && entry.id === hatEntry.id).artMode, "texture");
+  assert.match((await maker("look", "clothing", hatEntry.id, "melted")).said, /sticker or texture/);
+
+  // deleting: their own only, and gone from everyone
+  assert.match((await maker("delete", "clothing", 50001)).said, /not one of your items/);
+  for (const entry of full.mine) {
+    assert.match((await maker("delete", entry.kind, entry.id)).said, /^Deleted /);
+  }
+  assert.deepStrictEqual((await maker("info")).mine, []);
+  assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png`)).status, 404);
+  assert.strictEqual((await dev("/mod/api/items")).data.items.length, 3);
+
+  // --- the admin's switches: what players make waits for a moderator first,
+  // out of the game till then; or the Item Maker is off
+  assert.strictEqual((await admin("/admin/api/item-switches", {enabled: true, approval: true})).status, 200);
+  const asked = await maker("make", "clothing", base.id, "Waiting Hat");
+  assert.match(asked.said, /waiting for a moderator/);
+  const waitingHat = asked.mine.find(entry => entry.name === "Waiting Hat");
+  assert.strictEqual(waitingHat.waiting, "item");
+  assert.ok(!(await searchAs(waitingHat.id)).some(entry => entry.id === waitingHat.id)); // not in the game yet
+  const queue = (await admin("/admin/api/review")).data;
+  assert.deepStrictEqual([queue.enabled, queue.approval, queue.waiting.map(entry => `${entry.name} ${entry.waiting} ${entry.maker}`)],
+    [true, true, ["Waiting Hat item Pat"]]);
+  assert.strictEqual((await dev("/mod/api/review")).status, 403); // a developer approves nothing
+  assert.match((await admin("/admin/api/review", {kind: "clothing", id: waitingHat.id, approve: true})).data.ok, /in the game, and Pat has one/);
+  for (;;) {
+    const changed = await pat.client.untilXt("il");
+    if (changed[2] === "2" && changed[10] === String(waitingHat.id)) { // given to Pat
+      break;
+    }
+  }
+  assert.ok((await searchAs(waitingHat.id, patAs)).some(entry => entry.id === waitingHat.id));
+  // a new picture waits too, and is not shown till then
+  assert.match((await upload(pat, waitingHat, png(20))).ok, /waiting for a moderator/);
+  assert.strictEqual((await maker("info")).mine.find(entry => entry.id === waitingHat.id && entry.kind === "clothing").waiting, "picture");
+  assert.match((await admin("/admin/api/review", {kind: "clothing", id: waitingHat.id, approve: false})).data.ok,
+    /picture was turned away\. Pat has had 1 of 3 pictures turned away\.$/);
+  assert.strictEqual((await admin("/admin/api/review")).data.waiting.length, 0);
+  // the same picture cannot come back; after three turned away, uploads stop
+  assert.match((await upload(pat, waitingHat, png(20))).error, /turned that picture away before/);
+  assert.match((await upload(pat, waitingHat, png(21))).ok, /waiting/);
+  assert.match((await admin("/admin/api/review", {kind: "clothing", id: waitingHat.id, approve: false})).data.ok, /2 of 3/);
+  assert.match((await upload(pat, waitingHat, png(22))).ok, /waiting/);
+  assert.match((await admin("/admin/api/review", {action: "takePicture", kind: "clothing", id: waitingHat.id})).data.ok,
+    /taken away\. That is 3 for Pat: their picture uploads are stopped\.$/);
+  assert.match((await upload(pat, waitingHat, png(23))).error, /turned off picture uploads/);
+  assert.deepStrictEqual((await admin("/admin/api/review")).data.stopped, ["Pat"]);
+  assert.match((await admin("/admin/api/review", {action: "uploads", username: "Pat", blocked: false})).data.ok, /Pat can upload pictures again/);
+  assert.match((await upload(pat, waitingHat, png(23))).ok, /waiting/);
+  assert.match((await admin("/admin/api/review", {kind: "clothing", id: waitingHat.id, approve: true})).data.ok, /shown now/);
+  // off: nothing is made
+  assert.strictEqual((await admin("/admin/api/item-switches", {enabled: false, approval: false})).status, 200);
+  assert.match((await maker("make", "clothing", base.id, "No Hat")).said, /turned off/);
+  assert.strictEqual((await admin("/admin/api/item-switches", {enabled: true})).status, 200);
+  assert.match((await maker("delete", "clothing", waitingHat.id)).said, /^Deleted /);
+
   // written down under the maker's name
   const log = (await admin("/admin/api/moderators")).data.log.map(entry => `${entry.by} ${entry.action} ${entry.detail}`);
   for (const line of ["Dev item made clothing 50000 Test Crown", "Dev item made den 50000 Test Chair", "Dev item changed clothing 50000 Gold Crown",
-    "Dev item made (in game) clothing 50001 Quick Hat"]) {
+    "Dev item made (in game) clothing 50001 Quick Hat", "Dev item locked clothing 50001", "Dev item taken (in game) clothing 50001 x2",
+    "Dev item taken den 50000 x1", "Dev item deleted clothing 50002"]) {
     assert.ok(log.includes(line), `missing from the log: ${line}\n${log.join("\n")}`);
   }
   made = {base};
