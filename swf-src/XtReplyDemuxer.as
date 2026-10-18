@@ -104,6 +104,26 @@ package
             AJClient.askYesNo(param1.obj);
             return;
          }
+         if(param1.obj[0] == "xgt")
+         {
+            AJClient.onStaffGoto(param1.obj);
+            return;
+         }
+         if(param1.obj[0] == "xcm")
+         {
+            AJClient.onItemMaker(param1.obj);
+            return;
+         }
+         if(param1.obj[0] == "xiv")
+         {
+            AJClient.onInvisible(param1.obj);
+            return;
+         }
+         if(param1.obj[0] == "xty")
+         {
+            AJClient.onTyping(param1.obj);
+            return;
+         }
          if(param1.obj[0] == "xw")
          {
             AJClient.onWhisper(param1.obj);

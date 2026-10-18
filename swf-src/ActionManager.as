@@ -47,6 +47,17 @@ package gui
       private var _names:Dictionary = new Dictionary(true);
       
       private var _swapBtn:MovieClip;
+
+      // Whether the next (and currently selected) action is horizontally
+      // mirrored. The state is sent with the action to other players.
+      public var mirrorActions:Boolean = false;
+
+      private var _lastAction:Sprite;
+
+      // sitting facing forward (":sitS:", AvatarWorldView's animation 1): the
+      // "Forward" in the middle of the four arrows. its action sprite is a
+      // class of the client's own (SitForwardAction), not of the HUD's art.
+      private static const SIT_FORWARD:String = "SitForwardAction";
       
 
       private const ACTIONWINDOW_DIM_ALPHA:Number = 0.5;
@@ -309,6 +320,7 @@ package gui
                      _loc12_.addEventListener("mouseDown",actionClickHandler,false,0,true);
                      _loc8_++;
                   }
+                  addSitDirectionButtons(_loc3_);
                }
                else if(_loc6_ >= 4)
                {
@@ -393,6 +405,7 @@ package gui
          actionStrings["sleepAnim_btnCont"] = actionStrings["diveAnim_btnCont"] = [":sleep:",":dive:"];
          actionStrings["hopAnim_btnCont"] = actionStrings["swirlAnim_btnCont"] = [":hop:",":swirl:"];
          actionStrings["playAnim_btnCont"] = [":play:"];
+         actionStrings[SIT_FORWARD] = [":sitS:"];
       }
       
       private function setupTitleBanner() : void
@@ -445,6 +458,110 @@ package gui
          return _loc2_.length > 1 ? _loc2_[_oceanShown ? 1 : 0] : _loc2_[0];
       }
       
+      // Front and Back sit facing straight forward and straight away. Mirror
+      // replays whichever action was picked most recently in the other
+      // horizontal direction (including dance, sleep, hop and play).
+      private function addSitDirectionButtons(param1:MovieClip) : void
+      {
+         var _loc2_:Rectangle = param1.getBounds(param1);
+         var _loc3_:Number = _loc2_.x + _loc2_.width * 0.5;
+         var _loc4_:Number = _loc2_.y + _loc2_.height * 0.5;
+         var _loc5_:Sprite = addDirectionButton(param1,"Front",0,0,false);
+         var _loc6_:Sprite = addDirectionButton(param1,"Back",0,0,true);
+         var _loc7_:Number = _loc3_ - (_loc5_.width + 3 + _loc6_.width) * 0.5;
+         _loc5_.x = _loc7_;
+         _loc6_.x = _loc7_ + _loc5_.width + 3;
+         _loc5_.y = _loc6_.y = _loc4_ - 13;
+         var _loc8_:Sprite = actionPill("Mirror");
+         var _loc9_:Sprite = actionHitTarget(_loc8_);
+         _loc9_.x = _loc3_ - _loc9_.width * 0.5;
+         _loc9_.y = _loc4_ + 3;
+         _loc9_.addEventListener("mouseDown",mirrorClickHandler,false,0,true);
+         _loc9_.addEventListener("mouseOver",function(param1:MouseEvent):void
+         {
+            _loc9_.alpha = 0.8;
+         },false,0,true);
+         _loc9_.addEventListener("mouseOut",function(param1:MouseEvent):void
+         {
+            _loc9_.alpha = 1;
+         },false,0,true);
+         param1.addChild(_loc9_);
+      }
+
+      private function addDirectionButton(param1:MovieClip, param2:String, param3:Number, param4:Number, param5:Boolean) : Sprite
+      {
+         var _loc6_:Sprite = actionPill(param2);
+         var _loc7_:Sprite = actionHitTarget(_loc6_);
+         _loc7_.x = param3;
+         _loc7_.y = param4;
+         _loc7_.name = param5 ? "sitBackHit" : "sitFrontHit";
+         _loc7_.addEventListener("mouseDown",sitDirectionClickHandler,false,0,true);
+         param1.addChild(_loc7_);
+         return _loc7_;
+      }
+
+      // Keep the generated controls visually uniform. Invisible trailing
+      // spaces reserve the same room without changing the labels players see.
+      private function actionPill(param1:String) : Sprite
+      {
+         var _loc2_:String = param1 == "Front" ? "Front " : (param1 == "Back" ? "Back  " : param1);
+         return AJClient.makePill(_loc2_,0x5CB82E,0x2C6E16,false,10);
+      }
+
+      private function sitDirectionClickHandler(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         // one sprite class for both; each sprite is named for the way it faces
+         var _loc2_:Sprite = new SitForwardAction();
+         _names[_loc2_] = param1.currentTarget.name == "sitBackHit" ? ":sitN:" : ":sitS:";
+         selectAction(_loc2_);
+      }
+
+      // The sit artwork is itself a MovieClip with mouse children. A separate
+      // transparent hit target above it keeps our generated labels clickable.
+      private function actionHitTarget(param1:Sprite) : Sprite
+      {
+         var _loc2_:Sprite = new Sprite();
+         _loc2_.graphics.beginFill(0,0);
+         _loc2_.graphics.drawRect(0,0,param1.width,param1.height);
+         _loc2_.graphics.endFill();
+         _loc2_.addChild(param1);
+         _loc2_.buttonMode = true;
+         _loc2_.useHandCursor = true;
+         _loc2_.mouseEnabled = true;
+         _loc2_.mouseChildren = false;
+         return _loc2_;
+      }
+
+      private function selectAction(param1:Sprite, param2:Boolean = false) : void
+      {
+         if(!actionBtn.isGray)
+         {
+            mirrorActions = param2;
+            _lastAction = param1;
+            setActionCallback(param1);
+            actionBtn.dispatchEvent(new MouseEvent("mouseDown"));
+         }
+      }
+
+      private function mirrorClickHandler(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         if(!actionBtn.isGray)
+         {
+            mirrorActions = !mirrorActions;
+            if(_lastAction)
+            {
+               setActionCallback(_lastAction);
+            }
+         }
+      }
+
+      public function rememberAction(param1:Sprite) : void
+      {
+         _lastAction = param1;
+      }
+
       public function getActionString(param1:Sprite) : String
       {
          if(_names[param1] != undefined)
@@ -462,6 +579,12 @@ package gui
       public function matchActionString(param1:String, param2:Boolean = false) : Sprite
       {
          var _loc3_:int = 0;
+         if(param1 == ":sitS:" || param1 == ":sitN:")
+         {
+            var _loc9_:Sprite = new SitForwardAction();
+            _names[_loc9_] = param1;
+            return _loc9_;
+         }
          var _loc4_:String = OTHER_SET_BUTTONS[param1];
          var _loc5_:Sprite = null;
          if(_loc4_ && param2 && !playerHasSet(param1.indexOf("Swim") != -1))
@@ -565,7 +688,8 @@ package gui
          param1.stopPropagation();
          if(!actionBtn.isGray && !param1.currentTarget.isGray)
          {
-            setActionCallback(new param1.currentTarget.constructor());
+            _lastAction = new param1.currentTarget.constructor();
+            setActionCallback(_lastAction);
             actionBtn.dispatchEvent(new MouseEvent("mouseDown"));
             param1.currentTarget.downToUpState();
          }

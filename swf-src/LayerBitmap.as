@@ -4,7 +4,9 @@ package com.sbi.graphics
    import com.sbi.loader.ImageServerURL;
    import flash.display.Bitmap;
    import flash.display.BitmapData;
+   import flash.geom.Matrix;
    import flash.geom.Point;
+   import flash.geom.Rectangle;
    import flash.utils.ByteArray;
    import flash.utils.Dictionary;
    
@@ -88,6 +90,42 @@ package com.sbi.graphics
       {
          _lastFrame = -1;
       }
+
+      // a custom item's picture has loaded (AJClient.customArtBitmap). the
+      // frames painted while it loaded show the item it was made from, and
+      // are kept: each is painted again, or the picture shows only on the
+      // frames not painted yet (and comes and goes as the animation plays).
+      public function artArrived() : void
+      {
+         var _loc1_:Array = [_activeLayerGroup];
+         for each(var _loc2_:LayerGroup in _cachedLayerGroups)
+         {
+            _loc1_.push(_loc2_);
+         }
+         for each(var _loc3_:LayerGroup in _loc1_)
+         {
+            if(_loc3_ == null || _loc3_.paintedFrames == null)
+            {
+               continue;
+            }
+            for each(var _loc4_:Array in _loc3_.paintedFrames)
+            {
+               if(_loc4_ == null)
+               {
+                  continue;
+               }
+               if(_loc4_[false] != null)
+               {
+                  _loc4_[false].isValid = false;
+               }
+               if(_loc4_[true] != null)
+               {
+                  _loc4_[true].isValid = false;
+               }
+            }
+         }
+         invalidate();
+      }
       
       public function trimLayerGroups() : Set
       {
@@ -126,7 +164,9 @@ package com.sbi.graphics
          return 100 + param1 * 16 + Math.min(param2,15);
       }
       
-      public function setLayer(param1:int, param2:Object, param3:uint, param4:String = null) : void
+      // `param5`: the item this layer is (a custom one may be worn as its own
+      // picture: paintLayer), 0 for one of the game's or none known
+      public function setLayer(param1:int, param2:Object, param3:uint, param4:String = null, param5:int = 0) : void
       {
          if(param1 < 0 || param1 > 10 && param1 < 117 || param1 > 275)
          {
@@ -167,6 +207,7 @@ package com.sbi.graphics
                setLayerColor(param1,param3);
             }
             _activeLayerGroup.layers[param1].o = param2;
+            _activeLayerGroup.layers[param1].item = param5;
          }
          else
          {
@@ -432,7 +473,7 @@ package com.sbi.graphics
                   _loc6_ = _activeLayerGroup.layers[_loc5_];
                   if(_loc6_ != null && _loc6_.o != null && _loc6_.pal != null)
                   {
-                     if(paintFrame(_loc6_.o,param1,_loc6_.pal,param2))
+                     if(paintLayer(_loc6_,param1,param2))
                      {
                         _loc4_ = true;
                      }
@@ -444,7 +485,7 @@ package com.sbi.graphics
                      _loc6_ = _activeLayerGroup.layers[100 + _loc5_ * 16 + _loc8_];
                      if(_loc6_ != null && _loc6_.o != null && _loc6_.pal != null)
                      {
-                        if(paintFrame(_loc6_.o,param1,_loc6_.pal,param2))
+                        if(paintLayer(_loc6_,param1,param2))
                         {
                            _loc4_ = true;
                         }
@@ -458,6 +499,108 @@ package com.sbi.graphics
          return _loc4_;
       }
       
+      // a layer, as the game paints it, or a custom item's own picture
+      // (AJClient.customArtMode): "sticker", the picture fitted in the
+      // item's place in this frame; "texture", the item's shape with the
+      // picture in it, its outlines kept. while the picture loads it is
+      // painted as the item it was made from.
+      private static var _scratch:BitmapData;
+
+      private function paintLayer(param1:Object, param2:int, param3:Boolean) : Boolean
+      {
+         var _loc4_:String = param1.item > 0 ? AJClient.customArtMode("clothing",param1.item) : null;
+         var _loc5_:BitmapData = _loc4_ != null ? AJClient.customArtBitmap("clothing",param1.item,this) : null;
+         if(_loc5_ == null || param1.o == null || !param1.o.hasOwnProperty("f") || param2 >= param1.o.f.length || param1.o.f[param2] == null)
+         {
+            return paintFrame(param1.o,param2,param1.pal,param3);
+         }
+         var _loc6_:Object = param1.o.f[param2];
+         var _loc7_:BitmapData = this.bitmapData;
+         if(_loc7_ == null)
+         {
+            return false;
+         }
+         var _loc8_:Number = _bmax.x - _bmin.x;
+         var _loc9_:Number = int(_loc6_.x) - _bmin.x;
+         var _loc10_:Number = int(_loc6_.y) - _bmin.y;
+         var _loc11_:Number = int(_loc6_.w);
+         var _loc12_:Number = int(_loc6_.h);
+         if(param3)
+         {
+            _loc9_ = _loc8_ - _loc9_ - _loc11_;
+         }
+         if(_loc4_ == "sticker")
+         {
+            var _loc13_:Number = Math.min(_loc11_ / _loc5_.width,_loc12_ / _loc5_.height);
+            var _loc14_:Matrix = new Matrix();
+            if(param3)
+            {
+               _loc14_.scale(-_loc13_,_loc13_);
+               _loc14_.translate(_loc9_ + (_loc11_ + _loc5_.width * _loc13_) * 0.5,_loc10_ + (_loc12_ - _loc5_.height * _loc13_) * 0.5);
+            }
+            else
+            {
+               _loc14_.scale(_loc13_,_loc13_);
+               _loc14_.translate(_loc9_ + (_loc11_ - _loc5_.width * _loc13_) * 0.5,_loc10_ + (_loc12_ - _loc5_.height * _loc13_) * 0.5);
+            }
+            _loc7_.draw(_loc5_,_loc14_,null,null,null,true);
+            return true;
+         }
+         // the texture: the layer alone first, then its pixels from the picture
+         if(_scratch == null || _scratch.width < _loc7_.width || _scratch.height < _loc7_.height)
+         {
+            if(_scratch != null)
+            {
+               _scratch.dispose();
+            }
+            _scratch = new BitmapData(Math.max(_loc7_.width,256),Math.max(_loc7_.height,256),true,0);
+         }
+         _scratch.fillRect(_scratch.rect,0);
+         this.bitmapData = _scratch;
+         var _loc15_:Boolean = paintFrame(param1.o,param2,param1.pal,param3);
+         this.bitmapData = _loc7_;
+         if(!_loc15_)
+         {
+            return false;
+         }
+         var _loc16_:int = Math.max(0,int(_loc9_));
+         var _loc17_:int = Math.max(0,int(_loc10_));
+         var _loc18_:int = Math.min(_loc7_.width,int(_loc9_ + _loc11_));
+         var _loc19_:int = Math.min(_loc7_.height,int(_loc10_ + _loc12_));
+         var _loc20_:int = _loc17_;
+         while(_loc20_ < _loc19_)
+         {
+            var _loc21_:int = _loc16_;
+            while(_loc21_ < _loc18_)
+            {
+               var _loc22_:uint = _scratch.getPixel32(_loc21_,_loc20_);
+               var _loc23_:uint = _loc22_ >>> 24;
+               if(_loc23_ > 0)
+               {
+                  var _loc24_:Number = (((_loc22_ >> 16) & 0xFF) * 3 + ((_loc22_ >> 8) & 0xFF) * 6 + (_loc22_ & 0xFF)) / 10;
+                  // dark: an outline, kept
+                  if(_loc24_ >= 60)
+                  {
+                     var _loc25_:int = int(((param3 ? _loc18_ - 1 - _loc21_ : _loc21_ - _loc16_) / Math.max(1,_loc18_ - _loc16_)) * _loc5_.width);
+                     var _loc26_:int = int(((_loc20_ - _loc17_) / Math.max(1,_loc19_ - _loc17_)) * _loc5_.height);
+                     var _loc27_:uint = _loc5_.getPixel32(Math.min(_loc5_.width - 1,_loc25_),Math.min(_loc5_.height - 1,_loc26_));
+                     // its shading kept: lighter or darker as the item was there
+                     var _loc28_:Number = Math.max(0.55,Math.min(1.15,_loc24_ / 170));
+                     var _loc29_:uint = Math.min(255,((_loc27_ >> 16) & 0xFF) * _loc28_);
+                     var _loc30_:uint = Math.min(255,((_loc27_ >> 8) & 0xFF) * _loc28_);
+                     var _loc31_:uint = Math.min(255,(_loc27_ & 0xFF) * _loc28_);
+                     var _loc32_:uint = Math.min(_loc23_,_loc27_ >>> 24);
+                     _scratch.setPixel32(_loc21_,_loc20_,_loc32_ << 24 | _loc29_ << 16 | _loc30_ << 8 | _loc31_);
+                  }
+               }
+               _loc21_++;
+            }
+            _loc20_++;
+         }
+         _loc7_.copyPixels(_scratch,new Rectangle(0,0,_loc7_.width,_loc7_.height),new Point(0,0),null,null,true);
+         return true;
+      }
+
       private function paintFrame(param1:Object, param2:int, param3:Array, param4:Boolean) : Boolean
       {
          var _loc25_:int = 0;

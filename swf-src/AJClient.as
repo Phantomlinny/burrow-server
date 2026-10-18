@@ -15,6 +15,9 @@ package
    import com.sbi.popup.SBStandardPopup;
    import com.sbi.popup.SBYesNoPopup;
    import createAccountFlow.CreateAccount;
+   import flash.display.Bitmap;
+   import flash.display.BitmapData;
+   import flash.display.Loader;
    import flash.display.MovieClip;
    import flash.display.Shape;
    import flash.display.DisplayObject;
@@ -22,10 +25,13 @@ package
    import flash.events.Event;
    import flash.geom.ColorTransform;
    import flash.geom.Matrix;
+   import flash.utils.ByteArray;
    import flash.geom.Point;
    import flash.events.KeyboardEvent;
    import flash.events.MouseEvent;
    import flash.events.TimerEvent;
+   import flash.net.FileFilter;
+   import flash.net.FileReference;
    import flash.net.URLLoader;
    import flash.net.URLRequest;
    import flash.text.Font;
@@ -34,6 +40,7 @@ package
    import flash.events.UncaughtErrorEvent;
    import flash.external.ExternalInterface;
    import flash.system.Capabilities;
+   import flash.system.LoaderContext;
    import flash.system.Security;
    import flash.system.System;
    import flash.ui.Mouse;
@@ -44,6 +51,8 @@ package
    import gamePlayFlow.GamePlay;
    import gskinner.motion.GTween;
    import gui.DarkenManager;
+   import gui.ChatBalloon;
+   import gui.EmoticonUtility;
    import gui.GuiManager;
    import loadProgress.LoadProgress;
    import loader.DefPacksDefHelper;
@@ -96,13 +105,17 @@ package
       // signed-in role may do ("xsp" from the server; empty for players).
       private var _moderate:Sprite;
 
-      private var _moderateContent:MovieClip;
+      private var _moderateContent:Sprite;
+
+      private var _moderateTitle:TextField;
 
       private var _moderateName:String;
 
       private var _moderateReason:int;
 
-      private var _moderateMessageBar:MovieClip;
+      private var _moderateInput:TextField;
+
+      private var _moderateHint:TextField;
 
       private var _moderateButtons:Array;
 
@@ -305,6 +318,7 @@ package
          }
          gMainFrame.stage.addEventListener("keyDown",onFinderKey,true,1000);
          gMainFrame.stage.addEventListener("keyDown",onFinderKey,false,1000);
+         startEmojiButton();
       }
       
       public static function openTool(param1:int) : void
@@ -318,6 +332,10 @@ package
             if(param1 == 1)
             {
                _toolsInstance.showChatFilter(true);
+            }
+            else if(param1 == 2)
+            {
+               _toolsInstance.showItemMaker(true);
             }
             else
             {
@@ -519,6 +537,20 @@ package
          try
          {
             var _loc2_:Array = JSON.parse(String(param1[3])) as Array;
+            for each(var _loc3_:Object in _loc2_)
+            {
+               // a picture of its own (uploaded by its maker): its version
+               if(_loc3_.art)
+               {
+                  _customArt[String(param1[2]) + ":" + _loc3_.id] = String(_loc3_.art);
+                  _customArtMode[String(param1[2]) + ":" + _loc3_.id] = _loc3_.artMode == "texture" ? "texture" : "sticker";
+               }
+               else
+               {
+                  delete _customArt[String(param1[2]) + ":" + _loc3_.id];
+                  delete _customArtMode[String(param1[2]) + ":" + _loc3_.id];
+               }
+            }
             if(String(param1[2]) == "den")
             {
                DenXtCommManager.addDenItemDefs(_loc2_);
@@ -532,6 +564,238 @@ package
          {
             GlobalErrorCatch.reportToServer("item defs: " + e + "\n" + e.getStackTrace());
          }
+      }
+
+      // custom items' own pictures (lib/itemart.js on the server): "kind:id"
+      // -> version, from the def rows ("xdi"). the picture stands in for the
+      // item's icon, and for a den item also for the item placed in a den.
+      private static var _customArt:Object = {};
+
+      // how a custom clothing item with a picture is worn ("artMode" in its
+      // def row): "sticker", the picture itself where the item would be, or
+      // "texture", the item's own shape painted with the picture.
+      private static var _customArtMode:Object = {};
+
+      // the pictures as bitmaps, for wearing: "kind:id" -> {bmp, art, waiting}
+      private static var _artBitmaps:Object = {};
+
+      // the look a worn item has, or null for one drawn as the game draws it
+      public static function customArtMode(param1:String, param2:int) : String
+      {
+         return _customArt[param1 + ":" + param2] == null ? null : _customArtMode[param1 + ":" + param2];
+      }
+
+      // what makes a painted frame of it different from its base's, for a
+      // cache key ("" for none)
+      public static function customArtKey(param1:String, param2:int) : String
+      {
+         var _loc3_:String = _customArt[param1 + ":" + param2];
+         return _loc3_ == null ? "" : param2 + ":" + _loc3_ + ":" + _customArtMode[param1 + ":" + param2];
+      }
+
+      // the picture as a bitmap, or null while it loads (then `param3`, an
+      // object with invalidate(), is told when it has: it paints again).
+      public static function customArtBitmap(param1:String, param2:int, param3:Object = null) : BitmapData
+      {
+         var _loc4_:String = param1 + ":" + param2;
+         var _loc5_:String = _customArt[_loc4_];
+         var _loc6_:Object = _artBitmaps[_loc4_];
+         if(_loc5_ == null)
+         {
+            return null;
+         }
+         if(_loc6_ != null && _loc6_.art == _loc5_)
+         {
+            if(_loc6_.bmp == null && param3 != null && _loc6_.waiting.indexOf(param3) == -1)
+            {
+               _loc6_.waiting.push(param3);
+            }
+            return _loc6_.bmp;
+         }
+         _loc6_ = _artBitmaps[_loc4_] = {"bmp":null,"art":_loc5_,"waiting":param3 != null ? [param3] : []};
+         var _loc7_:Loader = new Loader();
+         var _loc8_:Object = _loc6_;
+         _loc7_.contentLoaderInfo.addEventListener("complete",function(param1:Event):void
+         {
+            if(_loc7_.content is Bitmap)
+            {
+               _loc8_.bmp = Bitmap(_loc7_.content).bitmapData;
+            }
+            for each(var _loc2_:Object in _loc8_.waiting)
+            {
+               try
+               {
+                  if("artArrived" in _loc2_)
+                  {
+                     _loc2_.artArrived();
+                  }
+                  else
+                  {
+                     _loc2_.invalidate();
+                  }
+               }
+               catch(e:Error)
+               {
+               }
+            }
+            _loc8_.waiting = [];
+         });
+         _loc7_.contentLoaderInfo.addEventListener("ioError",function(param1:Event):void
+         {
+            _loc8_.waiting = [];
+         });
+         // its pixels are read (worn as a sticker or a texture): from another
+         // address that takes the server's /crossdomain.xml
+         _loc7_.load(new URLRequest(customArtUrl(param1,param2)),new LoaderContext(true));
+         return null;
+      }
+
+      // the picture's address, or null when the item has none.
+      public static function customArtUrl(param1:String, param2:int) : String
+      {
+         var _loc3_:String = _customArt[param1 + ":" + param2];
+         return _loc3_ == null ? null : gMainFrame.clientInfo.websiteURL + "itemart/" + param1 + "/" + param2 + ".png?v=" + encodeURIComponent(_loc3_);
+      }
+
+      // loads a picture into `param2`, fitted in a `param3` square: centred on
+      // its origin, or (`param4`) standing on it, as a den item does. then
+      // `param5`, if any. a picture that does not load leaves it empty.
+      // pictures loadArt has loaded, by address, drawn again from these
+      // rather than fetched and decoded again: emoji in chat bubbles, items'
+      // icons in long lists. those asked for while one loads wait for it.
+      // past ART_CACHE_MAX pictures it starts afresh (a picture shown keeps
+      // its own).
+      private static const ART_CACHE_MAX:int = 400;
+
+      private static var _artCache:Object = {};
+
+      private static var _artCacheCount:int = 0;
+
+      private static var _artLoading:Object = {};
+
+      public static function loadArt(param1:String, param2:Sprite, param3:int, param4:Boolean, param5:Function = null) : void
+      {
+         var url:String = param1;
+         var place:Function = function(param1:BitmapData):void
+         {
+            var _loc2_:Bitmap = null;
+            var _loc3_:Number = NaN;
+            if(param1 != null)
+            {
+               _loc2_ = new Bitmap(param1,"auto",true);
+               _loc3_ = Math.min(1,param3 / Math.max(1,param1.width),param3 / Math.max(1,param1.height));
+               _loc2_.scaleX = _loc2_.scaleY = _loc3_;
+               _loc2_.x = -int(param1.width * _loc3_ * 0.5);
+               _loc2_.y = param4 ? -int(param1.height * _loc3_) : -int(param1.height * _loc3_ * 0.5);
+               param2.addChild(_loc2_);
+            }
+            if(param5 != null)
+            {
+               param5();
+            }
+         };
+         if(_artCache[url] != null)
+         {
+            place(_artCache[url]);
+            return;
+         }
+         if(_artLoading[url] != null)
+         {
+            _artLoading[url].push({"place":place,"sprite":param2,"side":param3,"standing":param4,"then":param5});
+            return;
+         }
+         _artLoading[url] = [];
+         var shared:Loader = new Loader();
+         var loaded:Function = function(param1:Event):void
+         {
+            var _loc2_:BitmapData = null;
+            var _loc3_:Array = _artLoading[url];
+            shared.contentLoaderInfo.removeEventListener("complete",loaded);
+            shared.contentLoaderInfo.removeEventListener("ioError",notLoaded);
+            delete _artLoading[url];
+            try
+            {
+               _loc2_ = shared.content is Bitmap ? Bitmap(shared.content).bitmapData : null;
+            }
+            catch(e:Error)
+            {
+               _loc2_ = null;
+            }
+            if(_loc2_ == null)
+            {
+               // not to be shared (another site's, without its leave): each
+               // has a loader of its own, as before
+               loadArtUncached(url,param2,param3,param4,param5);
+               for each(var _loc4_:Object in _loc3_)
+               {
+                  loadArtUncached(url,_loc4_.sprite,_loc4_.side,_loc4_.standing,_loc4_.then);
+               }
+               return;
+            }
+            if(_artCacheCount >= ART_CACHE_MAX)
+            {
+               _artCache = {};
+               _artCacheCount = 0;
+            }
+            _artCache[url] = _loc2_;
+            _artCacheCount++;
+            place(_loc2_);
+            for each(var _loc5_:Object in _loc3_)
+            {
+               _loc5_.place(_loc2_);
+            }
+         };
+         var notLoaded:Function = function(param1:Event):void
+         {
+            var _loc2_:Array = _artLoading[url];
+            shared.contentLoaderInfo.removeEventListener("complete",loaded);
+            shared.contentLoaderInfo.removeEventListener("ioError",notLoaded);
+            delete _artLoading[url];
+            place(null);
+            for each(var _loc3_:Object in _loc2_)
+            {
+               _loc3_.place(null);
+            }
+         };
+         shared.contentLoaderInfo.addEventListener("complete",loaded);
+         shared.contentLoaderInfo.addEventListener("ioError",notLoaded);
+         shared.load(new URLRequest(url),new LoaderContext(true));
+      }
+
+      private static function loadArtUncached(param1:String, param2:Sprite, param3:int, param4:Boolean, param5:Function = null) : void
+      {
+         var _loc6_:Loader = new Loader();
+         var done:Function = function(param1:Event):void
+         {
+            var _loc2_:Number = NaN;
+            _loc6_.contentLoaderInfo.removeEventListener("complete",done);
+            _loc6_.contentLoaderInfo.removeEventListener("ioError",failed);
+            if(_loc6_.content is Bitmap)
+            {
+               Bitmap(_loc6_.content).smoothing = true;
+            }
+            _loc2_ = Math.min(1,param3 / Math.max(1,_loc6_.contentLoaderInfo.width),param3 / Math.max(1,_loc6_.contentLoaderInfo.height));
+            _loc6_.scaleX = _loc6_.scaleY = _loc2_;
+            _loc6_.x = -int(_loc6_.contentLoaderInfo.width * _loc2_ * 0.5);
+            _loc6_.y = param4 ? -int(_loc6_.contentLoaderInfo.height * _loc2_) : -int(_loc6_.contentLoaderInfo.height * _loc2_ * 0.5);
+            param2.addChild(_loc6_);
+            if(param5 != null)
+            {
+               param5();
+            }
+         };
+         var failed:Function = function(param1:Event):void
+         {
+            _loc6_.contentLoaderInfo.removeEventListener("complete",done);
+            _loc6_.contentLoaderInfo.removeEventListener("ioError",failed);
+            if(param5 != null)
+            {
+               param5();
+            }
+         };
+         _loc6_.contentLoaderInfo.addEventListener("complete",done);
+         _loc6_.contentLoaderInfo.addEventListener("ioError",failed);
+         _loc6_.load(new URLRequest(param1));
       }
 
       // "xsp": [.., .., role, permissions]. sent at login to staff only: their
@@ -575,6 +839,98 @@ package
          new SBOkPopup(GuiManager.guiLayer,String(param1[2]));
       }
       
+      // "xgt": [.., .., x, y, same room]: staff moving a player (summon,
+      // goto) puts them on that spot: now when in the room already ("1"),
+      // else on spawning in the room they are sent to next ("0"). with no
+      // spot, the one kept is forgotten (the move failed).
+      public static function onStaffGoto(param1:Object) : void
+      {
+         var _loc2_:RoomManagerWorld = RoomManagerWorld.instance;
+         if(_loc2_ == null)
+         {
+            return;
+         }
+         if(param1.length < 5)
+         {
+            _loc2_.setGotoSpawnPoint("default");
+            return;
+         }
+         if(String(param1[4]) == "1")
+         {
+            _loc2_.teleportPlayer(int(param1[2]),int(param1[3]),true);
+         }
+         else
+         {
+            _loc2_.setGotoSpawnLocation(int(param1[2]),int(param1[3]));
+         }
+      }
+
+      // whether this player is invisible staff (lib/world.js setInvisible),
+      // for the staff window's button.
+      public static var staffInvisible:Boolean = false;
+
+      // "xiv": [.., .., sfsId, 1 | 0]: an animal of invisible staff, which
+      // only staff are shown, drawn half see-through (this player's own too).
+      public static function onInvisible(param1:Object) : void
+      {
+         var _loc2_:int = int(param1[2]);
+         var _loc3_:Boolean = String(param1[3]) == "1";
+         var _loc4_:AvatarWorldView = AvatarManager.avatarViewList != null ? AvatarManager.avatarViewList[_loc2_] as AvatarWorldView : null;
+         if(_loc2_ == AvatarManager.playerSfsUserId)
+         {
+            staffInvisible = _loc3_;
+         }
+         if(_loc4_ != null)
+         {
+            _loc4_.alpha = _loc3_ ? 0.5 : 1;
+         }
+      }
+
+      // typing (lib/world.js xty): this player's chat box says so as it
+      // changes (gui.ChatHistory), again every TYPING_RESEND ms while it goes
+      // on, and once when it is emptied; a line sent counts as stopping.
+      private static const TYPING_RESEND:int = 4000;
+
+      private static var _typingSent:Boolean = false;
+
+      private static var _typingSentAt:int = 0;
+
+      public static function noteTyping(param1:String) : void
+      {
+         var _loc2_:Boolean = param1 != null && param1.replace(/\s+/g,"").length > 0;
+         if(gMainFrame.clientInfo.invisMode || staffInvisible)
+         {
+            return;
+         }
+         if(_loc2_ && (!_typingSent || getTimer() - _typingSentAt > TYPING_RESEND))
+         {
+            gMainFrame.server.setXtObject_Str("xty",[1]);
+            _typingSent = true;
+            _typingSentAt = getTimer();
+         }
+         else if(!_loc2_ && _typingSent)
+         {
+            gMainFrame.server.setXtObject_Str("xty",[0]);
+            _typingSent = false;
+         }
+      }
+
+      // a line was sent: every other game drops the "..." when it arrives.
+      public static function typingSent() : void
+      {
+         _typingSent = false;
+      }
+
+      // "xty": [.., .., sfsId, 1 | 0]: another player typing, or not.
+      public static function onTyping(param1:Object) : void
+      {
+         var _loc2_:AvatarWorldView = AvatarManager.avatarViewList != null ? AvatarManager.avatarViewList[int(param1[2])] as AvatarWorldView : null;
+         if(_loc2_ != null && int(param1[2]) != AvatarManager.playerSfsUserId)
+         {
+            _loc2_.setTyping(String(param1[3]) == "1");
+         }
+      }
+
       // "xyn": [.., .., id, text]. A yes-or-no box; the answer goes back as
       // "xyn" [id, 1 | 0].
       public static function askYesNo(param1:Object) : void
@@ -2037,58 +2393,214 @@ package
       // which the server runs as if typed: lib/commands.js, its permission
       // checks and log included); only the ones the role allows are shown.
       // the window closes and the server's answer comes as a message box.
+      // a warning's reason, as the server knows it, and its chip. with text
+      // in the box, Warn sends that text as the warning ("custom": what the
+      // player is shown) and the reason is not used.
       private static const MODERATE_REASONS:Array = ["behavior","bullying","personal","scamming"];
 
-      private static const MODERATE_REASON_NAMES:Array = ["Inappropriate behavior","Bullying","Personal information","Scamming"];
+      private static const MODERATE_REASON_NAMES:Array = ["Behavior","Bullying","Personal info","Scamming"];
+
+      // the window's look: flat, dark, rounded, in the game's font.
+      private static const MOD_W:int = 560;
+
+      private static const MOD_H:int = 432;
+
+      private static const MOD_PAD:int = 24;
+
+      private static const MOD_BG:uint = 0x1C1D24;
+
+      private static const MOD_EDGE:uint = 0x34364A;
+
+      private static const MOD_FIELD:uint = 0x272934;
+
+      private static const MOD_MUTED:uint = 0x9A9DB0;
+
+      private static const MOD_GREY:uint = 0x3A3D4E;
+
+      private static const MOD_AMBER:uint = 0xE0A030;
+
+      private static const MOD_BLUE:uint = 0x3D7BF0;
+
+      private static const MOD_PURPLE:uint = 0x8B5CF6;
+
+      private static const MOD_TEAL:uint = 0x14A38B;
+
+      private static const MOD_RED:uint = 0xE0475B;
+
+      // text in the game's font (embedded when the game has it).
+      public static function modText(param1:String, param2:int, param3:uint, param4:Boolean = true) : TextField
+      {
+         var _loc5_:TextField = new TextField();
+         _loc5_.embedFonts = hasGameFont();
+         _loc5_.selectable = false;
+         _loc5_.mouseEnabled = false;
+         _loc5_.autoSize = "left";
+         _loc5_.defaultTextFormat = new TextFormat("CCDigitalDelivery",param2,param3,param4);
+         _loc5_.text = param1;
+         return _loc5_;
+      }
+
+      // a flat button: a rounded box of colour `param6`, its label centred.
+      private function modButton(param1:String, param2:String, param3:Number, param4:Number, param5:Number, param6:uint, param7:String) : Sprite
+      {
+         var _loc8_:Sprite = new Sprite();
+         _loc8_.name = param1;
+         _loc8_.x = param3;
+         _loc8_.y = param4;
+         _loc8_.buttonMode = true;
+         _loc8_.useHandCursor = true;
+         _loc8_.mouseChildren = false;
+         var _loc9_:TextField = modText(param2,14,0xFFFFFF);
+         _loc9_.name = "label";
+         _loc8_.addChild(_loc9_);
+         paintFlatButton(_loc8_,param5,param6);
+         _loc8_.addEventListener("mouseDown",onModerateButton);
+         _loc8_.addEventListener("mouseOver",onFlatHover);
+         _loc8_.addEventListener("mouseOut",onFlatHover);
+         _moderateContent.addChild(_loc8_);
+         _moderateButtons.push({
+            "clip":_loc8_,
+            "permission":param7
+         });
+         return _loc8_;
+      }
+
+      // draws a flat button `param2` wide in colour `param3`, its label
+      // ("label") centred in it. also for the settings menu's own windows.
+      public static function paintFlatButton(param1:Sprite, param2:Number, param3:uint) : void
+      {
+         var _loc4_:TextField = param1.getChildByName("label") as TextField;
+         param1.graphics.clear();
+         param1.graphics.beginFill(param3);
+         param1.graphics.drawRoundRect(0,0,param2,34,14,14);
+         param1.graphics.endFill();
+         if(_loc4_ != null)
+         {
+            _loc4_.x = int((param2 - _loc4_.width) * 0.5);
+            _loc4_.y = int((34 - _loc4_.height) * 0.5);
+         }
+      }
+
+      private static function modSetLabel(param1:Sprite, param2:String) : void
+      {
+         var _loc3_:TextField = param1.getChildByName("label") as TextField;
+         var _loc4_:Number = param1.width;
+         _loc3_.text = param2;
+         _loc3_.x = int((_loc4_ - _loc3_.width) * 0.5);
+      }
+
+      public static function onFlatHover(param1:MouseEvent) : void
+      {
+         Sprite(param1.currentTarget).alpha = param1.type == "mouseOver" ? 0.82 : 1;
+      }
+
+      private function modSection(param1:String, param2:Number) : void
+      {
+         var _loc3_:TextField = modText(param1.toUpperCase(),11,MOD_MUTED);
+         _loc3_.x = MOD_PAD;
+         _loc3_.y = param2;
+         _moderateContent.addChild(_loc3_);
+      }
 
       private function buildModerate() : void
       {
-         var _loc1_:MovieClip = GETDEFINITIONBYNAME("ReportRulesPopupSkin");
-         var _loc2_:int = 1;
+         var _loc1_:Number = (MOD_W - MOD_PAD * 2 - 20) / 3; // a column's width
+         var _loc2_:Array = [MOD_PAD,MOD_PAD + _loc1_ + 10,MOD_PAD + (_loc1_ + 10) * 2];
+         var _loc3_:Sprite = null;
+         var _loc4_:Number = MOD_PAD;
+         var _loc5_:int = 0;
          _moderate = new Sprite();
-         _moderate.graphics.beginFill(0,0.45);
+         _moderate.graphics.beginFill(0,0.55);
          _moderate.graphics.drawRect(0,0,900,550);
          _moderate.graphics.endFill();
-         var _loc3_:Sprite = new Sprite();
-         _loc3_.x = 450;
-         _loc3_.y = 275;
-         _moderate.addChild(_loc3_);
-         _loc3_.addChild(_loc1_);
-         _moderateContent = GETDEFINITIONBYNAME("ReportRulesPopupContent");
-         _moderateContent.x = _loc1_.c.x;
-         _moderateContent.y = _loc1_.c.y;
-         _loc3_.addChild(_moderateContent);
-         _loc1_.bx.addEventListener("mouseDown",onModerateCloseClick);
-         while(_loc2_ <= 5)
-         {
-            _moderateContent["ruleTxt" + _loc2_].visible = false;
-            _moderateContent["ruleBodyTxt" + _loc2_].visible = false;
-            _loc2_++;
-         }
-         var _loc4_:TextField = _moderateContent.ruleBodyTxt1;
-         _loc4_.visible = true;
-         _loc4_.wordWrap = true;
-         _loc4_.x = -245;
-         _loc4_.y = -150;
-         _loc4_.width = 490;
-         _loc4_.height = 40;
-         _loc4_.text = "What you do here is written down under your name, as in the moderator panel.";
+         _moderateContent = new Sprite();
+         _moderateContent.x = int((900 - MOD_W) * 0.5);
+         _moderateContent.y = int((550 - MOD_H) * 0.5);
+         // a soft shadow, then the panel
+         _moderateContent.graphics.beginFill(0,0.35);
+         _moderateContent.graphics.drawRoundRect(0,6,MOD_W,MOD_H,26,26);
+         _moderateContent.graphics.endFill();
+         _moderateContent.graphics.lineStyle(1,MOD_EDGE);
+         _moderateContent.graphics.beginFill(MOD_BG);
+         _moderateContent.graphics.drawRoundRect(0,0,MOD_W,MOD_H,26,26);
+         _moderateContent.graphics.endFill();
+         _moderate.addChild(_moderateContent);
          _moderateButtons = [];
-         // a row each: warn (the reason cycles), a message, chat, moving them.
-         moderateButton("reason","",-150,-88,"player.warn");
-         moderateButton("warn","Warn",90,-88,"player.warn");
-         _moderateMessageBar = finderSearchBar(-247,-56,330,"Message to show them",null,200,false);
-         _moderateContent.addChild(_moderateMessageBar);
-         moderateButton("message","Send",150,-52,"player.warn");
-         moderateButton("silence 1","Silence 1 hour",-160,12,"chat.silence");
-         moderateButton("silence 24","Silence 1 day",0,12,"chat.silence");
-         moderateButton("silence off","Lift silence",160,12,"chat.silence");
-         moderateButton("summon","Bring here",-160,72,"player.summon");
-         moderateButton("goto","Go to them",0,72,"player.goto");
-         moderateButton("kick","Disconnect",160,72,"player.kick");
-         // their warnings, and taking back the latest (one given by mistake)
-         moderateButton("warnings","Warnings",-80,132,"player.warn");
-         moderateButton("unwarn","Take back warning",80,132,"player.warn");
+         _moderateTitle = modText("",22,0xFFFFFF);
+         _moderateTitle.x = MOD_PAD;
+         _moderateTitle.y = 18;
+         _moderateContent.addChild(_moderateTitle);
+         var _loc6_:TextField = modText("Everything here is logged under your name.",12,MOD_MUTED,false);
+         _loc6_.x = MOD_PAD;
+         _loc6_.y = 50;
+         _moderateContent.addChild(_loc6_);
+         // the close button: a round grey X
+         _loc3_ = new Sprite();
+         _loc3_.name = "close";
+         _loc3_.buttonMode = true;
+         _loc3_.useHandCursor = true;
+         _loc3_.graphics.beginFill(MOD_GREY);
+         _loc3_.graphics.drawCircle(0,0,15);
+         _loc3_.graphics.endFill();
+         _loc3_.graphics.lineStyle(2.5,0xFFFFFF);
+         _loc3_.graphics.moveTo(-5,-5);
+         _loc3_.graphics.lineTo(5,5);
+         _loc3_.graphics.moveTo(5,-5);
+         _loc3_.graphics.lineTo(-5,5);
+         _loc3_.x = MOD_W - MOD_PAD - 6;
+         _loc3_.y = 32;
+         _loc3_.addEventListener("mouseDown",onModerateCloseClick);
+         _loc3_.addEventListener("mouseOver",onFlatHover);
+         _loc3_.addEventListener("mouseOut",onFlatHover);
+         _moderateContent.addChild(_loc3_);
+         // warn: a chip for each reason, and Warn
+         modSection("Warn",84);
+         _loc5_ = 0;
+         while(_loc5_ < MODERATE_REASONS.length)
+         {
+            _loc3_ = modButton("reason" + _loc5_,MODERATE_REASON_NAMES[_loc5_],_loc4_,102,_loc5_ == 2 ? 104 : 82,MOD_GREY,"player.warn");
+            _loc4_ += _loc3_.width + 8;
+            _loc5_++;
+         }
+         modButton("warn","Warn",_loc2_[2] + _loc1_ - 120,102,120,MOD_AMBER,"player.warn");
+         // the text: a message, or the warning in the staff member's words
+         modSection("Message, or your own warning",150);
+         var _loc7_:Sprite = new Sprite();
+         _loc7_.x = MOD_PAD;
+         _loc7_.y = 168;
+         _loc7_.graphics.lineStyle(1,MOD_EDGE);
+         _loc7_.graphics.beginFill(MOD_FIELD);
+         _loc7_.graphics.drawRoundRect(0,0,_loc2_[2] - MOD_PAD - 10,34,14,14);
+         _loc7_.graphics.endFill();
+         _moderateContent.addChild(_loc7_);
+         _moderateHint = modText("Type here, then Send it or press Warn",13,0x6E7187,false);
+         _moderateHint.x = 12;
+         _moderateHint.y = int((34 - _moderateHint.height) * 0.5);
+         _loc7_.addChild(_moderateHint);
+         _moderateInput = new TextField();
+         _moderateInput.embedFonts = hasGameFont();
+         _moderateInput.type = "input";
+         _moderateInput.defaultTextFormat = new TextFormat("CCDigitalDelivery",14,0xFFFFFF,false);
+         _moderateInput.maxChars = 200;
+         _moderateInput.x = 10;
+         _moderateInput.y = 7;
+         _moderateInput.width = _loc2_[2] - MOD_PAD - 30;
+         _moderateInput.height = 22;
+         _moderateInput.addEventListener("change",onModerateTyped);
+         _loc7_.addChild(_moderateInput);
+         modButton("message","Send",_loc2_[2],168,_loc1_,MOD_BLUE,"player.warn");
+         modSection("Chat",218);
+         modButton("silence 1","Silence 1 hour",_loc2_[0],236,_loc1_,MOD_PURPLE,"chat.silence");
+         modButton("silence 24","Silence 1 day",_loc2_[1],236,_loc1_,MOD_PURPLE,"chat.silence");
+         modButton("silence off","Lift silence",_loc2_[2],236,_loc1_,MOD_GREY,"chat.silence");
+         modSection("Move",286);
+         modButton("summon","Bring here",_loc2_[0],304,_loc1_,MOD_TEAL,"player.summon");
+         modButton("goto","Go to them",_loc2_[1],304,_loc1_,MOD_TEAL,"player.goto");
+         modButton("kick","Disconnect",_loc2_[2],304,_loc1_,MOD_RED,"player.kick");
+         modSection("Record, and you",354);
+         modButton("warnings","Warnings",_loc2_[0],372,_loc1_,MOD_GREY,"player.warn");
+         modButton("unwarn","Undo warning",_loc2_[1],372,_loc1_,MOD_GREY,"player.warn");
+         modButton("invisible","Go invisible",_loc2_[2],372,_loc1_,MOD_GREY,"staff.invisible");
          _moderate.addEventListener("mouseDown",onFinderMouse);
          _moderate.addEventListener("mouseUp",onFinderMouse);
          _moderate.addEventListener("click",onFinderMouse);
@@ -2097,19 +2609,10 @@ package
          addChild(_moderate);
       }
 
-      private function moderateButton(param1:String, param2:String, param3:Number, param4:Number, param5:String) : void
+      private function onModerateTyped(param1:Event) : void
       {
-         var _loc6_:MovieClip = GETDEFINITIONBYNAME("introBtnCont");
-         _loc6_.x = param3;
-         _loc6_.y = param4;
-         _loc6_.name = param1;
-         finderButtonText(_loc6_,param2);
-         _loc6_.addEventListener("mouseDown",onModerateButton);
-         _moderateContent.addChild(_loc6_);
-         _moderateButtons.push({
-            "clip":_loc6_,
-            "permission":param5
-         });
+         _moderateHint.visible = _moderateInput.text.length == 0;
+         showModerateReason();
       }
 
       private function showModerate(param1:String) : void
@@ -2120,22 +2623,35 @@ package
          }
          _moderateName = param1;
          _moderateReason = 0;
-         _moderateContent.titleTxt.text = "Moderate " + param1;
-         _moderateMessageBar.searchTxt.text = "";
-         _moderateMessageBar.txt.visible = true;
+         _moderateTitle.text = "Moderate " + param1;
+         _moderateInput.text = "";
+         _moderateHint.visible = true;
          for each(var _loc2_:Object in _moderateButtons)
          {
             _loc2_.clip.visible = staffMay(_loc2_.permission);
          }
-         _moderateMessageBar.visible = staffMay("player.warn");
+         _moderateInput.parent.visible = staffMay("player.warn");
+         modSetLabel(_moderateContent.getChildByName("invisible") as Sprite,staffInvisible ? "Be seen" : "Go invisible");
          showModerateReason();
          _moderate.visible = true;
          setChildIndex(_moderate,numChildren - 1);
       }
 
+      // the chosen reason's chip is lit; with text typed none is (the text is
+      // the warning), and Warn says so.
       private function showModerateReason() : void
       {
-         finderButtonText(_moderateContent.getChildByName("reason") as MovieClip,MODERATE_REASON_NAMES[_moderateReason]);
+         var _loc1_:Boolean = _moderateInput.text.replace(/^\s+|\s+$/g,"").length > 0;
+         var _loc2_:int = 0;
+         var _loc3_:Sprite = null;
+         while(_loc2_ < MODERATE_REASONS.length)
+         {
+            _loc3_ = _moderateContent.getChildByName("reason" + _loc2_) as Sprite;
+            paintFlatButton(_loc3_,_loc3_.width,!_loc1_ && _loc2_ == _moderateReason ? MOD_AMBER : MOD_GREY);
+            _loc3_.alpha = _loc1_ ? 0.45 : 1;
+            _loc2_++;
+         }
+         modSetLabel(_moderateContent.getChildByName("warn") as Sprite,_loc1_ ? "Warn with text" : "Warn");
       }
 
       private function hideModerate() : void
@@ -2156,25 +2672,35 @@ package
       private function onModerateButton(param1:MouseEvent) : void
       {
          param1.stopPropagation();
-         var _loc2_:String = MovieClip(param1.currentTarget).name;
+         var _loc2_:String = Sprite(param1.currentTarget).name;
          var _loc3_:String = null;
-         if(_loc2_ == "reason")
+         if(_loc2_.indexOf("reason") == 0)
          {
-            _moderateReason = (_moderateReason + 1) % MODERATE_REASONS.length;
+            _moderateReason = int(_loc2_.substr(6));
             showModerateReason();
             return;
          }
-         if(_loc2_ == "warn")
+         if(_loc2_ == "invisible")
+         {
+            gMainFrame.server.setXtObject_Str("xiv",[]);
+            hideModerate();
+            return;
+         }
+         // "%" ends a field of the message: left out.
+         _loc3_ = _moderateInput.text.split("%").join("").replace(/^\s+|\s+$/g,"");
+         if(_loc2_ == "warn" && _loc3_.length > 0)
+         {
+            gMainFrame.server.setXtObject_Str("xmd",["warn",_moderateName,"custom",_loc3_]);
+         }
+         else if(_loc2_ == "warn")
          {
             gMainFrame.server.setXtObject_Str("xmd",["warn",_moderateName,MODERATE_REASONS[_moderateReason]]);
          }
          else if(_loc2_ == "message")
          {
-            // "%" ends a field of the message: left out.
-            _loc3_ = _moderateMessageBar.searchTxt.text.split("%").join("").replace(/^\s+|\s+$/g,"");
             if(_loc3_.length == 0)
             {
-               gMainFrame.stage.focus = _moderateMessageBar.searchTxt;
+               gMainFrame.stage.focus = _moderateInput;
                return;
             }
             gMainFrame.server.setXtObject_Str("xmd",["message",_moderateName,_loc3_]);
@@ -2189,7 +2715,970 @@ package
          }
          hideModerate();
       }
-      
+
+      // ---- emoji in chat. the game's text box takes nothing from Windows'
+      // emoji panel, so they are put in from here: a button at the end of the
+      // chat box opens a grid of them (Twemoji's pictures, from the server's
+      // /emoji/), and ":name:" in a line becomes the emoji when it is sent
+      // (unless it is one of the game's own emote codes, which win). the
+      // bubble draws them (gui.ChatBalloon). each is its name and its code
+      // points in hex, as Twemoji names its pictures.
+      private static const EMOJI_LIST:String = "smile:1f604,grin:1f601,joy:1f602,rofl:1f923,smiley:1f603,wink:1f609,blush:1f60a,innocent:1f607,"
+         + "heart_eyes:1f60d,kissing_heart:1f618,star_struck:1f929,partying:1f973,sunglasses:1f60e,nerd:1f913,thinking:1f914,"
+         + "neutral:1f610,expressionless:1f611,rolling_eyes:1f644,smirk:1f60f,relieved:1f60c,sleeping:1f634,yum:1f60b,"
+         + "tongue:1f61b,zany:1f92a,shush:1f92b,cry:1f622,sob:1f62d,pleading:1f97a,angry:1f620,rage:1f621,scream:1f631,"
+         + "flushed:1f633,cold:1f976,hot:1f975,skull:1f480,ghost:1f47b,alien:1f47d,robot:1f916,clown:1f921,poop:1f4a9,"
+         + "thumbsup:1f44d,thumbsdown:1f44e,clap:1f44f,wave:1f44b,ok_hand:1f44c,pray:1f64f,muscle:1f4aa,raised_hands:1f64c,"
+         + "v:270c,point_up:261d,eyes:1f440,heart:2764,orange_heart:1f9e1,yellow_heart:1f49b,green_heart:1f49a,"
+         + "blue_heart:1f499,purple_heart:1f49c,black_heart:1f5a4,white_heart:1f90d,broken_heart:1f494,sparkling_heart:1f496,"
+         + "two_hearts:1f495,fire:1f525,sparkles:2728,star:2b50,zap:26a1,boom:1f4a5,rainbow:1f308,sunny:2600,cloud:2601,"
+         + "snowflake:2744,moon:1f319,tada:1f389,confetti:1f38a,balloon:1f388,gift:1f381,crown:1f451,gem:1f48e,trophy:1f3c6,"
+         + "100:1f4af,check:2705,x:274c,warning:26a0,question:2753,exclamation:2757,music:1f3b5,video_game:1f3ae,dog:1f436,"
+         + "cat:1f431,wolf:1f43a,fox:1f98a,bunny:1f430,bear:1f43b,panda:1f43c,tiger:1f42f,lion:1f981,monkey:1f435,"
+         + "penguin:1f427,koala:1f428,horse:1f434,unicorn:1f984,owl:1f989,frog:1f438,turtle:1f422,snake:1f40d,dolphin:1f42c,"
+         + "whale:1f433,shark:1f988,octopus:1f419,butterfly:1f98b,bee:1f41d,cherry_blossom:1f338,rose:1f339,sunflower:1f33b,"
+         + "tree:1f333,cactus:1f335,mushroom:1f344,apple:1f34e,pizza:1f355,hamburger:1f354,fries:1f35f,cake:1f382,cookie:1f36a,"
+         + "ice_cream:1f366,candy:1f36c,coffee:2615,house:1f3e0,rocket:1f680,ocean:1f30a,earth:1f30d,pumpkin:1f383,"
+         + "christmas_tree:1f384,snowman:2603,crystal_ball:1f52e,magic:1fa84,paw:1f43e,feather:1fab6,leaf:1f343,four_leaf:1f340";
+
+      private static const EMOJI_COLUMNS:int = 14;
+
+      private static const EMOJI_CELL:int = 26;
+
+      private static var _emojiTable:Array; // [{name, hex, chars}]
+
+      private static var _emojiByName:Object;
+
+      private var _emojiButton:Sprite;
+
+      private var _emojiPanel:Sprite;
+
+      private var _emojiHint:TextField;
+
+      private var _emojiField:TextField;
+
+      private var _emojiCaret:int = -1;
+
+      private var _emojiTimer:Timer;
+
+      // the characters of code points in hex ("1f468-200d-1f469")
+      public static function charsOfHex(param1:String) : String
+      {
+         var _loc2_:String = "";
+         var _loc3_:int = 0;
+         for each(var _loc4_:String in param1.split("-"))
+         {
+            _loc3_ = parseInt(_loc4_,16);
+            if(_loc3_ > 0xFFFF)
+            {
+               _loc3_ -= 0x10000;
+               _loc2_ += String.fromCharCode(0xD800 + (_loc3_ >> 10),0xDC00 + (_loc3_ & 0x3FF));
+            }
+            else
+            {
+               _loc2_ += String.fromCharCode(_loc3_);
+            }
+         }
+         return _loc2_;
+      }
+
+      private static function emojiTable() : Array
+      {
+         if(_emojiTable == null)
+         {
+            _emojiTable = [];
+            _emojiByName = {};
+            for each(var _loc1_:String in EMOJI_LIST.split(","))
+            {
+               var _loc2_:Array = _loc1_.split(":");
+               var _loc3_:Object = {"name":_loc2_[0],"hex":_loc2_[1],"chars":charsOfHex(_loc2_[1])};
+               _emojiTable.push(_loc3_);
+               _emojiByName[_loc3_.name] = _loc3_.chars;
+            }
+         }
+         return _emojiTable;
+      }
+
+      // a line about to be sent: each ":name:" of an emoji above becomes it,
+      // but not the game's own emote codes (":happy:", ":joy:"), which the
+      // bubble shows as the game's.
+      public static function emojiShortcodes(param1:String) : String
+      {
+         if(param1.indexOf(":") == -1)
+         {
+            return param1;
+         }
+         emojiTable();
+         return param1.replace(/:([a-z0-9_]{1,30}):/g,function(param1:String, param2:String, ... rest):String
+         {
+            if(EmoticonUtility.doesStringMatchAnEmote(param1) || _emojiByName[param2] == null)
+            {
+               return param1;
+            }
+            return _emojiByName[param2];
+         });
+      }
+
+      // a line about to be sent, its emoji as "\{1f600}" (their pictures'
+      // names): the game's socket carries characters past U+FFFF badly, and
+      // these are plain letters. the bubble draws them (gui.ChatBalloon).
+      public static function emojiToTokens(param1:String) : String
+      {
+         var _loc2_:String = "";
+         var _loc3_:int = 0;
+         var _loc4_:int = 0;
+         while(_loc3_ < param1.length)
+         {
+            _loc4_ = ChatBalloon.emojiLength(param1,_loc3_);
+            if(_loc4_ > 0)
+            {
+               _loc2_ += "\\{" + ChatBalloon.emojiName(param1.substr(_loc3_,_loc4_)) + "}";
+               _loc3_ += _loc4_;
+            }
+            else
+            {
+               _loc2_ += param1.charAt(_loc3_);
+               _loc3_++;
+            }
+         }
+         return _loc2_;
+      }
+
+      // a line for the chat history's list, which has no pictures: each emoji
+      // as its name (":fire:"), or ":emoji:" for one not in the grid.
+      public static function emojiAsNames(param1:String) : String
+      {
+         if(param1.indexOf("\\{") == -1)
+         {
+            return param1;
+         }
+         emojiTable();
+         return param1.replace(/\\\{([0-9a-f]{2,6}(?:-[0-9a-f]{2,6}){0,9})\}/g,function(param1:String, param2:String, ... rest):String
+         {
+            for each(var _loc4_:Object in _emojiTable)
+            {
+               if(_loc4_.hex == param2 || ChatBalloon.emojiName(_loc4_.chars) == param2)
+               {
+                  return ":" + _loc4_.name + ":";
+               }
+            }
+            return ":emoji:";
+         });
+      }
+
+      private function startEmojiButton() : void
+      {
+         _emojiTimer = new Timer(500);
+         _emojiTimer.addEventListener("timer",placeEmojiButton);
+         _emojiTimer.start();
+         gMainFrame.stage.addEventListener("mouseDown",onEmojiStageDown,false,0,true);
+      }
+
+      private static function shownOnStage(param1:DisplayObject) : Boolean
+      {
+         if(param1 == null || param1.stage == null)
+         {
+            return false;
+         }
+         while(param1 != null)
+         {
+            if(!param1.visible)
+            {
+               return false;
+            }
+            param1 = param1.parent;
+         }
+         return true;
+      }
+
+      // the button, kept at the right end of the chat box while it is shown
+      private function placeEmojiButton(param1:Event = null) : void
+      {
+         var _loc2_:TextField = null;
+         var _loc3_:Point = null;
+         try
+         {
+            _loc2_ = GuiManager.chatHist != null ? GuiManager.chatHist.chatMsgText : null;
+         }
+         catch(e:Error)
+         {
+            _loc2_ = null;
+         }
+         if(_emojiButton == null)
+         {
+            _emojiButton = new Sprite();
+            _emojiButton.buttonMode = true;
+            _emojiButton.useHandCursor = true;
+            _emojiButton.graphics.lineStyle(2,8349508);
+            _emojiButton.graphics.beginFill(16774084);
+            _emojiButton.graphics.drawCircle(0,0,12);
+            _emojiButton.graphics.endFill();
+            var _loc4_:Sprite = new Sprite();
+            _loc4_.mouseEnabled = false;
+            _loc4_.mouseChildren = false;
+            loadArt(gMainFrame.clientInfo.websiteURL + "emoji/1f600.png",_loc4_,17,false);
+            _emojiButton.addChild(_loc4_);
+            _emojiButton.addEventListener("mouseDown",onEmojiButton);
+            addChild(_emojiButton);
+         }
+         var _loc5_:Boolean = shownOnStage(_loc2_) && _loc2_.type == "input";
+         _emojiButton.visible = _loc5_;
+         if(!_loc5_)
+         {
+            if(_emojiPanel != null)
+            {
+               _emojiPanel.visible = false;
+            }
+            return;
+         }
+         // the box gives up room for it once
+         if(_emojiField != _loc2_)
+         {
+            _emojiField = _loc2_;
+            _loc2_.width = Math.max(60,_loc2_.width - 28);
+         }
+         _loc3_ = globalToLocal(_loc2_.localToGlobal(new Point(_loc2_.width,_loc2_.height * 0.5)));
+         _emojiButton.x = int(_loc3_.x + 15);
+         _emojiButton.y = int(_loc3_.y);
+         if(getChildIndex(_emojiButton) < numChildren - 1 && (_emojiPanel == null || !_emojiPanel.visible))
+         {
+            setChildIndex(_emojiButton,numChildren - 1);
+         }
+      }
+
+      private function onEmojiButton(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         if(_emojiPanel == null)
+         {
+            buildEmojiPanel();
+         }
+         _emojiCaret = _emojiField != null && gMainFrame.stage.focus == _emojiField ? _emojiField.caretIndex : -1;
+         _emojiPanel.visible = !_emojiPanel.visible;
+         if(_emojiPanel.visible)
+         {
+            _emojiPanel.x = int(Math.max(4,_emojiButton.x + 14 - _emojiPanel.width));
+            _emojiPanel.y = int(Math.max(4,_emojiButton.y - 18 - _emojiPanel.height));
+            setChildIndex(_emojiPanel,numChildren - 1);
+            setChildIndex(_emojiButton,numChildren - 1);
+         }
+      }
+
+      private function buildEmojiPanel() : void
+      {
+         var _loc1_:Array = emojiTable();
+         var _loc2_:int = Math.ceil(_loc1_.length / EMOJI_COLUMNS);
+         var _loc3_:int = EMOJI_COLUMNS * EMOJI_CELL + 12;
+         var _loc4_:int = _loc2_ * EMOJI_CELL + 36;
+         var _loc5_:int = 0;
+         _emojiPanel = new Sprite();
+         _emojiPanel.graphics.lineStyle(2,8349508);
+         _emojiPanel.graphics.beginFill(16774084);
+         _emojiPanel.graphics.drawRoundRect(0,0,_loc3_,_loc4_,14,14);
+         _emojiPanel.graphics.endFill();
+         while(_loc5_ < _loc1_.length)
+         {
+            var _loc6_:Sprite = new Sprite();
+            _loc6_.name = "emoji" + _loc5_;
+            _loc6_.x = 6 + (_loc5_ % EMOJI_COLUMNS) * EMOJI_CELL + EMOJI_CELL * 0.5;
+            _loc6_.y = 6 + Math.floor(_loc5_ / EMOJI_COLUMNS) * EMOJI_CELL + EMOJI_CELL * 0.5;
+            _loc6_.graphics.beginFill(3184463,0);
+            _loc6_.graphics.drawRoundRect(-EMOJI_CELL * 0.5,-EMOJI_CELL * 0.5,EMOJI_CELL,EMOJI_CELL,8,8);
+            _loc6_.graphics.endFill();
+            _loc6_.buttonMode = true;
+            _loc6_.useHandCursor = true;
+            _loc6_.mouseChildren = false;
+            loadArt(gMainFrame.clientInfo.websiteURL + "emoji/" + _loc1_[_loc5_].hex + ".png",_loc6_,20,false);
+            _loc6_.addEventListener("mouseDown",onEmojiPick);
+            _loc6_.addEventListener("mouseOver",onEmojiHover);
+            _loc6_.addEventListener("mouseOut",onEmojiHover);
+            _emojiPanel.addChild(_loc6_);
+            _loc5_++;
+         }
+         _emojiHint = new TextField();
+         _emojiHint.embedFonts = hasGameFont();
+         _emojiHint.selectable = false;
+         _emojiHint.mouseEnabled = false;
+         _emojiHint.defaultTextFormat = new TextFormat("CCDigitalDelivery",12,6045213,true);
+         _emojiHint.width = _loc3_ - 16;
+         _emojiHint.height = 20;
+         _emojiHint.x = 8;
+         _emojiHint.y = _loc4_ - 26;
+         _emojiHint.text = "Or type its name, as :fire: or :heart:";
+         _emojiPanel.addChild(_emojiHint);
+         _emojiPanel.visible = false;
+         addChild(_emojiPanel);
+      }
+
+      private function onEmojiHover(param1:MouseEvent) : void
+      {
+         var _loc2_:Sprite = Sprite(param1.currentTarget);
+         var _loc3_:Object = emojiTable()[int(_loc2_.name.substr(5))];
+         _loc2_.alpha = param1.type == "mouseOver" ? 0.7 : 1;
+         _emojiHint.text = param1.type == "mouseOver" ? ":" + _loc3_.name + ":" : "Or type its name, as :fire: or :heart:";
+      }
+
+      // an emoji into the chat box, where its cursor was
+      private function onEmojiPick(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         var _loc2_:Object = emojiTable()[int(Sprite(param1.currentTarget).name.substr(5))];
+         var _loc3_:TextField = _emojiField;
+         if(_loc3_ == null || _loc3_.text.length + _loc2_.chars.length > _loc3_.maxChars && _loc3_.maxChars > 0)
+         {
+            return;
+         }
+         var _loc4_:int = _emojiCaret >= 0 && _emojiCaret <= _loc3_.text.length ? _emojiCaret : _loc3_.text.length;
+         _loc3_.replaceText(_loc4_,_loc4_,_loc2_.chars);
+         _emojiCaret = _loc4_ + _loc2_.chars.length;
+         gMainFrame.stage.focus = _loc3_;
+         _loc3_.setSelection(_emojiCaret,_emojiCaret);
+         _loc3_.dispatchEvent(new Event("change"));
+      }
+
+      // a click anywhere else closes the grid
+      private function onEmojiStageDown(param1:MouseEvent) : void
+      {
+         if(_emojiPanel != null && _emojiPanel.visible && !_emojiPanel.contains(param1.target as DisplayObject) && !_emojiButton.contains(param1.target as DisplayObject))
+         {
+            _emojiPanel.visible = false;
+         }
+      }
+
+      // ---- the Item Maker (the settings menu): a player's own item made from
+      // one of the game's (the server's lib/playeritems.js), in the look of the
+      // game's own windows, as the Item Giver is. two pages: making one (the
+      // game's items, looked up as the Item Giver does, "base=1": only those
+      // that can be copied) and the player's own (rename, a picture of its own,
+      // delete). the server answers "xcm" [ok, what to say, left today, left
+      // in all, the player's items as JSON]; a picture goes over HTTP
+      // (POST /api/itemart, lib/itemart.js).
+      private static const MAKER_ROWS:int = 5;
+
+      private var _maker:Sprite;
+
+      private var _makerContent:MovieClip;
+
+      private var _makerMode:String = "make";
+
+      private var _makerKind:String = "clothing";
+
+      private var _makerStatus:TextField;
+
+      private var _makerSearchBar:MovieClip;
+
+      private var _makerNameBar:MovieClip;
+
+      private var _makerKindButton:MovieClip;
+
+      private var _makerRowsSprite:Sprite;
+
+      private var _makerResults:Array = [];
+
+      private var _makerMine:Array = [];
+
+      private var _makerPage:int = 0;
+
+      private var _makerChosen:Object;
+
+      private var _makerLeft:String = "";
+
+      private var _makerButtons:Object = {};
+
+      private var _makerFile:FileReference;
+
+      private var _makerUploading:Object;
+
+      private var _makerIcons:Array = [];
+
+      // "xcm": the server's answer, for the Item Maker if it is open.
+      public static function onItemMaker(param1:Object) : void
+      {
+         if(_toolsInstance != null)
+         {
+            try
+            {
+               _toolsInstance.makerAnswer(param1);
+            }
+            catch(e:Error)
+            {
+               GlobalErrorCatch.reportToServer("item maker: " + e + "\n" + e.getStackTrace());
+            }
+         }
+      }
+
+      // a button of the game's, at param3, param4; `param5` says which pages
+      // show it.
+      private function makerButton(param1:String, param2:String, param3:Number, param4:Number, param5:String, param6:Number = 1) : MovieClip
+      {
+         var _loc7_:MovieClip = GETDEFINITIONBYNAME("introBtnCont");
+         _loc7_.name = param1;
+         _loc7_.x = param3;
+         _loc7_.y = param4;
+         _loc7_.scaleX = _loc7_.scaleY = param6;
+         finderButtonText(_loc7_,param2);
+         // the file picker opens only for a click
+         _loc7_.addEventListener(param1 == "picture" ? "click" : "mouseDown",onMakerButton);
+         _makerContent.addChild(_loc7_);
+         _makerButtons[param1] = {"clip":_loc7_,"pages":param5};
+         return _loc7_;
+      }
+
+      private function buildItemMaker() : void
+      {
+         var _loc1_:MovieClip = GETDEFINITIONBYNAME("ReportRulesPopupSkin");
+         var _loc2_:int = 1;
+         var _loc3_:MovieClip = null;
+         _maker = new Sprite();
+         _maker.graphics.beginFill(0,0.45);
+         _maker.graphics.drawRect(0,0,900,550);
+         _maker.graphics.endFill();
+         var _loc4_:Sprite = new Sprite();
+         _loc4_.x = 450;
+         _loc4_.y = 275;
+         _maker.addChild(_loc4_);
+         _loc4_.addChild(_loc1_);
+         _makerContent = GETDEFINITIONBYNAME("ReportRulesPopupContent");
+         _makerContent.x = _loc1_.c.x;
+         _makerContent.y = _loc1_.c.y;
+         _loc4_.addChild(_makerContent);
+         _loc1_.bx.addEventListener("mouseDown",function(param1:MouseEvent):void
+         {
+            param1.stopPropagation();
+            showItemMaker(false);
+         });
+         while(_loc2_ <= 5)
+         {
+            _makerContent["ruleTxt" + _loc2_].visible = false;
+            _makerContent["ruleBodyTxt" + _loc2_].visible = false;
+            _loc2_++;
+         }
+         _makerContent.titleTxt.text = "Item Maker";
+         _makerStatus = _makerContent.ruleBodyTxt1;
+         _makerStatus.visible = true;
+         _makerStatus.wordWrap = true;
+         _makerStatus.x = -245;
+         _makerStatus.y = -116;
+         _makerStatus.width = 490;
+         _makerStatus.height = 44;
+         // the bars and the kind, over the list
+         _makerSearchBar = finderSearchBar(-247,-160,212,"Search the game's items",null,40,true);
+         _makerContent.addChild(_makerSearchBar);
+         _makerKindButton = makerButton("kind","Clothing",-30,-156,"make");
+         _makerNameBar = finderSearchBar(93,-160,156,"Your item's name","A-Za-z0-9 '&!?.,:()#+\\-",40,false);
+         _makerContent.addChild(_makerNameBar);
+         _makerRowsSprite = new Sprite();
+         _makerRowsSprite.y = -54;
+         _makerContent.addChild(_makerRowsSprite);
+         _loc3_ = GETDEFINITIONBYNAME("arrow_l_btnContOld");
+         _loc3_.x = -228;
+         _loc3_.y = 166;
+         _loc3_.name = "prev";
+         _loc3_.addEventListener("mouseDown",onMakerButton);
+         _makerContent.addChild(_loc3_);
+         _loc3_ = GETDEFINITIONBYNAME("arrow_r_btnContOld");
+         _loc3_.x = 228;
+         _loc3_.y = 166;
+         _loc3_.name = "next";
+         _loc3_.addEventListener("mouseDown",onMakerButton);
+         _makerContent.addChild(_loc3_);
+         // making one
+         makerButton("make","Make it",-175,148,"make");
+         makerButton("mine","My items",-58,148,"make");
+         makerButton("search","Search",59,148,"make");
+         // their own: what the bar's name, a picture or a delete does to the one chosen
+         makerButton("rename","Rename",-215,148,"mine",0.72);
+         makerButton("picture","Picture",-128,148,"mine",0.72);
+         makerButton("look","Look",-41,148,"mine",0.72);
+         makerButton("delete","Delete",46,148,"mine",0.72);
+         makerButton("back","Make more",133,148,"mine",0.72);
+         _maker.addEventListener("mouseDown",onFinderMouse);
+         _maker.addEventListener("mouseUp",onFinderMouse);
+         _maker.addEventListener("click",onFinderMouse);
+         _maker.addEventListener("mouseWheel",onFinderMouse);
+         _maker.visible = false;
+         addChild(_maker);
+      }
+
+      private function showItemMaker(param1:Boolean) : void
+      {
+         if(!param1)
+         {
+            if(_maker != null)
+            {
+               _maker.visible = false;
+            }
+            gMainFrame.stage.focus = null;
+            return;
+         }
+         if(_maker == null)
+         {
+            buildItemMaker();
+         }
+         _makerChosen = null;
+         _makerNameBar.searchTxt.text = "";
+         _makerNameBar.txt.visible = true;
+         makerMode("make");
+         _maker.visible = true;
+         setChildIndex(_maker,numChildren - 1);
+         gMainFrame.stage.focus = _makerSearchBar.searchTxt;
+         gMainFrame.server.setXtObject_Str("xcm",["info"]);
+         makerSearch();
+      }
+
+      private function makerMode(param1:String) : void
+      {
+         _makerMode = param1;
+         _makerPage = 0;
+         _makerChosen = null;
+         for each(var _loc2_:Object in _makerButtons)
+         {
+            _loc2_.clip.visible = String(_loc2_.pages).indexOf(param1) != -1;
+         }
+         _makerSearchBar.visible = param1 == "make";
+         _makerNameBar.txt.text = param1 == "make" ? "Your item's name" : "New name";
+         makerSay(param1 == "make" ? "Choose one of the game's items, name it, then Make it. " + _makerLeft : "Choose one of your items: rename it (type the name first), give it a picture, change its Look (worn as the picture, or its shape painted with it), or delete it.");
+         makerRows();
+      }
+
+      private function makerSay(param1:String) : void
+      {
+         _makerStatus.text = param1;
+      }
+
+      private function makerSearch() : void
+      {
+         var _loc1_:URLLoader = new URLLoader();
+         _loc1_.addEventListener("complete",onMakerResults,false,0,false);
+         _loc1_.addEventListener("ioError",onMakerFailed,false,0,false);
+         _loc1_.addEventListener("securityError",onMakerFailed,false,0,false);
+         _loc1_.load(new URLRequest(gMainFrame.clientInfo.websiteURL + "api/search?base=1&kind=" + _makerKind + "&q=" + encodeURIComponent(_makerSearchBar.searchTxt.text)
+            + "&username=" + encodeURIComponent(gMainFrame.server.userName) + "&token=" + encodeURIComponent(gMainFrame.clientInfo.authToken)));
+      }
+
+      private function onMakerFailed(param1:Event) : void
+      {
+         makerSay("That did not work. Try again.");
+      }
+
+      private function onMakerResults(param1:Event) : void
+      {
+         try
+         {
+            _makerResults = JSON.parse(param1.target.data).results as Array;
+         }
+         catch(e:Error)
+         {
+            _makerResults = null;
+         }
+         if(_makerResults == null)
+         {
+            _makerResults = [];
+         }
+         _makerPage = 0;
+         if(_makerMode == "make")
+         {
+            makerRows();
+            if(_makerResults.length == 0)
+            {
+               makerSay("Nothing found. Try another word.");
+            }
+         }
+      }
+
+      private function makerList() : Array
+      {
+         return _makerMode == "make" ? _makerResults : _makerMine;
+      }
+
+      // the page of the list shown: a row of the game's for each, its icon
+      // (a custom item's own picture, when it has one) beside it.
+      private function makerRows() : void
+      {
+         var _loc1_:Array = makerList();
+         var _loc2_:int = _makerPage * MAKER_ROWS;
+         var _loc3_:MovieClip = null;
+         var _loc4_:Object = null;
+         while(_makerRowsSprite.numChildren > 0)
+         {
+            _makerRowsSprite.removeChildAt(0);
+         }
+         _makerIcons = [];
+         while(_loc2_ < _loc1_.length && _loc2_ < _makerPage * MAKER_ROWS + MAKER_ROWS)
+         {
+            _loc4_ = _loc1_[_loc2_];
+            _loc3_ = GETDEFINITIONBYNAME("textBtnCont");
+            _loc3_.x = -40;
+            _loc3_.y = (_loc2_ - _makerPage * MAKER_ROWS) * 40;
+            _loc3_.name = "row" + _loc2_;
+            _loc3_.currTxt.mouseEnabled = false;
+            var _loc5_:Boolean = _makerChosen != null && _makerChosen.id == _loc4_.id && _makerChosen.kind == _loc4_.kind;
+            _loc3_.currTxt.text = (_loc5_ ? "> " : "") + makerShort(String(_loc4_.name || "(no name)"),24) + (_makerMode == "mine" ? (_loc4_.waiting == "item" ? "  (waiting)" : _loc4_.waiting == "picture" ? "  (picture waiting)" : _loc4_.art ? (_loc4_.kind == "clothing" ? (_loc4_.artMode == "texture" ? "  (texture)" : "  (sticker)") : "  (picture)") : "") : "   #" + _loc4_.id);
+            _loc3_.addEventListener("mouseDown",onMakerButton);
+            _makerRowsSprite.addChild(_loc3_);
+            _makerRowsSprite.addChild(finderPreview(_loc4_,_loc2_,186,_loc3_.y));
+            _loc2_++;
+         }
+         if(_makerMode == "mine" && _loc1_.length == 0)
+         {
+            makerSay("You have not made any items yet. " + _makerLeft);
+         }
+      }
+
+      private static function makerShort(param1:String, param2:int) : String
+      {
+         return param1.length > param2 ? param1.substr(0,param2 - 3) + "..." : param1;
+      }
+
+      public function makerAnswer(param1:Object) : void
+      {
+         if(_maker == null)
+         {
+            return;
+         }
+         var _loc2_:String = String(param1[3]);
+         try
+         {
+            _makerMine = JSON.parse(String(param1[6])) as Array;
+         }
+         catch(e:Error)
+         {
+            _makerMine = null;
+         }
+         if(_makerMine == null)
+         {
+            _makerMine = [];
+         }
+         _makerMine.reverse(); // the newest first
+         // the one chosen on this page, as it is now (its look, its picture)
+         if(_makerMode == "mine" && _makerChosen != null)
+         {
+            var _loc6_:Object = _makerChosen;
+            _makerChosen = null;
+            for each(var _loc7_:Object in _makerMine)
+            {
+               if(_loc7_.kind == _loc6_.kind && _loc7_.id == _loc6_.id)
+               {
+                  _makerChosen = _loc7_;
+               }
+            }
+         }
+         _makerLeft = "You can make " + int(param1[4]) + " more today (" + int(param1[5]) + " in all).";
+         if(_loc2_.length > 0)
+         {
+            makerSay(_loc2_);
+         }
+         else if(_makerMode == "make")
+         {
+            makerSay("Choose one of the game's items, name it, then Make it. " + _makerLeft);
+         }
+         if(String(param1[2]) == "1" && _loc2_.length > 0)
+         {
+            _makerNameBar.searchTxt.text = "";
+            _makerNameBar.txt.visible = true;
+            _makerChosen = null;
+         }
+         if(_makerMode == "mine")
+         {
+            makerRows();
+         }
+      }
+
+      private function makerName() : String
+      {
+         return _makerNameBar.searchTxt.text.split("%").join("").replace(/^\s+|\s+$/g,"");
+      }
+
+      private function onMakerButton(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         var _loc2_:String = DisplayObject(param1.currentTarget).name;
+         var _loc3_:Object = null;
+         if(_loc2_.indexOf("row") == 0)
+         {
+            _makerChosen = makerList()[int(_loc2_.substr(3))];
+            if(_makerChosen != null && _makerMode == "make" && _makerNameBar.searchTxt.text.length == 0)
+            {
+               _makerNameBar.searchTxt.text = String(_makerChosen.name || "").replace(/[^A-Za-z0-9 '&!?.,:()#+\-]/g,"").substr(0,40);
+               _makerNameBar.txt.visible = _makerNameBar.searchTxt.text.length == 0;
+            }
+            if(_makerChosen != null)
+            {
+               makerSay((_makerMode == "make" ? "Making it from " : "Chosen: ") + _makerChosen.name + ".");
+            }
+            makerRows();
+         }
+         else if(_loc2_ == "kind")
+         {
+            _makerKind = _makerKind == "clothing" ? "den" : "clothing";
+            finderButtonText(_makerKindButton,_makerKind == "clothing" ? "Clothing" : "Den items");
+            _makerChosen = null;
+            makerSearch();
+         }
+         else if(_loc2_ == "search")
+         {
+            makerSearch();
+         }
+         else if(_loc2_ == "prev" || _loc2_ == "next")
+         {
+            _makerPage = Math.max(0,Math.min(_makerPage + (_loc2_ == "next" ? 1 : -1),Math.ceil(makerList().length / MAKER_ROWS) - 1));
+            makerRows();
+         }
+         else if(_loc2_ == "mine")
+         {
+            makerMode("mine");
+         }
+         else if(_loc2_ == "back")
+         {
+            makerMode("make");
+            makerSearch();
+         }
+         else if(_makerChosen == null)
+         {
+            makerSay(_makerMode == "make" ? "Choose one of the game's items first." : "Choose one of your items first.");
+         }
+         else if(_loc2_ == "make")
+         {
+            if(makerName().length == 0)
+            {
+               gMainFrame.stage.focus = _makerNameBar.searchTxt;
+               makerSay("Type a name for it first.");
+               return;
+            }
+            makerSay("Making it...");
+            gMainFrame.server.setXtObject_Str("xcm",["make",_makerChosen.kind,_makerChosen.id,makerName()]);
+         }
+         else if(_loc2_ == "rename")
+         {
+            if(makerName().length == 0)
+            {
+               gMainFrame.stage.focus = _makerNameBar.searchTxt;
+               makerSay("Type the new name in the box first.");
+               return;
+            }
+            gMainFrame.server.setXtObject_Str("xcm",["rename",_makerChosen.kind,_makerChosen.id,makerName()]);
+         }
+         else if(_loc2_ == "delete")
+         {
+            _loc3_ = _makerChosen;
+            new SBYesNoPopup(GuiManager.guiLayer,"Delete " + _loc3_.name + "? It goes from everyone who has it.",true,function(param1:Object):void
+            {
+               if(param1.status)
+               {
+                  gMainFrame.server.setXtObject_Str("xcm",["delete",_loc3_.kind,_loc3_.id]);
+               }
+            },0);
+         }
+         else if(_loc2_ == "picture")
+         {
+            makerPickPicture(_makerChosen);
+         }
+         // how a clothing item with a picture is worn: the picture itself
+         // (a sticker) or the item's shape painted with it (a texture)
+         else if(_loc2_ == "look")
+         {
+            if(_makerChosen.kind != "clothing" || !_makerChosen.art)
+            {
+               makerSay(_makerChosen.kind != "clothing" ? "A den item stands as its picture." : "Give it a picture first.");
+               return;
+            }
+            gMainFrame.server.setXtObject_Str("xcm",["look",_makerChosen.kind,_makerChosen.id,_makerChosen.artMode == "texture" ? "sticker" : "texture"]);
+         }
+      }
+
+      // the picture: chosen from this computer, read, and sent as it is (the
+      // server checks it and takes out what does not belong in it).
+      private function makerPickPicture(param1:Object) : void
+      {
+         _makerUploading = param1;
+         _makerFile = new FileReference();
+         _makerFile.addEventListener("select",function(param1:Event):void
+         {
+            makerSay("Reading the picture...");
+            _makerFile.load();
+         });
+         _makerFile.addEventListener("complete",onMakerPictureRead);
+         _makerFile.addEventListener("ioError",onMakerFailed);
+         try
+         {
+            _makerFile.browse([new FileFilter("Pictures (PNG, JPEG, GIF, BMP)","*.png;*.jpg;*.jpeg;*.gif;*.bmp")]);
+         }
+         catch(e:Error)
+         {
+            makerSay("The picture could not be chosen here. Use your account page on the website instead.");
+         }
+      }
+
+      // the picture read: sent as it is when the server takes it so (a PNG,
+      // JPEG or GIF small enough, or a BMP, which the server makes a PNG); one
+      // too big is drawn smaller here and sent as a PNG.
+      private static const MAKER_PICTURE_SIDE:int = 512;
+
+      private static const MAKER_PICTURE_BYTES:int = 300 * 1024;
+
+      private function onMakerPictureRead(param1:Event) : void
+      {
+         var _loc2_:ByteArray = _makerFile.data;
+         if(/\.bmp$/i.test(String(_makerFile.name)))
+         {
+            makerSendPicture(_loc2_);
+            return;
+         }
+         var _loc3_:Loader = new Loader();
+         _loc3_.contentLoaderInfo.addEventListener("complete",function(param1:Event):void
+         {
+            var _loc2_:BitmapData = _loc3_.content is Bitmap ? Bitmap(_loc3_.content).bitmapData : null;
+            if(_loc2_ == null)
+            {
+               makerSay("That picture could not be read. Try a PNG, JPEG or GIF.");
+            }
+            else if(_loc2_.width <= MAKER_PICTURE_SIDE && _loc2_.height <= MAKER_PICTURE_SIDE && _makerFile.data.length <= MAKER_PICTURE_BYTES)
+            {
+               makerSendPicture(_makerFile.data);
+            }
+            else
+            {
+               makerSay("Making the picture smaller...");
+               makerSendPicture(shrunkPng(_loc2_));
+            }
+         });
+         _loc3_.contentLoaderInfo.addEventListener("ioError",function(param1:Event):void
+         {
+            makerSay("That picture could not be read. Try a PNG, JPEG or GIF.");
+         });
+         _loc3_.loadBytes(_loc2_);
+      }
+
+      // a PNG of the picture fitted in MAKER_PICTURE_SIDE, smaller until it is
+      // no more than MAKER_PICTURE_BYTES
+      private static function shrunkPng(param1:BitmapData) : ByteArray
+      {
+         var _loc2_:ByteArray = null;
+         for each(var _loc3_:int in [MAKER_PICTURE_SIDE,384,256,128])
+         {
+            var _loc4_:Number = Math.min(1,_loc3_ / param1.width,_loc3_ / param1.height);
+            var _loc5_:BitmapData = new BitmapData(Math.max(1,Math.round(param1.width * _loc4_)),Math.max(1,Math.round(param1.height * _loc4_)),true,0);
+            _loc5_.draw(param1,new Matrix(_loc4_,0,0,_loc4_),null,null,null,true);
+            _loc2_ = encodePng(_loc5_);
+            _loc5_.dispose();
+            if(_loc2_.length <= MAKER_PICTURE_BYTES)
+            {
+               break;
+            }
+         }
+         return _loc2_;
+      }
+
+      private static var _crcTable:Array;
+
+      private static function crc32(param1:ByteArray, param2:int, param3:int) : uint
+      {
+         var _loc4_:uint = 0;
+         var _loc5_:int = 0;
+         var _loc6_:int = 0;
+         if(_crcTable == null)
+         {
+            _crcTable = [];
+            while(_loc5_ < 256)
+            {
+               _loc4_ = _loc5_;
+               _loc6_ = 0;
+               while(_loc6_ < 8)
+               {
+                  _loc4_ = (_loc4_ & 1) != 0 ? uint(0xEDB88320 ^ (_loc4_ >>> 1)) : uint(_loc4_ >>> 1);
+                  _loc6_++;
+               }
+               _crcTable[_loc5_] = _loc4_;
+               _loc5_++;
+            }
+         }
+         _loc4_ = 0xFFFFFFFF;
+         _loc5_ = param2;
+         while(_loc5_ < param3)
+         {
+            _loc4_ = uint(_crcTable[(_loc4_ ^ param1[_loc5_]) & 0xFF] ^ (_loc4_ >>> 8));
+            _loc5_++;
+         }
+         return uint(_loc4_ ^ 0xFFFFFFFF);
+      }
+
+      private static function pngChunk(param1:ByteArray, param2:uint, param3:ByteArray) : void
+      {
+         param1.writeUnsignedInt(param3 == null ? 0 : param3.length);
+         var _loc4_:int = int(param1.position);
+         param1.writeUnsignedInt(param2);
+         if(param3 != null)
+         {
+            param1.writeBytes(param3);
+         }
+         param1.writeUnsignedInt(crc32(param1,_loc4_,int(param1.position)));
+      }
+
+      // a PNG (RGBA, 8 bits a channel) of `param1`
+      public static function encodePng(param1:BitmapData) : ByteArray
+      {
+         var _loc2_:ByteArray = new ByteArray();
+         var _loc3_:ByteArray = new ByteArray();
+         var _loc4_:ByteArray = new ByteArray();
+         var _loc5_:int = 0;
+         var _loc6_:int = 0;
+         var _loc7_:uint = 0;
+         _loc2_.writeUnsignedInt(0x89504E47);
+         _loc2_.writeUnsignedInt(0x0D0A1A0A);
+         _loc3_.writeInt(param1.width);
+         _loc3_.writeInt(param1.height);
+         _loc3_.writeByte(8);
+         _loc3_.writeByte(6);
+         _loc3_.writeByte(0);
+         _loc3_.writeByte(0);
+         _loc3_.writeByte(0);
+         pngChunk(_loc2_,0x49484452,_loc3_);
+         while(_loc5_ < param1.height)
+         {
+            _loc4_.writeByte(0);
+            _loc6_ = 0;
+            while(_loc6_ < param1.width)
+            {
+               _loc7_ = param1.getPixel32(_loc6_,_loc5_);
+               _loc4_.writeUnsignedInt(uint((_loc7_ & 0xFFFFFF) << 8 | _loc7_ >>> 24));
+               _loc6_++;
+            }
+            _loc5_++;
+         }
+         _loc4_.compress();
+         pngChunk(_loc2_,0x49444154,_loc4_);
+         pngChunk(_loc2_,0x49454E44,null);
+         return _loc2_;
+      }
+
+      private function makerSendPicture(param1:ByteArray) : void
+      {
+         var _loc2_:URLRequest = new URLRequest(gMainFrame.clientInfo.websiteURL + "api/itemart?kind=" + _makerUploading.kind + "&id=" + _makerUploading.id
+            + "&token=" + encodeURIComponent(gMainFrame.clientInfo.authToken));
+         _loc2_.method = "POST";
+         _loc2_.contentType = "application/octet-stream";
+         _loc2_.data = param1;
+         var _loc3_:URLLoader = new URLLoader();
+         _loc3_.addEventListener("complete",function(param1:Event):void
+         {
+            var _loc2_:Object = null;
+            try
+            {
+               _loc2_ = JSON.parse(param1.target.data);
+            }
+            catch(e:Error)
+            {
+               _loc2_ = {"error":"That did not work. Try again."};
+            }
+            makerSay(_loc2_.ok ? String(_loc2_.ok) : String(_loc2_.error));
+            gMainFrame.server.setXtObject_Str("xcm",["info"]);
+         });
+         _loc3_.addEventListener("ioError",onMakerFailed);
+         _loc3_.addEventListener("securityError",onMakerFailed);
+         makerSay("Sending the picture...");
+         _loc3_.load(_loc2_);
+      }
+
       private function onFinderKey(param1:KeyboardEvent) : void
       {
          if(param1.eventPhase == 3)
@@ -2197,6 +3686,31 @@ package
             return;
          }
          var _loc2_:Boolean = _finder != null && _finder.visible;
+         // the Item Maker and the staff's window: Esc closes them, Enter
+         // searches (in the Item Maker's search box), and no key gets past
+         // them to the game (which would take typing for its chat bar).
+         if(_maker != null && _maker.visible)
+         {
+            if(param1.keyCode == 27)
+            {
+               showItemMaker(false);
+            }
+            else if(param1.keyCode == 13 && gMainFrame.stage.focus == _makerSearchBar.searchTxt)
+            {
+               makerSearch();
+            }
+            param1.stopImmediatePropagation();
+            return;
+         }
+         if(_moderate != null && _moderate.visible)
+         {
+            if(param1.keyCode == 27)
+            {
+               hideModerate();
+            }
+            param1.stopImmediatePropagation();
+            return;
+         }
          // the rules: Esc closes them as their X does
          if(_rulesWin != null && _rulesWin.visible)
          {

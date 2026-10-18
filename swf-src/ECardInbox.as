@@ -33,6 +33,7 @@ package gui
    import flash.net.navigateToURL;
    import giftPopup.GiftPopup;
    import gui.itemWindows.ItemWindowECard;
+   import item.ItemXtCommManager;
    import item.SimpleIcon;
    import loader.DenItemHelper;
    import loader.MediaHelper;
@@ -698,6 +699,16 @@ package gui
                switch(_loc6_.type)
                {
                   case 1:
+                     // a custom item's own picture, when it has one (AJClient.customArtUrl)
+                     if(AJClient.customArtUrl("clothing",giftItemDefId(_loc6_)) != null)
+                     {
+                        var _loc8_:Sprite = new Sprite();
+                        AJClient.loadArt(AJClient.customArtUrl("clothing",giftItemDefId(_loc6_)),_loc8_,100,false,function():void
+                        {
+                           setupGiftPopup(_loc8_);
+                        });
+                        break;
+                     }
                      _clothingIconHelper = new SimpleIcon();
                      _clothingIconHelper.init(_loc6_.giftColor,_loc6_.giftId,1,true,false,clothingIconReceived);
                      break;
@@ -802,10 +813,45 @@ package gui
          setupGiftPopup(_guiPet);
       }
       
+      // a clothing gift's item id, which the server sends as "item|<id>" in
+      // the card's additional gift data (its gift id is the art's), or 0
+      private static function giftItemDefId(param1:ECard) : int
+      {
+         var _loc2_:String = param1.additionalGiftData == null ? "" : param1.additionalGiftData;
+         return _loc2_.indexOf("item|") == 0 ? int(_loc2_.substr(5)) : 0;
+      }
+
+      // a custom item's name as it is now (the server sends it with the
+      // item, "xdi"): the game's strings have none for one made since this
+      // game started, nor a name it was given since.
+      private static function giftItemName(param1:ECard) : String
+      {
+         var _loc2_:Object = null;
+         var _loc3_:int = param1.type == 1 ? giftItemDefId(param1) : param1.giftId;
+         if(_loc3_ < 50000)
+         {
+            return null;
+         }
+         if(param1.type == 1)
+         {
+            _loc2_ = ItemXtCommManager.getItemDef(_loc3_);
+         }
+         else if(param1.type == 3 || param1.type == 99)
+         {
+            _loc2_ = DenXtCommManager.getDenItemDef(_loc3_);
+         }
+         return _loc2_ != null && _loc2_.name ? String(_loc2_.name) : null;
+      }
+
       private function setupGiftPopup(param1:Sprite) : void
       {
          DarkenManager.showLoadingSpiral(false);
          var _loc2_:ECard = _inbox[_currCardIdx];
+         var _loc4_:String = giftItemName(_loc2_);
+         if(_loc4_ != null)
+         {
+            _loc2_.giftName = _loc4_;
+         }
          var _loc3_:Boolean = _loc2_.isFromVoice && _loc2_.additionalGiftData.length > 0 && _loc2_.additionalGiftData.indexOf("|") == -1;
          _giftPopup = new GiftPopup();
          _giftPopup.init(_guiLayer,param1,_loc2_.giftName,_loc2_.giftId,_loc2_.isFromVoice ? 6 : 0,GiftPopup.giftTypeForECardType(_loc2_.type),keepGiftCallback,rejectGiftCallback,destroyGiftPopup,!_loc2_.isFromVoice,GiftPopup.buttonsTypeForECardType(_loc2_.type),_loc2_.secondaryType,null,_loc3_ ? _loc2_.modifiedMsg : null,_petBits);

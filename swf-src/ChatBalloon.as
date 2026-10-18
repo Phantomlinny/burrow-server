@@ -63,9 +63,12 @@ package gui
       
       private var _emoteBGOffsetFunc:Function;
       
-      // emotes drawn inside a line of chat: "\" and an emote's code
-      // ("\:)", "\:fever:") is shown as that emote, small, where it was
-      // typed. each is {at, clip}: where its gap starts in the text shown.
+      // emotes drawn inside a line of chat, small, where they were typed: an
+      // emote's code standing as a word of its own ("hi :) there", ":fever:"),
+      // or anywhere after a "\" ("yay\:)"). and emoji (typed with Windows'
+      // emoji panel, say), which the game's font has none of: each is drawn
+      // as a picture of it, from the server (/emoji/<code points>.png,
+      // Twemoji's). each is {at, clip}: where its gap starts in the text shown.
       private static const INLINE_GAP:String = "    ";
       
       private static const LONGEST_EMOTE_CODE:int = 16;
@@ -130,7 +133,7 @@ package gui
             this.visible = true;
          }
          clearInline();
-         _msgTxt.text = param1.indexOf("\\") == -1 ? param1 : inlineEmotes(param1);
+         _msgTxt.text = inlineEmotes(param1);
          _msgTxt.height;
          // AJClient.whisperNext is set by the server's "xw" just ahead of a
          // whispered line.
@@ -178,50 +181,63 @@ package gui
          }
       }
       
-      // the text with each "\<emote code>" replaced by a gap, the emote for
-      // it kept in _inline. A code that is no emote stays as typed.
+      // the text with each emote code and emoji (above) replaced by a gap, the
+      // picture for it kept in _inline. what is neither stays as typed.
       private function inlineEmotes(param1:String) : String
       {
          var _loc2_:String = "";
          var _loc3_:int = 0;
-         var _loc4_:int = 0;
          var _loc5_:String = null;
-         var _loc6_:String = null;
-         var _loc7_:MovieClip = null;
+         var _loc7_:Sprite = null;
+         var _loc8_:int = 0;
          while(_loc3_ < param1.length)
          {
-            _loc5_ = null;
-            if(param1.charAt(_loc3_) == "\\")
+            _loc8_ = emojiLength(param1,_loc3_);
+            if(_loc8_ > 0)
             {
-               _loc4_ = Math.min(LONGEST_EMOTE_CODE,param1.length - _loc3_ - 1);
-               while(_loc4_ >= 2 && _loc5_ == null)
-               {
-                  _loc6_ = param1.substr(_loc3_ + 1,_loc4_);
-                  if(EmoticonUtility.doesStringMatchAnEmote(_loc6_))
-                  {
-                     _loc5_ = _loc6_;
-                  }
-                  _loc4_--;
-               }
+               _inline.push({
+                  "at":_loc2_.length,
+                  "clip":emojiClip(param1.substr(_loc3_,_loc8_))
+               });
+               _loc2_ += INLINE_GAP;
+               _loc3_ += _loc8_;
+               continue;
             }
-            if(_loc5_ != null)
+            _loc5_ = null;
+            // an emoji as it is sent: "\{1f600}" (AJClient.emojiToTokens)
+            if(param1.substr(_loc3_,2) == "\\{")
             {
-               _loc7_ = EmoticonUtility.getSmallSmileyMCForEmoteString(_loc5_);
-               if(_loc7_ != null)
+               var _loc9_:Array = /^\\\{([0-9a-f]{2,6}(?:-[0-9a-f]{2,6}){0,9})\}/.exec(param1.substr(_loc3_,90));
+               if(_loc9_ != null)
                {
-                  _loc7_.mouseEnabled = false;
-                  _loc7_.mouseChildren = false;
                   _inline.push({
                      "at":_loc2_.length,
-                     "clip":_loc7_
+                     "clip":emojiClipNamed(_loc9_[1])
                   });
                   _loc2_ += INLINE_GAP;
+                  _loc3_ += String(_loc9_[0]).length;
+                  continue;
                }
-               else
-               {
-                  _loc2_ += _loc5_;
-               }
-               _loc3_ += 1 + _loc5_.length;
+            }
+            if(param1.charAt(_loc3_) == "\\")
+            {
+               _loc5_ = emoteCodeAt(param1,_loc3_ + 1,false);
+            }
+            else if(_loc3_ == 0 || param1.charAt(_loc3_ - 1) == " ")
+            {
+               _loc5_ = emoteCodeAt(param1,_loc3_,true);
+            }
+            _loc7_ = _loc5_ == null ? null : EmoticonUtility.getSmallSmileyMCForEmoteString(_loc5_);
+            if(_loc7_ != null)
+            {
+               _loc7_.mouseEnabled = false;
+               _loc7_.mouseChildren = false;
+               _inline.push({
+                  "at":_loc2_.length,
+                  "clip":_loc7_
+               });
+               _loc2_ += INLINE_GAP;
+               _loc3_ += (param1.charAt(_loc3_) == "\\" ? 1 : 0) + _loc5_.length;
             }
             else
             {
@@ -231,7 +247,149 @@ package gui
          }
          return _loc2_;
       }
-      
+
+      // the longest emote code at `param2`, or null. `param3`: as a word of its
+      // own, so it must end the text or come before a space or a stop.
+      private static function emoteCodeAt(param1:String, param2:int, param3:Boolean) : String
+      {
+         var _loc4_:int = Math.min(LONGEST_EMOTE_CODE,param1.length - param2);
+         var _loc5_:String = null;
+         var _loc6_:String = null;
+         while(_loc4_ >= 2)
+         {
+            _loc5_ = param1.substr(param2,_loc4_);
+            _loc6_ = param1.charAt(param2 + _loc4_);
+            if((!param3 || _loc6_ == "" || " .,!?".indexOf(_loc6_) != -1) && EmoticonUtility.doesStringMatchAnEmote(_loc5_))
+            {
+               return _loc5_;
+            }
+            _loc4_--;
+         }
+         return null;
+      }
+
+      // how many UTF-16 units the emoji at `param2` takes (with its skin tone,
+      // its variation selector, a keycap, a second flag letter, and whatever
+      // it is joined to with a zero-width joiner), or 0 when there is none.
+      public static function emojiLength(param1:String, param2:int) : int
+      {
+         var _loc3_:int = param1.charCodeAt(param2);
+         var _loc4_:int = 0;
+         var _loc5_:int = 0;
+         var _loc6_:int = 0;
+         var _loc7_:Boolean = false;
+         if(_loc3_ >= 0xD800 && _loc3_ <= 0xDBFF)
+         {
+            _loc5_ = codePointAt(param1,param2);
+            if(_loc5_ < 0x1F000 || _loc5_ > 0x1FAFF)
+            {
+               return 0;
+            }
+            _loc4_ = 2;
+            _loc7_ = _loc5_ >= 0x1F1E6 && _loc5_ <= 0x1F1FF;
+            // a flag is two letters
+            if(_loc7_)
+            {
+               _loc6_ = codePointAt(param1,param2 + 2);
+               if(_loc6_ >= 0x1F1E6 && _loc6_ <= 0x1F1FF)
+               {
+                  _loc4_ = 4;
+               }
+            }
+         }
+         else if(_loc3_ >= 0x2600 && _loc3_ <= 0x27BF || _loc3_ >= 0x2300 && _loc3_ <= 0x23FF || _loc3_ >= 0x2B00 && _loc3_ <= 0x2BFF
+            || _loc3_ >= 0x2194 && _loc3_ <= 0x21AA || _loc3_ >= 0x25AA && _loc3_ <= 0x25FE
+            || [0x203C,0x2049,0x2122,0x2139,0x24C2,0x2934,0x2935,0x3030,0x303D,0x3297,0x3299,0xA9,0xAE].indexOf(_loc3_) != -1 && param1.charCodeAt(param2 + 1) == 0xFE0F)
+         {
+            _loc4_ = 1;
+         }
+         else if("0123456789#*".indexOf(param1.charAt(param2)) != -1 && param1.charCodeAt(param2 + 1) == 0xFE0F && param1.charCodeAt(param2 + 2) == 0x20E3)
+         {
+            return 3;
+         }
+         else
+         {
+            return 0;
+         }
+         while(param2 + _loc4_ < param1.length)
+         {
+            _loc3_ = param1.charCodeAt(param2 + _loc4_);
+            if(_loc3_ == 0xFE0F || _loc3_ == 0x20E3)
+            {
+               _loc4_++;
+            }
+            else if(_loc3_ == 0xD83C && param1.charCodeAt(param2 + _loc4_ + 1) >= 0xDFFB && param1.charCodeAt(param2 + _loc4_ + 1) <= 0xDFFF)
+            {
+               _loc4_ += 2;
+            }
+            else if(_loc3_ == 0x200D && param2 + _loc4_ + 1 < param1.length)
+            {
+               _loc5_ = emojiLength(param1,param2 + _loc4_ + 1);
+               if(_loc5_ == 0)
+               {
+                  break;
+               }
+               _loc4_ += 1 + _loc5_;
+               break;
+            }
+            else
+            {
+               break;
+            }
+         }
+         return _loc4_;
+      }
+
+      private static function codePointAt(param1:String, param2:int) : int
+      {
+         var _loc3_:int = param1.charCodeAt(param2);
+         var _loc4_:int = param1.charCodeAt(param2 + 1);
+         if(_loc3_ >= 0xD800 && _loc3_ <= 0xDBFF && _loc4_ >= 0xDC00 && _loc4_ <= 0xDFFF)
+         {
+            return (_loc3_ - 0xD800) * 0x400 + (_loc4_ - 0xDC00) + 0x10000;
+         }
+         return _loc3_;
+      }
+
+      // its picture's name, as Twemoji names its files: the code points in
+      // hex, "-" between, without U+FE0F unless it is joined (U+200D).
+      public static function emojiName(param1:String) : String
+      {
+         var _loc2_:Array = [];
+         var _loc3_:int = 0;
+         var _loc4_:int = 0;
+         var _loc5_:Boolean = param1.indexOf(String.fromCharCode(0x200D)) != -1;
+         while(_loc3_ < param1.length)
+         {
+            _loc4_ = codePointAt(param1,_loc3_);
+            _loc3_ += _loc4_ > 0xFFFF ? 2 : 1;
+            if(_loc4_ != 0xFE0F || _loc5_)
+            {
+               _loc2_.push(_loc4_.toString(16));
+            }
+         }
+         return _loc2_.join("-");
+      }
+
+      // the picture of an emoji: a 72-square, its middle on the origin (as
+      // the game's small emotes are), filled when the picture has loaded.
+      private static function emojiClip(param1:String) : Sprite
+      {
+         return emojiClipNamed(emojiName(param1));
+      }
+
+      private static function emojiClipNamed(param1:String) : Sprite
+      {
+         var _loc2_:Sprite = new Sprite();
+         _loc2_.graphics.beginFill(0,0);
+         _loc2_.graphics.drawRect(-36,-36,72,72);
+         _loc2_.graphics.endFill();
+         _loc2_.mouseEnabled = false;
+         _loc2_.mouseChildren = false;
+         AJClient.loadArt(gMainFrame.clientInfo.websiteURL + "emoji/" + param1 + ".png",_loc2_,72,false);
+         return _loc2_;
+      }
+
       // puts each inline emote over its gap, as tall as the line.
       private function placeInline() : void
       {
