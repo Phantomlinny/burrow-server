@@ -295,6 +295,74 @@ const run = async () => {
     b.xt("rl", room, room);
   }
 
+  // --- game bubbles: Ann puts up Pairs over her head (a chat line of type
+  // 12), everyone in the room sees it as "on|<game>", and whoever clicks it
+  // plays her
+  const bubble = (client, me, word, game) => client.send(`<msg t='sys'><body action='pubMsg' r='${me.roomId}'><txt><![CDATA[${word}%12%${game}]]></txt></body></msg>`);
+  bubble(a, ann, "on", GAMES.pairs);
+  for (const client of [a, b, c]) {
+    assert.deepStrictEqual((await client.untilXt("uc")).slice(1), [ann.roomId, ann.id, "on|93", "12", "0"]);
+  }
+  // A game that is not the one in the bubble, or a bubble nobody has up: "no".
+  c.xt("mcp", cat.roomId, GAMES.ticTacToe, 0, "Ann");
+  assert.deepStrictEqual((await c.untilXt("mp")).slice(2), ["89", "1"]);
+  c.xt("mcp", cat.roomId, GAMES.pairs, 0, "Ben");
+  assert.deepStrictEqual((await c.untilXt("mp")).slice(2), ["93", "1"]);
+  // Ben clicks it: the game starts for the two of them and the bubble goes
+  // for Cat. Ann hears her own "off" only once the game is over.
+  b.xt("mcp", ben.roomId, GAMES.pairs, 0, "Ann");
+  assert.deepStrictEqual((await c.untilXt("uc")).slice(1), [ann.roomId, ann.id, "off", "12"]);
+  let pairsRoom;
+  for (const client of [a, b]) {
+    pairsRoom = (await client.untilXt("rj"))[4];
+    assert.deepStrictEqual((await client.untilXt("ms")).slice(1, 5), [pairsRoom, "2", ann.id, ben.id]);
+  }
+  // too late for Cat
+  c.xt("mcp", cat.roomId, GAMES.pairs, 0, "Ann");
+  assert.deepStrictEqual((await c.untilXt("mp")).slice(2), ["93", "1"]);
+  // while in it, Ann's client turning the bubble off is not answered yet
+  bubble(a, ann, "off", 0);
+  b.xt("rl", pairsRoom, pairsRoom);
+  a.xt("rl", pairsRoom, pairsRoom);
+  assert.deepStrictEqual((await a.untilXt("uc")).slice(1), [ann.roomId, ann.id, "off", "12"]);
+  // put up and taken down again outside a game: answered at once
+  bubble(a, ann, "on", GAMES.bowling);
+  assert.deepStrictEqual((await a.untilXt("uc")).slice(3), ["on|98", "12", "0"]);
+  assert.deepStrictEqual((await c.untilXt("uc")).slice(3), ["on|98", "12", "0"]);
+  bubble(a, ann, "off", 0);
+  assert.deepStrictEqual((await a.untilXt("uc")).slice(3), ["off", "12"]);
+  assert.deepStrictEqual((await c.untilXt("uc")).slice(3), ["off", "12"]);
+  // not a buddy game: refused, and the client is put back with an "off"
+  bubble(a, ann, "on", 4);
+  assert.deepStrictEqual((await a.untilXt("uc")).slice(3), ["off", "12"]);
+  await b.untilXt("uc"); // the bowling bubble's two lines, which Ben saw as well
+  await b.untilXt("uc");
+
+  // somebody who walks in sees a bubble that is already up, with its owner
+  bubble(a, ann, "on", GAMES.shellGame);
+  await a.untilXt("uc");
+  for (const client of [b, c]) {
+    await client.untilXt("uc");
+  }
+  const reg = await fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username: "Dee", password: "KettlePass01", avatarType: 1, agreed: true})});
+  assert.strictEqual(reg.status, 200);
+  const dee = await arrive("Dee");
+  let seen;
+  do {
+    seen = await dee.client.untilXt("uc");
+  } while (seen[2] !== ann.id);
+  assert.deepStrictEqual(seen.slice(3), ["on|92", "12", "0"]);
+  bubble(a, ann, "off", 0);
+  await a.untilXt("uc");
+  dee.client.socket.destroy();
+
+  // --- the HUD's Games window lists the buddy games too, Pairs among them
+  a.xt("gl", ann.roomId, 341);
+  const gameList = await a.untilXt("gl");
+  for (const id of Object.values(GAMES)) {
+    assert.ok(gameList.includes(String(id)), `game ${id} in the Games window`);
+  }
+
   // --- a player who logs off takes their invitation with them
   a.xt("mp", ann.roomId, GAMES.marbles, 0, "Ben");
   await b.untilXt("mp");
