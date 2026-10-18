@@ -101,6 +101,12 @@ class GameClient {
         this.varUpdates.push(fields);
         continue;
       }
+      // the chat filter settings ("xfl", after every login), the one-time
+      // question which filter to use ("xfa", on the first room) and the
+      // buddy list with when each was last seen ("bl", "xls": at login) come unasked.
+      if ((fields[0] === "xfl" || fields[0] === "xfa" || fields[0] === "bl" || fields[0] === "xls") && cmd !== fields[0]) {
+        continue;
+      }
       if (this.unasked(fields)) {
         continue;
       }
@@ -148,8 +154,10 @@ const postJson = (url, body) => fetch(url, {
 
 // starts a server on the given ports with an empty database, runs `run`
 // against it, and prints `name` passed or the server's output on failure.
-const withServer = async (name, httpPort, gamePort, run) => {
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
+// with `dataDir` it uses that database instead, and leaves it there (for a
+// test of what is still there after a restart).
+const withServer = async (name, httpPort, gamePort, run, {dataDir: keptDir = null} = {}) => {
+  const dataDir = keptDir || fs.mkdtempSync(path.join(os.tmpdir(), "aj-test-"));
   const server = spawn(process.execPath, [path.join(__dirname, "..", "server.js")], {
     env: {...process.env, AJ_HTTP_PORT: httpPort, AJ_GAME_PORT: gamePort, AJ_DATA_DIR: dataDir, AJ_QUIET: "1",
       // everyone arrives in the township, as the tests expect
@@ -177,8 +185,14 @@ const withServer = async (name, httpPort, gamePort, run) => {
     throw err;
   }
   finally {
+    // on Windows the database stays locked until the process has gone, so
+    // wait for it before throwing its files away.
+    const exited = server.exitCode !== null ? Promise.resolve() : new Promise(resolve => server.once("exit", resolve));
     server.kill();
-    fs.rmSync(dataDir, {recursive: true, force: true});
+    await exited;
+    if (!keptDir) {
+      fs.rmSync(dataDir, {recursive: true, force: true, maxRetries: 10, retryDelay: 200});
+    }
   }
 };
 

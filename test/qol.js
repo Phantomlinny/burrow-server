@@ -21,7 +21,7 @@ const told = async client => (await client.untilXt("xtl"))[2];
 // logs in and asks for the township, as the game always does first.
 // returns where the server put them.
 const arrive = async username => {
-  const auth = await (await postJson(`${BASE}/authenticate`, {username, password: "Password01"})).json();
+  const auth = await (await postJson(`${BASE}/authenticate`, {username, password: "KettlePass01"})).json();
   const client = new harness.GameClient(GAME_PORT);
   await client.connect();
   const login = await client.logIn(username, auth.auth_token);
@@ -36,7 +36,7 @@ const arrive = async username => {
 const run = async () => {
   for (const username of ["Ann", "Ben"]) {
     const response = await fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({username, password: "Password01", avatarType: 1, agreed: true})});
+      body: JSON.stringify({username, password: "KettlePass01", avatarType: 1, agreed: true})});
     assert.strictEqual(response.status, 200);
   }
   let {client: a, login, roomId, room} = await arrive("Ann");
@@ -149,7 +149,7 @@ const run = async () => {
   assert.strictEqual(await owned(), before + 3);
   say(a, roomId, "!help"); // gone: the list is at /commands
   assert.strictEqual((await a.untilXt("uc"))[3], "!help");
-  assert.match(await (await fetch(`${BASE}/commands`)).text(), /!outfit save NAME/);
+  assert.match(await (await fetch(`${BASE}/commands`)).text(), /!outfit save <i>NAME<\/i>/); // the page sets what to type in italics
 
   // --- den undo, mail, music
   say(a, roomId, "!den undo");
@@ -190,7 +190,7 @@ const run = async () => {
   await new Promise(resolve => setTimeout(resolve, 200));
 
   // --- "start in your own den" (asked for at sign-in): the game asks for the township and is put in the den
-  const denAuth = await (await postJson(`${BASE}/authenticate`, {username: "Ann", password: "Password01", login_choices: {startInDen: true}})).json();
+  const denAuth = await (await postJson(`${BASE}/authenticate`, {username: "Ann", password: "KettlePass01", login_choices: {startInDen: true}})).json();
   const home = new harness.GameClient(GAME_PORT);
   await home.connect();
   await home.logIn("Ann", denAuth.auth_token);

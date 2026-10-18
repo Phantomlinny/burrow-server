@@ -14,6 +14,7 @@ package gui
    import flash.events.TextEvent;
    import flash.text.StyleSheet;
    import flash.text.TextField;
+   import flash.text.TextFormat;
    import flash.ui.Mouse;
    import gui.itemWindows.ItemWindowTextNode;
    import localization.LocalizationManager;
@@ -211,6 +212,8 @@ package gui
       
       public function addMessage(param1:String, param2:String, param3:String, param4:String) : void
       {
+         // emoji as their names here: this list has no pictures (AJClient.emojiAsNames)
+         param4 = AJClient.emojiAsNames(param4);
          var _loc5_:Boolean = false;
          var _loc6_:* = 0;
          var _loc7_:int = 0;
@@ -479,9 +482,10 @@ package gui
          }
          else
          {
-            // 150 here, where the original stopped at 70. the server takes
-            // up to config.maxChatLength.
-            chatMsgText.maxChars = 150;
+            // 200 here, where the original stopped at 70. the server takes
+            // up to config.maxChatLength (more: an emoji goes as a tag of 8
+            // or more), and makes long lines shorter (lib/chatspam.js).
+            chatMsgText.maxChars = 200;
          }
       }
       
@@ -753,6 +757,51 @@ package gui
          {
             _predictiveTextManager.onTextFieldChanged(param1);
          }
+         showEmojiInInput();
+         AJClient.noteTyping(chatMsgText.text);
+      }
+
+      // the chat box while it holds an emoji (Windows' emoji panel, say): the
+      // game's font has none, so the box is drawn in the computer's own emoji
+      // font until there are none again. the bubble shows them as pictures
+      // (gui.ChatBalloon).
+      private var _inputShowsEmoji:Boolean = false;
+
+      private var _inputFormat:TextFormat;
+
+      private var _inputEmbedded:Boolean = true;
+
+      public function showEmojiInInput() : void
+      {
+         var _loc1_:Boolean = false;
+         var _loc2_:int = 0;
+         var _loc3_:String = chatMsgText == null ? "" : chatMsgText.text;
+         var _loc4_:TextFormat = null;
+         while(_loc2_ < _loc3_.length && !_loc1_)
+         {
+            _loc1_ = ChatBalloon.emojiLength(_loc3_,_loc2_) > 0;
+            _loc2_++;
+         }
+         if(chatMsgText == null || _loc1_ == _inputShowsEmoji)
+         {
+            return;
+         }
+         if(_loc1_)
+         {
+            _inputFormat = chatMsgText.defaultTextFormat;
+            _inputEmbedded = chatMsgText.embedFonts;
+            _loc4_ = new TextFormat("Segoe UI Emoji",_inputFormat.size,_inputFormat.color,_inputFormat.bold);
+            chatMsgText.embedFonts = false;
+            chatMsgText.defaultTextFormat = _loc4_;
+            chatMsgText.setTextFormat(_loc4_);
+         }
+         else
+         {
+            chatMsgText.embedFonts = _inputEmbedded;
+            chatMsgText.defaultTextFormat = _inputFormat;
+            chatMsgText.setTextFormat(_inputFormat);
+         }
+         _inputShowsEmoji = _loc1_;
       }
       
       private function keyDownListener(param1:KeyboardEvent) : void

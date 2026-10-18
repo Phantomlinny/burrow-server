@@ -14,7 +14,7 @@ const {postJson} = harness;
 const GAMES = {ticTacToe: 89, fourGems: 90, rockPaperScissors: 91, shellGame: 92, pairs: 93, scooped: 95, bowling: 98, marbles: 101};
 
 const arrive = async username => {
-  const auth = await (await postJson(`${BASE}/authenticate`, {username, password: "Password01"})).json();
+  const auth = await (await postJson(`${BASE}/authenticate`, {username, password: "KettlePass01"})).json();
   const client = new harness.GameClient(GAME_PORT);
   await client.connect();
   const login = await client.logIn(username, auth.auth_token);
@@ -28,7 +28,7 @@ const arrive = async username => {
 
 const run = async () => {
   for (const username of ["Ann", "Ben", "Cat"]) {
-    const response = await fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username, password: "Password01", avatarType: 1, agreed: true})});
+    const response = await fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username, password: "KettlePass01", avatarType: 1, agreed: true})});
     assert.strictEqual(response.status, 200);
   }
   const ann = await arrive("Ann");
@@ -300,6 +300,56 @@ const run = async () => {
   await b.untilXt("mp");
   a.socket.destroy();
   assert.deepStrictEqual((await b.untilXt("mp")).slice(2), ["101", "1"]);
+
+  // --- a room game played together (lib/minigames.js MULTIPLAYER): Gem
+  // Breaker offers its waiting list, Ben waits in the room, Cat joins, both
+  // are taken in, and each one's moves reach the other
+  // (and first, typing: Cat's "..." reaches Ben, said again too soon is not
+  // passed on, and stopping is)
+  c.xt("xty", cat.roomId, 1);
+  assert.deepStrictEqual((await b.untilXt("xty")).slice(2), [cat.id, "1"]);
+  c.xt("xty", cat.roomId, 1);
+  c.xt("xty", cat.roomId, 0);
+  assert.deepStrictEqual((await b.nextXt("xty")).slice(2), [cat.id, "0"]);
+
+  const GEM_BREAKER = 30;
+  b.xt("mi", ben.roomId, GEM_BREAKER);
+  const gemInfo = (await b.untilXt("mi")).slice(3);
+  assert.deepStrictEqual([gemInfo[0], gemInfo[4], gemInfo[5]], ["30", "2", "2"]);
+  b.xt("mj", ben.roomId, GEM_BREAKER, 1, 0, -1);
+  assert.deepStrictEqual((await b.untilXt("mj")).slice(1), [ben.roomId, ben.id]);
+  c.xt("mj", cat.roomId, GEM_BREAKER, 1, 0, -1);
+  for (const client of [b, c]) {
+    assert.deepStrictEqual((await client.untilXt("mj")).slice(1), [ben.roomId, ben.id, cat.id]);
+  }
+  const gemRoom = (await b.untilXt("rj"))[4];
+  for (const client of [b, c]) {
+    assert.deepStrictEqual((await client.untilXt("mj")).slice(1), [gemRoom, ben.id, cat.id]);
+    assert.deepStrictEqual((await client.untilXt("ms")).slice(2, 5), ["2", ben.id, cat.id]);
+  }
+  b.xt("mm", gemRoom, GEM_BREAKER, "ready");
+  c.xt("mm", gemRoom, GEM_BREAKER, "ready");
+  for (const client of [b, c]) {
+    const go = await client.untilXt("mm");
+    assert.deepStrictEqual([go[2], ...go.slice(4)], ["start", "2", ben.id, "0", cat.id, "0"]);
+  }
+  b.xt("mm", gemRoom, GEM_BREAKER, "pos", "-45");
+  assert.deepStrictEqual((await c.nextXt("mm")).slice(2), ["pos", ben.id, "-45"]);
+  c.xt("mm", gemRoom, GEM_BREAKER, "shoot", "0.5", "-0.8", "210", "40", "3", "1", "300", "0", "5");
+  assert.deepStrictEqual((await b.nextXt("mm")).slice(2), ["shoot", "0.5", "-0.8", "210", "40", "3", "1", "300", "0", "5"]);
+  c.xt("mm", gemRoom, GEM_BREAKER, "pos", "<b>");
+  c.xt("mm", gemRoom, GEM_BREAKER, "playerLost", "12345");
+  assert.deepStrictEqual((await b.nextXt("mm")).slice(2), ["playerLost", "12345"]); // and not the one with markup
+  // one leaving: the other is told, as the game expects
+  c.xt("ml", gemRoom);
+  assert.deepStrictEqual((await b.untilXt("ml")).slice(1), [gemRoom, cat.id]);
+  // alone, the start names its one player, whose cannon it is
+  b.xt("rj", gemRoom, TOWNSHIP, 1, 0, 0);
+  const back = (await b.untilXt("rj"))[4];
+  b.xt("mj", back, GEM_BREAKER, 0, 0, -1);
+  const soloRoom = (await b.untilXt("mj"))[1];
+  b.xt("mm", soloRoom, GEM_BREAKER, "ready");
+  assert.deepStrictEqual((await b.untilXt("mm")).slice(4), ["1", ben.id, "0"]);
 
   b.socket.destroy();
   c.socket.destroy();

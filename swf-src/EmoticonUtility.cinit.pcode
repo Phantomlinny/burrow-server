@@ -3,7 +3,7 @@
          returns null
          
          body
-            maxstack 43
+            maxstack 45
             localcount 1
             initscopedepth 0
             maxscopedepth 1
@@ -54,7 +54,9 @@
                pushstring "emo_star2_sml"
                pushstring "emo_star3_sml"
                pushstring "emo_temp_sml"
-               newarray 43
+               pushstring "emo_skull_sml"
+               pushstring "emo_sob_sml"
+               newarray 45
                findproperty QName(PrivateNamespace("gui:EmoticonUtility"),"displaySprites")
                swap
                setproperty QName(PrivateNamespace("gui:EmoticonUtility"),"displaySprites")
@@ -126,7 +128,9 @@
                pushstring "emo_star2"
                pushstring "emo_star3"
                pushstring "emo_temp"
-               newarray 43
+               pushstring "emo_skull"
+               pushstring "emo_sob"
+               newarray 45
                findproperty QName(PrivateNamespace("gui:EmoticonUtility"),"emoteSprites")
                swap
                setproperty QName(PrivateNamespace("gui:EmoticonUtility"),"emoteSprites")
@@ -563,6 +567,26 @@
                getlex QName(PrivateNamespace("gui:EmoticonUtility"),"_emoteChatStrings")
                pushstring "emo_temp"
                pushstring ":fever:"
+               newarray 1
+               setproperty MultinameL([PrivateNamespace("gui:EmoticonUtility"),StaticProtectedNs("gui:EmoticonUtility"),StaticProtectedNs("Object"),PackageNamespace("gui"),PackageInternalNs("gui"),PrivateNamespace("FilePrivateNS:EmoticonUtility"),PackageNamespace(""),Namespace("http://adobe.com/AS3/2006/builtin")])
+               getlex QName(PrivateNamespace("gui:EmoticonUtility"),"_emoteStrings")
+               pushstring "emo_skull"
+               pushstring ":skull:"
+               newarray 1
+               setproperty MultinameL([PrivateNamespace("gui:EmoticonUtility"),StaticProtectedNs("gui:EmoticonUtility"),StaticProtectedNs("Object"),PackageNamespace("gui"),PackageInternalNs("gui"),PrivateNamespace("FilePrivateNS:EmoticonUtility"),PackageNamespace(""),Namespace("http://adobe.com/AS3/2006/builtin")])
+               getlex QName(PrivateNamespace("gui:EmoticonUtility"),"_emoteChatStrings")
+               pushstring "emo_skull"
+               pushstring ":skull:"
+               newarray 1
+               setproperty MultinameL([PrivateNamespace("gui:EmoticonUtility"),StaticProtectedNs("gui:EmoticonUtility"),StaticProtectedNs("Object"),PackageNamespace("gui"),PackageInternalNs("gui"),PrivateNamespace("FilePrivateNS:EmoticonUtility"),PackageNamespace(""),Namespace("http://adobe.com/AS3/2006/builtin")])
+               getlex QName(PrivateNamespace("gui:EmoticonUtility"),"_emoteStrings")
+               pushstring "emo_sob"
+               pushstring ":sob:"
+               newarray 1
+               setproperty MultinameL([PrivateNamespace("gui:EmoticonUtility"),StaticProtectedNs("gui:EmoticonUtility"),StaticProtectedNs("Object"),PackageNamespace("gui"),PackageInternalNs("gui"),PrivateNamespace("FilePrivateNS:EmoticonUtility"),PackageNamespace(""),Namespace("http://adobe.com/AS3/2006/builtin")])
+               getlex QName(PrivateNamespace("gui:EmoticonUtility"),"_emoteChatStrings")
+               pushstring "emo_sob"
+               pushstring ":sob:"
                newarray 1
                setproperty MultinameL([PrivateNamespace("gui:EmoticonUtility"),StaticProtectedNs("gui:EmoticonUtility"),StaticProtectedNs("Object"),PackageNamespace("gui"),PackageInternalNs("gui"),PrivateNamespace("FilePrivateNS:EmoticonUtility"),PackageNamespace(""),Namespace("http://adobe.com/AS3/2006/builtin")])
                returnvoid

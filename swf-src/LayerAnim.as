@@ -440,7 +440,8 @@ package com.sbi.graphics
             _loc2_ = false;
             for(var _loc4_ in param1)
             {
-               if(!_layers[_loc4_] || _layers[_loc4_].l != param1[_loc4_].l)
+               // (a custom item has its base's art: its own picture makes it another, AJClient.customArtKey)
+               if(!_layers[_loc4_] || _layers[_loc4_].l != param1[_loc4_].l || AJClient.customArtKey("clothing",int(_layers[_loc4_].d)) != AJClient.customArtKey("clothing",int(param1[_loc4_].d)))
                {
                   _loc2_ = true;
                   break;
@@ -702,6 +703,19 @@ package com.sbi.graphics
          buildRequestArray(param1,_loc2_,_loc4_);
          _loc2_.sort();
          var _loc3_:String = _loc2_.join();
+         // custom items with pictures of their own are painted otherwise than
+         // their bases: their frames are kept apart
+         for each(var _loc5_:Object in _layers)
+         {
+            if(_loc5_.d)
+            {
+               var _loc6_:String = AJClient.customArtKey("clothing",int(_loc5_.d));
+               if(_loc6_ != "")
+               {
+                  _loc3_ += "|" + _loc6_;
+               }
+            }
+         }
          _colors = _loc4_;
          _requestedCacheKey = _loc3_;
          _receivedData = [];
@@ -792,7 +806,8 @@ package com.sbi.graphics
                {
                   var _loc7_:int = int(_loc6_[_loc4_.l]);
                   _loc6_[_loc4_.l] = _loc7_ + 1;
-                  _bitmap.setLayer(LayerBitmap.slotFor(_loc4_.l,_loc7_),_loc4_.d,_loc4_.c,_requestedCacheKey);
+                  _bitmap.setLayer(LayerBitmap.slotFor(_loc4_.l,_loc7_),_loc4_.d,_loc4_.c,_requestedCacheKey,
+                     _loc4_.p >= 0 && _layers != null && _layers[_loc4_.p] != null ? int(_layers[_loc4_.p].d) : 0);
                }
                finishAnimRequest();
                _receivedData = null;

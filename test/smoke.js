@@ -28,29 +28,29 @@ const run = async () => {
   // --- registration: the web form's API, and no accounts made by logging in
   assert.match(await (await fetch(`${BASE}/register`)).text(), /Create an account/);
   const registerJson = body => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({avatarType: 1, agreed: true, ...body})});
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Alice", password: "Password01"})).status, 401);
-  assert.strictEqual((await registerJson({username: "Alice", password: "Password01"})).status, 200);
-  assert.deepStrictEqual(await (await registerJson({username: "alice", password: "Password01"})).json(), {error: "username_taken"});
-  assert.deepStrictEqual(await (await registerJson({username: "a!", password: "Password01"})).json(), {error: "invalid_username"});
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Alice", password: "KettlePass01"})).status, 401);
+  assert.strictEqual((await registerJson({username: "Alice", password: "KettlePass01"})).status, 200);
+  assert.deepStrictEqual(await (await registerJson({username: "alice", password: "KettlePass01"})).json(), {error: "username_taken"});
+  assert.deepStrictEqual(await (await registerJson({username: "a!", password: "KettlePass01"})).json(), {error: "invalid_username"});
   assert.deepStrictEqual(await (await registerJson({username: "Shorty", password: "pw"})).json(), {error: "invalid_password"});
   // no default animal: whoever signs up picks one of the nine on the page.
-  assert.deepStrictEqual(await (await registerJson({username: "Noanimal", password: "Password01", avatarType: undefined})).json(), {error: "choose_animal"});
-  assert.deepStrictEqual(await (await registerJson({username: "Noanimal", password: "Password01", avatarType: 2})).json(), {error: "choose_animal"});
+  assert.deepStrictEqual(await (await registerJson({username: "Noanimal", password: "KettlePass01", avatarType: undefined})).json(), {error: "choose_animal"});
+  assert.deepStrictEqual(await (await registerJson({username: "Noanimal", password: "KettlePass01", avatarType: 2})).json(), {error: "choose_animal"});
   assert.match(await (await fetch(`${BASE}/register`)).text(), /Choose an animal/);
   assert.strictEqual((await fetch(`${BASE}/signup/thumb_wolf.svg`)).headers.get("content-type"), "image/svg+xml");
   assert.strictEqual((await fetch(`${BASE}/signup/..%2Faccount.html`)).status, 404);
-  for (const [username, password] of [["Bob", "Password02"], ["Carol", "Password03"], ["foo", "Password04"]]) {
+  for (const [username, password] of [["Bob", "KettlePass02"], ["Carol", "KettlePass03"], ["foo", "KettlePass04"]]) {
     assert.strictEqual((await registerJson({username, password})).status, 200);
   }
 
-  let res = await postJson(`${BASE}/authenticate`, {username: "Alice", password: "Password01", domain: "flash", df: "x"});
+  let res = await postJson(`${BASE}/authenticate`, {username: "Alice", password: "KettlePass01", domain: "flash", df: "x"});
   assert.strictEqual(res.status, 200);
   assert.strictEqual(res.headers.get("access-control-allow-origin"), "null");
   const alice = await res.json();
   assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "alice", password: "wrong"})).status, 401);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "constructor", password: "Password01"})).status, 401);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "constructor", password: "KettlePass01"})).status, 401);
   assert.strictEqual((await postJson(`${BASE}/authenticate`, {refresh_token: alice.refresh_token})).status, 200);
-  const bob = await (await postJson(`${BASE}/authenticate`, {username: "Bob", password: "Password02"})).json();
+  const bob = await (await postJson(`${BASE}/authenticate`, {username: "Bob", password: "KettlePass02"})).json();
 
   res = await fetch(`${BASE}/player?domain=flash&client_version=1830`, {headers: {Authorization: `Bearer ${alice.auth_token}`}});
   assert.strictEqual((await res.json()).screen_name, "Alice");
@@ -83,11 +83,11 @@ const run = async () => {
   assert.deepStrictEqual((await guest.nextXt("la")).slice(2), ["1"]);
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv("aes-256-cbc", crypto.createHash("sha256").update(guestKey).digest(), iv);
-  const encrypted = Buffer.concat([iv, cipher.update("DavePass01"), cipher.final()]).toString("base64");
+  const encrypted = Buffer.concat([iv, cipher.update("TulipKettle01"), cipher.final()]).toString("base64");
   guest.xt("lc", 1, "Dave", encrypted, "2000-01-01", 0, "", 15136, 15224, 15299, 4, 0, "US", 1830);
   assert.deepStrictEqual((await guest.nextXt("lc")).slice(2, 3), ["1"]);
   guest.socket.destroy();
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Dave", password: "DavePass01"})).status, 200);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Dave", password: "TulipKettle01"})).status, 200);
 
   // --- first player: login and world entry
   const a = new GameClient();
@@ -158,6 +158,10 @@ const run = async () => {
   assert.deepStrictEqual((await b.nextXt("uc")).slice(1), [roomId, String(bobId), "hi & bye", "0"]);
   b.send(`<msg t='sys'><body action='pubMsg' r='${roomId}'><txt><![CDATA[7%2]]></txt></body></msg>`); // emote: not echoed
   assert.deepStrictEqual((await a.nextXt("uc")).slice(3), ["7", "2"]);
+  // Actions are sent to every other player in the room. The sender has
+  // already applied the action locally, so it is not echoed back to them.
+  b.send(`<msg t='sys'><body action='pubMsg' r='${roomId}'><txt><![CDATA[:sitS:%3%m1]]></txt></body></msg>`);
+  assert.deepStrictEqual((await a.nextXt("uc")).slice(3), [":sitS:", "3", "m1"]);
 
   // --- player cards
   a.xt("ag", roomId, "bob", 1);
@@ -234,7 +238,7 @@ const run = async () => {
   assert.deepStrictEqual((await a.nextXt("ds")).slice(2), ["0", "0", "1"]);
 
   // --- shops, clothing, animals and pets (Carol watches from the same den)
-  const carol = await (await postJson(`${BASE}/authenticate`, {username: "Carol", password: "Password03"})).json();
+  const carol = await (await postJson(`${BASE}/authenticate`, {username: "Carol", password: "KettlePass03"})).json();
   const c = new GameClient();
   await c.connect();
   await c.logIn("Carol", carol.auth_token);
@@ -383,17 +387,18 @@ const run = async () => {
   const moved = await c.nextXt("rp");
   assert.deepStrictEqual([moved[4], moved[5]], ["2", newDenDef]); // room type 2 = den, then the den type
   assert.deepStrictEqual((await c.nextXt("ds")).slice(2, 3), ["0"]); // the furniture stayed in the first den
-  assert.deepStrictEqual((await a.nextXt("ds")).slice(2, 3), ["0"]);
+  // the owner is also sent the den's items ("di") on a switch
+  assert.deepStrictEqual((await a.untilXt("ds")).slice(2, 3), ["0"]);
   a.xt("dc", denId, 0);
   await a.nextXt("dc");
   await c.nextXt("rp");
   assert.deepStrictEqual((await c.nextXt("ds")).slice(2, 3), ["1"]);
-  await a.nextXt("ds");
+  await a.untilXt("ds");
   a.xt("dp", denId, 0, 0);
   {
     const stranger = new GameClient();
     await stranger.connect();
-    await stranger.logIn("Dave", (await (await postJson(`${BASE}/authenticate`, {username: "Dave", password: "DavePass01"})).json()).auth_token);
+    await stranger.logIn("Dave", (await (await postJson(`${BASE}/authenticate`, {username: "Dave", password: "TulipKettle01"})).json()).auth_token);
     stranger.xt("dj", 1, "denAlice", 1, -1);
     assert.strictEqual((await stranger.nextXt("rj"))[2], "0");
     stranger.socket.destroy();
@@ -411,7 +416,7 @@ const run = async () => {
   assert.deepStrictEqual([gone[2], gone[5], ...gone.slice(7)], ["2", "Alice", "0", "1", tradedInv]);
 
   // --- item finder: search by name and id, give to a connected player
-  assert.match(await (await fetch(`${BASE}/shop`)).text(), /Item finder/);
+  assert.match(await (await fetch(`${BASE}/shop`)).text(), /Item giver/);
   const found = await (await fetch(`${BASE}/api/search?q=top+hat&kind=clothing`)).json();
   assert.ok(found.total > 0 && found.results.every(item => /top/i.test(item.name) && /hat/i.test(item.name)));
   const hat = found.results[0];
@@ -428,7 +433,7 @@ const run = async () => {
   assert.deepStrictEqual((await a.nextXt("di")).slice(3, 4), ["1"]);
 
   // --- no game account has admin powers: "foo" is an ordinary player now
-  const foo = await (await postJson(`${BASE}/authenticate`, {username: "foo", password: "Password04"})).json();
+  const foo = await (await postJson(`${BASE}/authenticate`, {username: "foo", password: "KettlePass04"})).json();
   const f = new GameClient();
   await f.connect();
   const fooLogin = await f.logIn("foo", foo.auth_token);
@@ -520,14 +525,14 @@ const run = async () => {
   // names sign-up would refuse are fine from the panel, and can log in.
   for (const odd of ["x", "~*Bob*~ <3", "Ünïcødé 名前", "a name well past twenty characters"]) {
     assert.strictEqual((await panel("account", {username: "Bob", action: "rename", newName: odd}, admin)).status, 200);
-    assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: odd, password: "Password02"})).status, 200);
+    assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: odd, password: "KettlePass02"})).status, 200);
     assert.strictEqual((await panel("account", {username: odd, action: "rename", newName: "Bob"}, admin)).status, 200);
   }
-  assert.strictEqual((await registerJson({username: "x", password: "Password09"})).status, 400); // sign-up rules unchanged
+  assert.strictEqual((await registerJson({username: "x", password: "KettlePass09"})).status, 400); // sign-up rules unchanged
   const renamed = await panel("account", {username: "Bob", action: "rename", newName: "Robert"}, admin);
   assert.deepStrictEqual([renamed.status, renamed.data.username], [200, "Robert"]);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Bob", password: "Password02"})).status, 401);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "robert", password: "Password02"})).status, 200);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "Bob", password: "KettlePass02"})).status, 401);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "robert", password: "KettlePass02"})).status, 200);
   assert.ok(!(await panel("accounts", undefined, admin)).data.accounts.some(account => account.username === "Bob"));
   assert.strictEqual((await panel("account", {username: "Robert", action: "rename", newName: "ROBERT"}, admin)).status, 200);
   assert.strictEqual((await panel("account", {username: "robert", action: "rename", newName: "Bob"}, admin)).status, 200);
@@ -535,7 +540,7 @@ const run = async () => {
   // A new password for a player: the old one and old tokens stop working.
   assert.strictEqual((await panel("account", {username: "foo", action: "password", password: "short"}, admin)).status, 400);
   assert.strictEqual((await panel("account", {username: "foo", action: "password", password: "New-password-4"}, admin)).status, 200);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "Password04"})).status, 401);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "KettlePass04"})).status, 401);
   assert.strictEqual((await postJson(`${BASE}/authenticate`, {refresh_token: foo.refresh_token})).status, 401);
   assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "New-password-4"})).status, 200);
   assert.strictEqual((await panel("account", {username: "foo", action: "delete"}, admin)).status, 200);
@@ -621,14 +626,16 @@ const run = async () => {
 
   // --- the custom client's login choices: honoured for that session only
   assert.strictEqual((await (await fetch(`${BASE}/flashvars`)).json()).loginChoices, true);
-  const chosen = await (await postJson(`${BASE}/authenticate`, {username: "Carol", password: "Password03",
+  // (a fresh account: Carol is banned by now, and a banned account's
+  // sign-in is refused with "account_banned", so it gets no token.)
+  assert.strictEqual((await registerJson({username: "Erin", password: "KettlePass05"})).status, 200);
+  const chosen = await (await postJson(`${BASE}/authenticate`, {username: "Erin", password: "KettlePass05",
     login_choices: {accountType: 0, isGuide: true, membershipDays: 12, isModerator: "yes"}})).json();
-  // (Carol is banned from the game by now, so only the web side is checked.)
   assert.strictEqual((await (await fetch(`${BASE}/player`, {headers: {Authorization: `Bearer ${chosen.auth_token}`}})).json()).game_account_type, 0);
-  a.xt("ag", denId, "Carol", 0);
+  a.xt("ag", denId, "Erin", 0);
   assert.deepStrictEqual((await a.untilXt("ag")).slice(5, 7), ["0", "1"]); // account type, guide
-  await postJson(`${BASE}/authenticate`, {username: "Carol", password: "Password03"}); // and back to normal
-  a.xt("ag", denId, "Carol", 0);
+  await postJson(`${BASE}/authenticate`, {username: "Erin", password: "KettlePass05"}); // and back to normal
+  a.xt("ag", denId, "Erin", 0);
   assert.deepStrictEqual((await a.untilXt("ag")).slice(5, 7), ["2", "0"]);
 
   // --- custom colours: an id for four RGB values, announced to everyone
@@ -642,7 +649,7 @@ const run = async () => {
   assert.strictEqual((await a.untilXt("ap"))[2], "1");
   const late = new GameClient();
   await late.connect();
-  const dev = await (await postJson(`${BASE}/authenticate`, {username: "Alice", password: "Password01", login_choices: {accountType: 4, membershipDays: 7}})).json();
+  const dev = await (await postJson(`${BASE}/authenticate`, {username: "Alice", password: "KettlePass01", login_choices: {accountType: 4, membershipDays: 7}})).json();
   const devLogin = await late.logIn("Alice", dev.auth_token);
   assert.deepStrictEqual([devLogin.params.accountType, devLogin.params.numDaysLeftOnSubscription, devLogin.params.isGuide, devLogin.params.isModerator], [4, 7, false, false]);
   assert.deepStrictEqual((await late.untilXt("xcc")).slice(2, 4), ["1", String(0xFD000000)]); // the table at login

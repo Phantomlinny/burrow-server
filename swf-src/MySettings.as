@@ -162,6 +162,13 @@ package gui
             "labelLabel":"Item Giver",
             "btnLabel":"Open"
          },{
+            // a player's own items (AJClient's Item Maker)
+            "type":TOGGLE_TYPE_JOIN,
+            "frame":"itemMaker",
+            "iconFrame":"redeemCode",
+            "labelLabel":"Item Maker",
+            "btnLabel":"Open"
+         },{
             "type":TOGGLE_TYPE_JOIN,
             "frame":"chatFilter",
             "iconFrame":"buddyRequest",

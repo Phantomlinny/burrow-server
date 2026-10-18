@@ -6,10 +6,10 @@
     <title>Moderators</title>
     <link rel="icon" type="image/png" href="/logo-square.png">
     <style>
-      /* black and white throughout, in the game's own text font: the look of
-         the client (its app/index.html). Nothing is said by colour: what
-         went wrong is white with a "!" before it, and what cannot be undone
-         has a dashed edge. */
+      /* a modern dark dashboard: a sidebar of pages, cards on a slate
+         ground. black and white throughout, in the game's own text font: the
+         look of the client. Nothing is said by colour: what went wrong is white
+         with a "!" before it, and what cannot be undone has a dashed edge. */
       @font-face { font-family: "DigitalDelivery"; font-weight: 400; src: url("/fonts/CCDigitalDelivery-Regular.otf") format("opentype"); }
       @font-face { font-family: "DigitalDelivery"; font-weight: 700; src: url("/fonts/CCDigitalDelivery-Bold.otf") format("opentype"); }
       :root {
@@ -17,43 +17,49 @@
         --bg: #000;
         --panel: #0d0d0d;
         --raised: #1a1a1a;
+        --field: #000;
         --line: #2e2e2e;
+        --line-strong: #555;
         --text: #fff;
         --muted: #8c8c8c;
+        --accent: #fff;
+        --accent-soft: #1a1a1a;
+        --radius: 14px;
+        --shadow: none;
       }
       * { box-sizing: border-box; }
       [hidden] { display: none !important; }
       ::selection { background: #fff; color: #000; }
       ::-webkit-scrollbar { width: 10px; height: 10px; }
-      ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; border: 3px solid var(--bg); }
+      ::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 5px; border: 3px solid var(--bg); }
       body {
         margin: 0;
-        padding: 24px 16px 48px;
         background: var(--bg);
         color: var(--text);
         font: 15px/1.4 "DigitalDelivery", system-ui, "Segoe UI", sans-serif;
         -webkit-font-smoothing: antialiased;
       }
       a { color: inherit; text-underline-offset: 3px; }
-      h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.01em; }
-      h2 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
-      h3 { font-size: 14px; font-weight: 700; }
+      h1, h2, h3 { font-family: "DigitalDelivery", system-ui, sans-serif; }
+      h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.01em; }
+      h2 { margin: 0 0 10px; font-size: 18px; font-weight: 700; }
+      h3 { font-size: 15px; font-weight: 700; }
       p { margin: 0 0 12px; color: var(--muted); }
       label { display: block; margin: 12px 0 5px; color: var(--muted); font-size: 13px; }
-      .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+      .hint { font-weight: 400; color: var(--muted); font-size: 12.5px; }
       input, select, textarea {
         font: inherit;
         color: var(--text);
-        background: var(--panel);
+        background: var(--field);
         border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 9px 14px 10px;
-        transition: border-color 0.12s;
+        border-radius: 10px;
+        padding: 8px 12px;
+        transition: border-color 0.12s, box-shadow 0.12s;
       }
       input::placeholder, textarea::placeholder { color: #555; }
-      input:hover, select:hover, textarea:hover { border-color: #555; }
+      input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
       input:focus, select:focus, textarea:focus { outline: none; border-color: var(--text); }
-      input:disabled, select:disabled, textarea:disabled { opacity: 0.4; }
+      input:disabled, select:disabled, textarea:disabled { opacity: 0.45; }
       select:not([multiple]) {
         -webkit-appearance: none;
         appearance: none;
@@ -72,29 +78,30 @@
         margin: 0 6px 0 0;
         padding: 0;
         vertical-align: -4px;
-        border: 1px solid #666;
-        border-radius: 6px;
-        background: var(--panel);
+        border: 1px solid var(--line-strong);
+        border-radius: 5px;
+        background: var(--field);
         cursor: pointer;
       }
-      input[type="checkbox"]:hover { border-color: var(--text); }
       input[type="checkbox"]:checked {
         border-color: var(--text);
         background: var(--text) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4.5 9.5l3 3 6-7' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 16px no-repeat;
       }
       button {
         font: inherit;
+        font-weight: 600;
         color: var(--text);
-        background: none;
+        background: var(--raised);
         border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 7px 16px 8px;
+        border-radius: 10px;
+        padding: 7px 14px;
         cursor: pointer;
         white-space: nowrap;
-        transition: background 0.12s, border-color 0.12s, color 0.12s;
+        transition: background 0.12s, border-color 0.12s, color 0.12s, transform 0.06s;
       }
-      button:hover { background: var(--raised); border-color: #555; }
-      button:disabled { opacity: 0.45; cursor: default; }
+      button:hover { background: #262626; border-color: var(--line-strong); }
+      button:active { transform: translateY(1px); }
+      button:disabled { opacity: 0.45; cursor: default; transform: none; }
       button:focus-visible, a:focus-visible, input[type="checkbox"]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
       button.primary { font-weight: 700; color: #000; background: var(--text); border-color: var(--text); }
       button.primary:hover { background: #d9d9d9; border-color: #d9d9d9; }
@@ -117,74 +124,145 @@
         text-align: center;
       }
       @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-      input, select, textarea { background: var(--bg); }
       label.check { margin: 0; color: var(--text); font-size: 14px; cursor: pointer; }
+      #item-colours { display: flex; gap: 6px 14px; flex-wrap: wrap; margin-top: 8px; }
+      #item-colours label.check { display: inline-flex; gap: 5px; align-items: center; }
+      ul.plain { list-style: none; padding: 0; margin: 10px 0 0; }
+      ul.plain li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+      ul.plain li:last-child { border-bottom: 0; }
+      img.guarded { filter: blur(14px) grayscale(0.6); cursor: pointer; transition: filter 0.15s; }
+      img.guarded.shown { filter: none; cursor: default; }
+      .made-items { display: grid; gap: 8px; margin: 8px 0; }
+      .made-item { display: flex; gap: 12px; align-items: center; padding: 8px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; }
+      .made-item .art { width: 52px; height: 52px; flex: none; border-radius: 8px; background: var(--field); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 10px; text-align: center; }
+      .made-item .art img { max-width: 100%; max-height: 100%; }
+      .made-item > div:nth-child(2) { flex: 1; min-width: 0; }
+      #quick-lock { margin-top: 18px; }
+      .lock-results li { display: flex; gap: 10px; align-items: center; }
+      .lock-results .meta { color: var(--muted); font-size: 12px; }
+      .lock-results button { margin-left: auto; }
+      .lock-results .is-locked { font-size: 11px; padding: 1px 7px; border: 1px solid var(--text); border-radius: 999px; }
 
+      /* signing in */
       #gate {
-        max-width: 380px;
-        margin: 6vh auto 0;
-        padding: 24px;
+        max-width: 400px;
+        margin: 10vh auto 0;
+        padding: 28px;
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 18px;
+        border-radius: 20px;
+        box-shadow: var(--shadow);
       }
       #gate h1 { margin-bottom: 4px; }
       #gate input { width: 100%; }
-      #gate button { width: 100%; margin-top: 18px; padding: 10px 16px 11px; }
+      #gate button { width: 100%; margin-top: 18px; padding: 10px 16px; }
       #captcha { margin-top: 16px; }
 
-      #panel { max-width: 1080px; margin: 0 auto; }
-      header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-      header h1 { flex: 1; }
-      /* the pages: one row of names, the chosen one filled. */
-      nav { display: flex; gap: 2px; margin-bottom: 16px; padding: 3px; border: 1px solid var(--line); border-radius: 22px; flex-wrap: wrap; }
-      nav button { border: 0; color: var(--muted); padding: 6px 14px 7px; }
-      nav button:hover { color: var(--text); }
-      nav button[aria-selected="true"] { color: #000; background: var(--text); font-weight: 700; }
-      section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 18px; margin-bottom: 16px; }
-      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-      .tile { padding: 12px 14px 11px; border: 1px solid var(--line); border-radius: 18px; }
-      .tile .value { font-size: 26px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-      .tile .name { margin-top: 2px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
-      .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+      /* the panel: a sidebar, and the page beside it */
+      #panel { display: grid; grid-template-columns: 236px minmax(0, 1fr); min-height: 100vh; }
+      #side {
+        position: sticky;
+        top: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 20px 14px;
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+      }
+      .brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+      .brand h1 { font-size: 19px; }
+      #who { display: block; margin-top: 1px; }
+      nav { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+      nav button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        padding: 9px 10px;
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-weight: 500;
+        text-align: left;
+      }
+      nav button .icon { width: 18px; text-align: center; opacity: 0.85; }
+      nav button:hover { background: var(--raised); color: var(--text); }
+      nav button[aria-selected="true"] { background: var(--text); color: #000; font-weight: 700; }
+      nav button span[id$="-count"]:not(:empty) {
+        margin-left: auto;
+        padding: 0 8px;
+        border-radius: 999px;
+        background: var(--text);
+        color: #000;
+        font-size: 11.5px;
+        font-weight: 700;
+        line-height: 19px;
+      }
+      #sign-out { width: 100%; }
+      #main { padding: 28px clamp(16px, 3vw, 36px) 48px; max-width: 1240px; width: 100%; }
+      .page-title { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+      .page-title h1 { font-size: 26px; }
+      @media (max-width: 860px) {
+        #panel { grid-template-columns: 1fr; }
+        #side { position: static; height: auto; flex-direction: column; }
+        nav { flex-direction: row; flex-wrap: wrap; }
+        nav button { width: auto; }
+      }
+
+      section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow); }
+      /* the dashboard's numbers: each a card that opens its page */
+      .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 18px; }
+      .tile { padding: 16px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+      button.tile { display: block; width: 100%; text-align: left; font-weight: 400; }
+      button.tile:hover { border-color: var(--text); background: var(--panel); }
+      .tile .value { font-size: 30px; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; font-family: "DigitalDelivery", system-ui, sans-serif; }
+      .tile .name { margin-top: 4px; font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+      .tile.attention { border-color: var(--text); }
+      .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
       .columns section { margin: 0; }
-      dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; }
+      dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 18px; margin: 0; }
       dt { color: var(--muted); }
       dd { margin: 0; overflow-wrap: anywhere; }
-      .table-wrap { overflow-x: auto; }
+      .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
       table { width: 100%; border-collapse: collapse; }
-      th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-      th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 400; }
+      th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+      th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; background: var(--raised); }
       td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-      td button { padding: 2px 12px 3px; font-weight: 700; }
+      td button { padding: 3px 11px; font-size: 13px; }
       tbody tr:last-child td { border-bottom: 0; }
-      tbody tr.selected td { background: var(--raised); }
+      tbody tr:hover td { background: #0f0f0f; }
+      tbody tr.selected td { background: var(--accent-soft); }
       tbody tr.pick { cursor: pointer; }
       .device-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
       button.link { background: none; border: 0; padding: 0; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; font-weight: 400; }
-      .empty { color: var(--muted); padding: 8px 0; }
-      .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-      .toolbar input[type="search"] { flex: 1; min-width: 180px; }
-      .tag { display: inline-block; padding: 1px 9px 2px; border: 1px solid var(--line); border-radius: 999px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+      .empty { color: var(--muted); padding: 10px 2px; }
+      .toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+      .toolbar input[type="search"] { flex: 1; min-width: 200px; }
+      .tag { display: inline-block; padding: 1px 9px; border: 1px solid var(--line-strong); border-radius: 999px; font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
       .tag.good { color: #000; background: var(--text); border-color: var(--text); font-weight: 700; }
       .tag.bad { color: var(--text); border-color: var(--text); font-weight: 700; }
-      #detail { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
-      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+      #detail { margin-top: 0; }
+      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
       .action .hint { margin: 8px 0 0; }
-      .action { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
-      .action h3 { margin: 0 0 8px; }
+      .action { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+      .action h3 { margin: 0 0 10px; }
       .action .row { display: flex; gap: 8px; flex-wrap: wrap; }
       .action .row input, .action .row select { flex: 1; min-width: 90px; }
+      .action .row input[type="checkbox"] { flex: none; min-width: 0; }
+      /* the items' buttons wrap in their cell, not out of the table */
+      #items td:last-child { white-space: normal; min-width: 300px; }
+      #items td:last-child button { margin: 2px 0; }
       .action .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
-      /* what the server printed keeps a fixed-width face: it is read in columns. */
       #log {
         height: 60vh;
         overflow: auto;
         margin: 0;
         padding: 12px 14px;
-        background: var(--bg);
+        background: var(--field);
         border: 1px solid var(--line);
-        border-radius: 14px;
+        border-radius: 12px;
         font: 12px/1.5 ui-monospace, Consolas, monospace;
         color: #bdbdbd;
         white-space: pre-wrap;
@@ -192,13 +270,13 @@
       }
       #log .time { color: var(--muted); }
       #log .error { color: var(--text); font-weight: 700; }
-      .report { border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin-bottom: 12px; }
+      .report { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
       .report h3 { margin: 0 0 4px; }
-      .report .typed { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; overflow-wrap: anywhere; }
-      .report pre { margin: 8px 0; padding: 8px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
+      .report .typed { margin: 8px 0; padding: 8px 12px; background: var(--field); border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+      .report pre { margin: 8px 0; padding: 8px 12px; background: var(--field); border: 1px solid var(--line); border-radius: 10px; font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
       .report .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-      .paintings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-      .painting { border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+      .paintings { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+      .painting { background: var(--raised); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
       .painting img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
       .painting h3 { margin: 8px 0 2px; }
       .painting .buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
@@ -210,31 +288,48 @@
       .send-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
       #owned { margin-top: 16px; }
       #owned ul { margin: 4px 0 12px; padding-left: 18px; columns: 220px; }
+      #owned li { break-inside: avoid; }
       #ban-record h3 { margin: 14px 0 4px; }
       #ban-record ul { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
       #ban-record li { margin: 3px 0; }
-      #ban-record li button { padding: 2px 10px 3px; font-size: 12px; }
-      #owned li { break-inside: avoid; }
+      #ban-record li button { padding: 2px 10px; font-size: 12px; }
       #password-form { max-width: 360px; }
       #password-form input { width: 100%; }
       #password-form button { margin-top: 16px; }
-      .logo { display: block; height: 72px; margin: 0 0 12px; }
+      .logo { display: block; height: 64px; margin: 0 0 12px; }
       .mark { height: 34px; flex: none; }
       #chat-lines { margin: 0; padding: 0; list-style: none; }
       .report-chat { margin: 0 0 8px; padding: 0; list-style: none; }
-      #chat-lines li, #chat-context li, .report-chat li { display: flex; gap: 10px; align-items: baseline; padding: 6px 4px; border-bottom: 1px solid var(--line); }
+      #chat-lines li, #chat-context li, .report-chat li { display: flex; gap: 10px; align-items: baseline; padding: 8px 6px; border-bottom: 1px solid var(--line); }
       #chat-lines li:last-child, #chat-context li:last-child { border-bottom: 0; }
       .chat-time { flex: none; width: 128px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-      .chat-who { flex: none; max-width: 190px; padding: 0; border: 0; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; }
+      .chat-who { flex: none; max-width: 190px; padding: 0; border: 0; background: none; font-weight: 700; text-align: left; overflow: hidden; text-overflow: ellipsis; }
       .chat-who:hover { background: none; text-decoration: underline; }
       .chat-text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
       .chat-room { display: block; color: var(--muted); font-size: 12px; }
-      .chat-more { flex: none; padding: 2px 10px 3px; font-size: 12px; }
+      .chat-more { flex: none; padding: 2px 10px; font-size: 12px; }
       #chat-context { margin: 0; padding: 0; list-style: none; }
-      #chat-context li.this { background: var(--raised); border-radius: 10px; }
-      #player-facts { margin-bottom: 14px; }
+      #chat-context li.this { background: var(--accent-soft); border-radius: 8px; }
+      #player-facts { margin-bottom: 16px; }
+      .record-title { margin: 20px 0 6px; }
+      #player-history, #player-warnings { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
       #timeline { margin: 0; padding-left: 18px; font-size: 13px; overflow-wrap: anywhere; }
-      .actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+      /* mod notes: cards, the newest first */
+      .notes { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+      .notes li { padding: 10px 12px; background: var(--raised); border: 1px solid var(--line); border-left: 3px solid var(--text); border-radius: 10px; overflow-wrap: anywhere; }
+      .notes .who { display: flex; gap: 8px; align-items: center; margin-bottom: 3px; color: var(--muted); font-size: 12px; }
+      .notes .who button { margin-left: auto; padding: 1px 9px; font-size: 12px; }
+      .notes .who button.about { margin-left: 0; padding: 0; }
+      .notes .about { padding: 0; border: 0; background: none; color: var(--text); font-weight: 700; font-size: 12px; text-decoration: underline; }
+      .note-row { display: flex; gap: 8px; align-items: flex-start; }
+      /* items waiting for approval: a card each, its picture on the left */
+      .review-list { display: grid; gap: 10px; }
+      .review-card { display: grid; grid-template-columns: 72px 1fr auto; gap: 14px; align-items: center; padding: 12px; background: var(--raised); border: 1px solid var(--line); border-radius: 14px; }
+      .review-card .art { width: 72px; height: 72px; border-radius: 10px; background: var(--field); display: grid; place-items: center; overflow: hidden; color: var(--muted); font-size: 11px; text-align: center; }
+      .review-card .art img { max-width: 100%; max-height: 100%; }
+      .review-card .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+      img.item-art { display: block; width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: var(--raised); }
+      #note-text { flex: 1; min-width: 0; }
     </style>
   </head>
   <body>
@@ -255,28 +350,72 @@
     </main>
 
     <div id="panel" hidden>
-      <header>
-        <img class="mark" src="/logo.png" alt="">
-        <h1>Moderators</h1>
-        <span class="hint" id="who"></span>
+      <aside id="side">
+        <div class="brand">
+          <img class="mark" src="/logo.png" alt="">
+          <div><h1>Moderators</h1><span class="hint" id="who"></span></div>
+        </div>
+        <nav role="tablist" aria-orientation="vertical">
+          <button role="tab" data-tab="home" data-needs="player.view" aria-selected="true"><span class="icon" aria-hidden="true">&#9673;</span>Dashboard</button>
+          <button role="tab" data-tab="players" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9787;</span>Players</button>
+          <button role="tab" data-tab="chat" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9993;</span>Chat</button>
+          <button role="tab" data-tab="reports" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9873;</span>Reports<span id="report-count"></span></button>
+          <button role="tab" data-tab="requests" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9998;</span>Requests<span id="request-count"></span></button>
+          <button role="tab" data-tab="masterpieces" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9635;</span>Masterpieces<span id="masterpiece-count"></span></button>
+          <button role="tab" data-tab="bans" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#8856;</span>Bans</button>
+          <button role="tab" data-tab="stats" data-needs="player.view" aria-selected="false"><span class="icon" aria-hidden="true">&#9636;</span>Stats</button>
+          <button role="tab" data-tab="review" data-needs="items.approve" aria-selected="false" hidden><span class="icon" aria-hidden="true">&#10004;</span>Review</button>
+          <button role="tab" data-tab="items" data-needs="items.create" aria-selected="false" hidden><span class="icon" aria-hidden="true">&#10070;</span>Items</button>
+        </nav>
         <button id="sign-out" type="button">Sign out</button>
-      </header>
-      <nav role="tablist">
-        <button role="tab" data-tab="players" aria-selected="true">Players</button>
-        <button role="tab" data-tab="chat" aria-selected="false">Chat</button>
-        <button role="tab" data-tab="reports" aria-selected="false">Reports<span id="report-count"></span></button>
-        <button role="tab" data-tab="requests" aria-selected="false">Requests<span id="request-count"></span></button>
-        <button role="tab" data-tab="masterpieces" aria-selected="false">Masterpieces<span id="masterpiece-count"></span></button>
-        <button role="tab" data-tab="bans" aria-selected="false">Bans</button>
-        <button role="tab" data-tab="stats" aria-selected="false">Stats</button>
-      </nav>
+      </aside>
+      <div id="main">
+      <div class="page-title"><h1 id="page-name">Dashboard</h1></div>
+
+      <div data-view="home">
+        <div class="tiles">
+          <button type="button" class="tile" data-goto="players"><div class="value" id="home-online">0</div><div class="name">Playing now</div></button>
+          <button type="button" class="tile" data-goto="reports"><div class="value" id="home-reports">0</div><div class="name">Open reports</div></button>
+          <button type="button" class="tile" data-goto="requests"><div class="value" id="home-requests">0</div><div class="name">Requests and appeals</div></button>
+          <button type="button" class="tile" data-goto="masterpieces"><div class="value" id="home-paintings">0</div><div class="name">Paintings to check</div></button>
+        </div>
+        <div class="columns">
+          <section>
+            <h2>Find a player</h2>
+            <p class="hint">By name: opens them on the Players page.</p>
+            <div class="toolbar"><input id="home-search" type="search" placeholder="Username" aria-label="Find a player">
+              <button type="button" class="primary" id="home-search-go">Find</button></div>
+          </section>
+          <section>
+            <h2>Recent mod notes</h2>
+            <ul class="notes" id="home-notes"></ul>
+            <div class="empty" id="no-home-notes" hidden>No notes yet. Notes are added on a player's page, or with !note in the game.</div>
+          </section>
+        </div>
+        <section id="quick-lock" hidden>
+          <h2>Restrict items</h2>
+          <p class="hint">Find any item, the game's or a custom one, by name or id, and lock it out of the item finder: players can no longer find it or take it there (staff still can). <span id="lock-count"></span></p>
+          <div class="toolbar">
+            <select id="quick-lock-kind" aria-label="Kind">
+              <option value="all">All items</option>
+              <option value="clothing">Clothing</option>
+              <option value="den">Den items</option>
+            </select>
+            <input id="quick-lock-q" type="search" placeholder="Item name or id" aria-label="Find an item to lock">
+            <button type="button" id="quick-lock-all">Every locked item</button>
+          </div>
+          <ul class="plain lock-results" id="quick-lock-results"></ul>
+          <p class="hint" id="quick-lock-more" hidden></p>
+          <p class="status" id="quick-lock-status" role="status"></p>
+        </section>
+      </div>
 
       <div data-view="players">
         <section>
           <div class="toolbar">
             <select id="player-search-by" aria-label="Search by">
               <option value="name">By name</option>
-              <option value="address">By IP address</option>
+              <option value="address" data-needs="address.ban">By IP address</option>
               <option value="device">By hardware ID</option>
             </select>
             <input id="player-search" type="search" placeholder="Search" aria-label="Search players">
@@ -316,10 +455,26 @@
                 <button type="button" id="open-paintings">Paintings</button></div>
             </div>
             <div class="action">
+              <h3>Warn</h3>
+              <div class="row"><select id="warn-reason" aria-label="Reason">
+                  <option value="behavior">Inappropriate behavior</option>
+                  <option value="bullying">Bullying</option>
+                  <option value="personal">Personal information</option>
+                  <option value="scamming">Scamming</option>
+                  <option value="custom">Custom (the note is shown to them)</option>
+                </select>
+                <input id="warn-note" maxlength="200" placeholder="Note for staff (optional)" aria-label="Note">
+                <button type="button" data-action="warn">Warn</button></div>
+              <div class="row" style="margin-top:8px"><button type="button" data-action="unwarn">Take back latest</button></div>
+            </div>
+            <div class="action">
               <h3>Message</h3>
               <div class="row"><input id="message-text" maxlength="200" placeholder="Text" aria-label="Message">
                 <button type="button" data-action="message">Send</button></div>
               <div class="row" style="margin-top:8px"><button type="button" data-action="kick">Disconnect</button></div>
+              <div class="row" style="margin-top:8px" title="In the game: both of you online, you in a room">
+                <button type="button" data-action="summon">Bring to me</button>
+                <button type="button" data-action="goto">Go to them</button></div>
             </div>
             <div class="action">
               <h3>Username and bio</h3>
@@ -359,6 +514,19 @@
           <h3 style="margin:16px 0 4px">Timeline</h3>
           <ul id="timeline"></ul>
           <div class="empty" id="no-timeline" hidden>Nothing yet.</div>
+          <div id="made-block" hidden>
+            <h3 class="record-title">Items they made</h3>
+            <p class="hint" style="margin:0 0 8px">From the Item Maker. A picture taken off counts against them, and cannot be uploaded again.</p>
+            <div class="made-items" id="made-items"></div>
+            <div class="empty" id="no-made-items" hidden>None.</div>
+            <div class="toolbar"><span class="hint" id="uploads-state"></span>
+              <button type="button" id="uploads-toggle"></button></div>
+          </div>
+          <h3 class="record-title">Mod notes</h3>
+          <p class="hint" style="margin:0 0 8px">For the other staff only: the player never sees these.</p>
+          <div class="note-row"><textarea id="note-text" maxlength="500" rows="2" placeholder="Add a note about this player" aria-label="New note"></textarea>
+            <button type="button" class="primary" id="note-add">Add note</button></div>
+          <ul class="notes" id="player-notes"></ul>
         </section>
       </div>
 
@@ -446,6 +614,91 @@
         </section>
       </div>
 
+      <div data-view="review" hidden>
+        <section>
+          <h2>Waiting for approval</h2>
+          <p class="hint">Items players made while the admin asks for them to be approved first, and every new picture a player gives one (unless the admin says not). Pictures are blurred: click one to see it. An item let in is given to its maker; one turned away is deleted (a picture turned away is only taken off).</p>
+          <div class="review-list" id="review-list"></div>
+          <div class="empty" id="no-review" hidden>Nothing is waiting.</div>
+          <h3 style="margin:18px 0 4px">Picture uploads stopped</h3>
+          <p class="hint">A player whose 3 pictures were turned away (or taken off) can upload no more till they are let again, which clears the count. A picture turned away can never be sent again.</p>
+          <div class="toolbar"><input id="stop-name" maxlength="20" placeholder="Username" aria-label="Player whose uploads to stop">
+            <button type="button" class="danger" id="stop-go">Stop their uploads</button></div>
+          <ul class="plain" id="stopped-list"></ul>
+          <div class="empty" id="no-stopped" hidden>Nobody.</div>
+          <p class="status" id="review-status" role="status"></p>
+        </section>
+      </div>
+
+      <div data-view="items" hidden>
+        <section>
+          <h2 id="item-form-title">Make an item</h2>
+          <p class="hint">One of the game's items under a new name, price and colours. Players have it at once, with no restart: in the item finder, and first in the hidden shops of oddities.</p>
+          <div class="actions">
+            <div class="action">
+              <h3>Made from</h3>
+              <div class="row">
+                <select id="item-kind" aria-label="Kind">
+                  <option value="clothing">Clothing</option>
+                  <option value="den">Den item</option>
+                </select>
+                <input id="item-base" type="number" min="1" placeholder="Id of the game's item" aria-label="Id of the item to copy">
+                <button type="button" id="item-look">Look up</button></div>
+              <p class="hint" id="item-base-name"></p>
+            </div>
+            <div class="action">
+              <h3>The new item</h3>
+              <div class="row"><input id="item-name" maxlength="40" placeholder="Name" aria-label="Name"></div>
+              <div class="row" style="margin-top:8px"><input id="item-cost" type="number" min="0" placeholder="Price in gems" aria-label="Price in gems">
+                <label class="check"><input type="checkbox" id="item-members"> Members only</label></div>
+              <div id="item-colours" aria-label="Colours offered"></div>
+              <div class="row" style="margin-top:12px">
+                <button type="button" class="primary" id="item-save">Make it</button>
+                <button type="button" id="item-cancel" hidden>Cancel</button></div>
+            </div>
+          </div>
+          <p class="status" id="item-status" role="status"></p>
+        </section>
+        <section>
+          <h2>Items made</h2>
+          <div class="table-wrap"><table>
+            <thead><tr><th>Picture</th><th class="num">Id</th><th>Name</th><th>Made from</th><th class="num">Price</th><th>By</th><th></th></tr></thead>
+            <tbody id="items"></tbody>
+          </table></div>
+          <div class="empty" id="no-items" hidden>None yet.</div>
+        </section>
+        <section>
+          <h2>Item finder and inventories</h2>
+          <p class="hint">Any item of the game's or a custom one, by its id. A locked item is kept out of the item finder for players; admins and developers still find it there, marked locked. Taking an item takes every one of it the player has.</p>
+          <div class="actions">
+            <div class="action">
+              <h3>Lock out of the finder</h3>
+              <div class="row">
+                <select id="lock-kind" aria-label="Kind">
+                  <option value="clothing">Clothing</option>
+                  <option value="den">Den item</option>
+                </select>
+                <input id="lock-id" type="number" min="1" placeholder="Item id" aria-label="Item id">
+                <button type="button" id="lock-add">Lock</button></div>
+              <ul class="plain" id="locked-items"></ul>
+              <div class="empty" id="no-locked">Nothing locked.</div>
+            </div>
+            <div class="action">
+              <h3>Take from a player</h3>
+              <div class="row"><input id="take-name" maxlength="20" placeholder="Username" aria-label="Username"></div>
+              <div class="row" style="margin-top:8px">
+                <select id="take-kind" aria-label="Kind">
+                  <option value="clothing">Clothing</option>
+                  <option value="den">Den item</option>
+                </select>
+                <input id="take-id" type="number" min="1" placeholder="Item id" aria-label="Item id">
+                <button type="button" id="take-go">Take</button></div>
+            </div>
+          </div>
+          <p class="status" id="control-status" role="status"></p>
+        </section>
+      </div>
+
       <div data-view="bans" hidden>
         <section>
           <h2>Banned and silenced</h2>
@@ -489,6 +742,7 @@
           <div class="empty" id="no-filter-hits" hidden>Nobody.</div>
         </section>
       </div>
+      </div>
     </div>
 
     <script src="/captcha.js"></script>
@@ -499,7 +753,7 @@
       const REFRESH_MS = 8000;
 
       let signedIn = false;
-      let tab = "players";
+      let tab = "home";
       let selected = null; // the username of the player whose box is open
       let players = [];
       let chatQuery = null; // what the Chat page shows: {username, room, text}
@@ -646,6 +900,7 @@
           ["Ban", player.banned === 0 ? "—" : `${left(player.banned)} · ${player.banReason}`],
           ["Chat", player.silenced === 0 ? "—" : `Silenced: ${left(player.silenced).toLowerCase()}`],
           ["Reports waiting", String(player.openReports)],
+          ["Warnings", String(player.warnings || 0)],
           ["Stopped by the filter", `${player.stoppedThisWeek} in the last 7 days`],
           ["Hardware IDs", player.devicesKnown ? String(player.devicesKnown) : "None"],
           ["Paintings", String(player.paintings)],
@@ -664,7 +919,51 @@
         if (document.activeElement !== $("ban-reason")) {
           $("ban-reason").value = player.banned === 0 ? "" : player.banReason;
         }
+        renderNotes(player.notes || []);
+        renderMade(player);
       };
+
+      // what they made in the Item Maker, for a report about one of its pictures
+      let uploadsStopped = false;
+      const renderMade = player => {
+        $("made-block").hidden = !permissions.has("items.approve");
+        const made = player.madeItems || [];
+        $("no-made-items").hidden = made.length > 0;
+        $("made-items").replaceChildren(...made.map(item => {
+          const row = el("div", undefined, "made-item");
+          const art = el("div", item.artUrl ? undefined : "No picture", "art");
+          if (item.artUrl) {
+            art.append(guardedPicture(item.artUrl));
+          }
+          const about = el("div");
+          about.append(el("strong", item.name), el("div", `${item.kind === "den" ? "den item" : "clothing"} ${item.id}${item.artWaiting ? " · picture waiting for approval" : ""}`, "hint"));
+          row.append(art, about);
+          if (item.artUrl) {
+            row.append(button("Take picture off", async () => {
+              if (!confirm(`Take the picture off ${item.name}? It counts against ${player.username}.`)) {
+                return;
+              }
+              const result = await api("review", {action: "takePicture", kind: item.kind, id: item.id});
+              setStatus($("detail-status"), said(result), !result.ok);
+              await loadDetail();
+            }, "danger"));
+          }
+          return row;
+        }));
+        uploadsStopped = player.picturesStopped;
+        $("uploads-state").textContent = player.picturesStopped ? "Picture uploads: stopped."
+          : `Picture uploads: allowed (${player.pictureStrikes || 0} of 3 turned away).`;
+        $("uploads-toggle").textContent = player.picturesStopped ? "Let them upload again" : "Stop their picture uploads";
+        $("uploads-toggle").className = player.picturesStopped ? "" : "danger";
+      };
+      $("uploads-toggle").addEventListener("click", async () => {
+        if (!selected) {
+          return;
+        }
+        const result = await api("review", {action: "uploads", username: selected, blocked: !uploadsStopped});
+        setStatus($("detail-status"), said(result), !result.ok);
+        await loadDetail();
+      });
 
       // the player's Jam-a-Grams or wall posts, sent and received
       // (lib/chatlog.js): asked with the rest of the extras, and a page more
@@ -735,12 +1034,45 @@
         $("no-timeline").hidden = events.length > 0;
       };
 
+      // mod notes (lib/modnotes.js): the newest first, each removable by its
+      // writer (or an admin).
+      const renderNotes = notes => {
+        $("player-notes").replaceChildren(...notes.map(note => {
+          const row = el("li");
+          const head = el("div", `${when(note.at)} · ${note.by}`, "who");
+          row.append(head, note.text);
+          head.append(button("Remove", async () => {
+            if (!confirm("Remove this note?")) {
+              return;
+            }
+            const result = await api("act", {username: selected, action: "deleteNote", id: note.id});
+            setStatus($("detail-status"), said(result), !result.ok);
+            refresh();
+          }));
+          return row;
+        }));
+      };
+      $("note-add").addEventListener("click", async () => {
+        const text = $("note-text").value.trim();
+        if (!text || !selected) {
+          return;
+        }
+        $("note-add").disabled = true;
+        const result = await api("act", {username: selected, action: "note", text});
+        $("note-add").disabled = false;
+        setStatus($("detail-status"), said(result), !result.ok);
+        if (result.ok) {
+          $("note-text").value = "";
+          refresh();
+        }
+      });
+
       const select = username => {
         selected = username;
         hashArg = username || "";
         setHash();
         setStatus($("detail-status"), "");
-        for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text"]) {
+        for (const id of ["ban-hours", "ban-reason", "silence-hours", "message-text", "warn-note", "note-text"]) {
           $(id).value = "";
         }
         renderPlayers();
@@ -775,6 +1107,7 @@
           case "banReason": case "banAddress": case "banDevices": return {reason: $("ban-reason").value};
           case "silence": return {hours: numberFrom("silence-hours")};
           case "message": return {text: $("message-text").value};
+          case "warn": return {reason: $("warn-reason").value, note: $("warn-note").value};
           default: return {};
         }
       };
@@ -783,6 +1116,7 @@
         banDevices: name => `Hardware ban ${name}? Everyone on their hardware is put out.`,
         unbanDevices: name => `Lift the hardware bans on ${name}?`,
         rejectName: name => `Reject the username ${name}? They are signed out and must pick another.`,
+        unwarn: name => `Take back ${name}'s latest warning?`,
       };
 
       $("detail").addEventListener("click", async event => {
@@ -837,11 +1171,15 @@
       const placeOf = line => (line.kind === "whisper" ? `Whisper to ${line.to}` : line.kind === "jamagram" ? `Jam-a-Gram to ${line.to}`
         : line.kind === "wall" ? `On ${line.to}'s wall` : line.room);
 
+      // a line as typed, its emoji ("\{1f600}", as the game sends them) as themselves
+      const withEmoji = text => String(text).replace(/\\\{([0-9a-f]{2,6}(?:-[0-9a-f]{2,6}){0,9})\}/g,
+        (whole, hex) => String.fromCodePoint(...hex.split("-").map(part => parseInt(part, 16))));
+
       const lineNode = (line, inContext = false) => {
         const item = el("li", undefined, inContext && line.marked ? "this" : "");
         const who = button(line.username, () => openPlayer(line.username), "chat-who");
         const text = el("span", undefined, "chat-text");
-        text.append(line.text || "(no words)", el("span", placeOf(line), "chat-room"));
+        text.append(withEmoji(line.text || "(no words)"), el("span", placeOf(line), "chat-room"));
         item.append(el("span", when(line.at), "chat-time"), who, text);
         if (!inContext) {
           item.append(button("Around", () => showContext(line.id), "chat-more"));
@@ -1206,21 +1544,380 @@
         $("no-filter-hits").hidden = list.length > 0;
       };
 
+      // ---- items (lib/customitems.js)
+      let items = [];
+      let editing = null; // the item the form is changing, or null to make one
+      let baseColours = []; // the colours of the item looked up
+
+      const showColours = (colours, chosen) => {
+        $("item-colours").replaceChildren(...colours.map((colour, index) => {
+          const box = el("input");
+          box.type = "checkbox";
+          box.value = String(colour);
+          box.checked = !chosen || chosen.includes(colour);
+          const label = el("label", undefined, "check");
+          label.append(box, ` Colour ${index + 1}`);
+          return label;
+        }));
+      };
+
+      const lookUp = async () => {
+        const result = await api(`items/base?kind=${$("item-kind").value}&id=${encodeURIComponent($("item-base").value.trim())}`);
+        baseColours = result.ok && result.data.colors ? result.data.colors : [];
+        if (!result.ok) {
+          $("item-base-name").textContent = said(result);
+          showColours([]);
+          return null;
+        }
+        if (!editing) {
+          $("item-base-name").textContent = `${result.data.name || "(no name)"}: ${result.data.cost} gems in the game.`;
+          if (!$("item-name").value.trim()) {
+            $("item-name").value = result.data.name || "";
+          }
+          showColours(baseColours);
+        }
+        return result.data;
+      };
+      $("item-look").addEventListener("click", lookUp);
+      $("item-kind").addEventListener("change", () => {
+        $("item-base-name").textContent = "";
+        showColours([]);
+      });
+
+      const itemForm = item => {
+        editing = item;
+        $("item-form-title").textContent = item ? `Change ${item.name}` : "Make an item";
+        $("item-save").textContent = item ? "Save" : "Make it";
+        $("item-cancel").hidden = !item;
+        for (const field of ["item-kind", "item-base", "item-look"]) {
+          $(field).disabled = Boolean(item);
+        }
+        if (item) {
+          $("item-kind").value = item.kind;
+        }
+        $("item-base").value = item ? item.base : "";
+        $("item-name").value = item ? item.name : "";
+        $("item-cost").value = item ? item.cost : "";
+        $("item-members").checked = Boolean(item && item.members);
+        $("item-base-name").textContent = item ? `${item.baseName} (${item.kind === "den" ? "den item" : "clothing"} ${item.base})` : "";
+        showColours([]);
+        if (item && item.kind === "clothing") {
+          // the base's colours, and any of the item's own that are not among them
+          lookUp().then(() => showColours([...new Set([...baseColours, ...item.colors])], item.colors));
+        }
+      };
+      $("item-cancel").addEventListener("click", () => itemForm(null));
+
+      $("item-save").addEventListener("click", async () => {
+        const fields = {name: $("item-name").value, cost: $("item-cost").value, members: $("item-members").checked};
+        const boxes = [...$("item-colours").querySelectorAll("input")];
+        if (boxes.length) {
+          fields.colors = boxes.filter(box => box.checked).map(box => Number(box.value));
+          if (!fields.colors.length) {
+            setStatus($("item-status"), "Leave at least one colour.", true);
+            return;
+          }
+        }
+        $("item-save").disabled = true;
+        const result = await api("items", editing
+          ? {action: "update", kind: editing.kind, id: editing.id, ...fields}
+          : {action: "create", kind: $("item-kind").value, base: $("item-base").value.trim(), ...fields});
+        $("item-save").disabled = false;
+        setStatus($("item-status"), said(result), !result.ok);
+        if (result.ok) {
+          itemForm(null);
+          refresh();
+        }
+      });
+
+      const renderItems = () => {
+        $("items").replaceChildren(...items.map(item => {
+          const row = el("tr");
+          const buttons = el("td");
+          buttons.append(button("Change", () => itemForm(item)), " ",
+            button(item.inShop ? "Take off sale" : "Put on sale", async () => {
+              const result = await api("items", {action: "update", kind: item.kind, id: item.id, inShop: !item.inShop});
+              setStatus($("item-status"), said(result), !result.ok);
+              await refresh();
+            }), " ",
+            button(item.locked ? "Unlock" : "Lock", async () => {
+              const result = await api("items", {action: item.locked ? "unlock" : "lock", kind: item.kind, id: item.id});
+              setStatus($("item-status"), said(result), !result.ok);
+              await refresh();
+            }), " ",
+            button("Picture", () => pickPicture(item)), " ",
+            ...(item.artUrl && item.kind === "clothing" ? [button(item.artMode === "texture" ? "Worn: texture" : "Worn: sticker", async () => {
+              const result = await api("items", {action: "look", kind: item.kind, id: item.id, look: item.artMode === "texture" ? "sticker" : "texture"});
+              setStatus($("item-status"), said(result), !result.ok);
+              await refresh();
+            }), " "] : []),
+            ...(item.artUrl ? [button("Remove picture", () => sendPicture(item, null)), " "] : []),
+            button("Delete", async () => {
+              if (!confirm(`Delete ${item.name}? It goes from the game and from every player who has it. This cannot be undone.`)) {
+                return;
+              }
+              const result = await api("items", {action: "delete", kind: item.kind, id: item.id});
+              setStatus($("item-status"), said(result), !result.ok);
+              await refresh();
+            }));
+          const art = el("td");
+          if (item.artUrl) {
+            const picture = el("img", undefined, "item-art");
+            picture.src = item.artUrl;
+            picture.alt = "";
+            art.append(picture);
+          }
+          else {
+            art.append(el("span", "—", "hint"));
+          }
+          row.append(art, el("td", String(item.id), "num"), el("td", `${item.name}${item.members ? " (members)" : ""}${item.ownerId ? " (a player's own)" : item.inShop ? "" : " (off sale)"}${item.locked ? " (locked)" : ""}`),
+            el("td", `${item.baseName} (${item.kind === "den" ? "den item" : "clothing"} ${item.base})`), el("td", String(item.cost), "num"),
+            el("td", item.createdBy), buttons);
+          return row;
+        }));
+        $("no-items").hidden = items.length > 0;
+      };
+
+      // an item's own picture (lib/itemart.js): chosen here, sent as it is
+      // a picture made ready to send (lib/itemart.js): as it is when the
+      // server takes it as it is (a PNG, JPEG or GIF small enough: a GIF keeps
+      // moving), else drawn into a PNG that fits, smaller until it is small
+      // enough. any picture this browser can open will do (WebP, AVIF, BMP...).
+      // null when it cannot be read at all.
+      const PICTURE_SIDE = 512;
+      const PICTURE_BYTES = 300 * 1024;
+      const preparePicture = async file => {
+        const kept = ["image/png", "image/jpeg", "image/gif"].includes(file.type);
+        let image = null;
+        try {
+          image = await createImageBitmap(file);
+        }
+        catch (err) {
+          return kept ? file : null;
+        }
+        if (kept && file.size <= PICTURE_BYTES && image.width <= PICTURE_SIDE && image.height <= PICTURE_SIDE) {
+          image.close();
+          return file;
+        }
+        for (const side of [PICTURE_SIDE, 384, 256, 128]) {
+          const scale = Math.min(1, side / image.width, side / image.height);
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+          if (blob && blob.size <= PICTURE_BYTES) {
+            image.close();
+            return blob;
+          }
+        }
+        image.close();
+        return null;
+      };
+
+      const sendPicture = async (item, chosen) => {
+        const file = chosen ? await preparePicture(chosen) : null;
+        if (chosen && !file) {
+          setStatus($("item-status"), "That picture could not be read. Try a PNG, JPEG or GIF.", true);
+          return;
+        }
+        setStatus($("item-status"), file ? "Sending the picture..." : "Taking the picture away...");
+        try {
+          const response = await fetch(`/mod/api/itemart?kind=${encodeURIComponent(item.kind)}&id=${encodeURIComponent(item.id)}${file ? "" : "&remove=1"}`,
+            {method: "POST", headers: {"Content-Type": "application/octet-stream"}, body: file || new Uint8Array(0)});
+          const data = await response.json().catch(() => ({}));
+          setStatus($("item-status"), data.ok || data.error || "That did not work.", !data.ok);
+        }
+        catch (err) {
+          setStatus($("item-status"), "The server did not answer.", true);
+        }
+        refresh();
+      };
+      const pickPicture = item => {
+        const file = el("input");
+        file.type = "file";
+        file.accept = "image/*";
+        file.addEventListener("change", () => file.files[0] && sendPicture(item, file.files[0]));
+        file.click();
+      };
+
+      // ---- the dashboard's item lock: any item by name or id, locked or
+      // unlocked where it is found (the Items page lists every locked one).
+      let quickLockTimer = null;
+      let quickLockAsked = 0;
+      const quickLockFind = async () => {
+        const query = $("quick-lock-q").value.trim();
+        const asked = ++quickLockAsked;
+        const result = await api(`items/find?q=${encodeURIComponent(query)}&kind=${$("quick-lock-kind").value}`);
+        if (asked !== quickLockAsked || !result.ok) {
+          return;
+        }
+        const {results, total, lockedCount} = result.data;
+        $("lock-count").textContent = lockedCount === 1 ? "1 item is locked now." : `${lockedCount} items are locked now.`;
+        const shown = query ? results : [];
+        $("quick-lock-results").replaceChildren(...shown.map(item => {
+          const row = el("li");
+          row.append(el("span", item.name || "(no name)"),
+            el("span", `${item.kind === "den" ? "den item" : "clothing"} ${item.id}${item.custom ? ", custom" : ""}`, "meta"));
+          if (item.locked) {
+            row.append(el("span", "locked", "is-locked"));
+          }
+          row.append(button(item.locked ? "Unlock" : "Lock", async () => {
+            const changed = await api("items", {action: item.locked ? "unlock" : "lock", kind: item.kind, id: item.id});
+            setStatus($("quick-lock-status"), said(changed), !changed.ok);
+            await quickLockFind();
+          }, item.locked ? undefined : "primary"));
+          return row;
+        }));
+        $("quick-lock-more").hidden = !query || (results.length > 0 && total <= results.length);
+        $("quick-lock-more").textContent = results.length === 0 ? "No item matches."
+          : `${total} items match; these are the first ${results.length}. Type more of the name.`;
+      };
+      $("quick-lock-q").addEventListener("input", () => {
+        clearTimeout(quickLockTimer);
+        quickLockTimer = setTimeout(quickLockFind, 250);
+      });
+      $("quick-lock-kind").addEventListener("change", quickLockFind);
+      $("quick-lock-all").addEventListener("click", () => showTab("items"));
+
+      // ---- locks and taking items (lib/itemcontrol.js)
+      let lockedItems = [];
+      const renderLocked = () => {
+        $("locked-items").replaceChildren(...lockedItems.map(entry => {
+          const row = el("li", `${entry.name || "(no name)"} (${entry.kind === "den" ? "den item" : "clothing"} ${entry.id}) `);
+          row.append(button("Unlock", async () => {
+            const result = await api("items", {action: "unlock", kind: entry.kind, id: entry.id});
+            setStatus($("control-status"), said(result), !result.ok);
+            await refresh();
+          }));
+          return row;
+        }));
+        $("no-locked").hidden = lockedItems.length > 0;
+      };
+      $("lock-add").addEventListener("click", async () => {
+        const result = await api("items", {action: "lock", kind: $("lock-kind").value, id: $("lock-id").value.trim()});
+        setStatus($("control-status"), said(result), !result.ok);
+        if (result.ok) {
+          $("lock-id").value = "";
+          await refresh();
+        }
+      });
+      $("take-go").addEventListener("click", async () => {
+        const name = $("take-name").value.trim();
+        const id = $("take-id").value.trim();
+        if (!name || !id || !confirm(`Take every ${$("take-kind").value === "den" ? "den item" : "clothing item"} ${id} from ${name}?`)) {
+          return;
+        }
+        const result = await api("items", {action: "take", username: name, kind: $("take-kind").value, id});
+        setStatus($("control-status"), said(result), !result.ok);
+      });
+
+      // pictures players upload are blurred till a moderator chooses to look:
+      // one that is gore need not be seen whole to be turned away.
+      const revealed = new Set(); // pictures shown, by address (kept over refreshes)
+      const guardedPicture = src => {
+        const picture = el("img", undefined, revealed.has(src) ? "guarded shown" : "guarded");
+        picture.src = src;
+        picture.alt = "";
+        picture.title = revealed.has(src) ? "" : "Click to show";
+        picture.addEventListener("click", () => {
+          revealed.add(src);
+          picture.classList.add("shown");
+          picture.title = "";
+        });
+        return picture;
+      };
+
+      // ---- what players made that waits for approval (lib/playeritems.js)
+      const renderReview = data => {
+        const waiting = data.waiting || [];
+        $("no-review").hidden = waiting.length > 0;
+        $("review-list").replaceChildren(...waiting.map(entry => {
+          const card = el("div", undefined, "review-card");
+          const art = el("div", entry.artUrl ? undefined : "No picture", "art");
+          if (entry.artUrl) {
+            art.append(guardedPicture(entry.artUrl));
+          }
+          const about = el("div");
+          about.append(el("strong", entry.name), el("div", `${entry.waiting === "item" ? "A new item" : "A new picture"} · ${entry.kind === "den" ? "den item" : "clothing"} from ${entry.baseName}`, "hint"),
+            el("div", `by ${entry.maker} · ${when(entry.createdAt)}${entry.makerStrikes ? ` · ${entry.makerStrikes} of ${data.strikes} pictures turned away before` : ""}`, "hint"));
+          const buttons = el("div", undefined, "buttons");
+          const decide = approve => async () => {
+            const result = await api("review", {kind: entry.kind, id: entry.id, approve});
+            setStatus($("review-status"), said(result), !result.ok);
+            await refresh();
+          };
+          buttons.append(button("Approve", decide(true), "primary"), button("Turn away", decide(false), "danger"));
+          card.append(art, about, buttons);
+          return card;
+        }));
+        const stopped = data.stopped || [];
+        $("no-stopped").hidden = stopped.length > 0;
+        $("stopped-list").replaceChildren(...stopped.map(username => {
+          const row = el("li", `${username} `);
+          row.append(button("Let them upload again", async () => {
+            const result = await api("review", {action: "uploads", username, blocked: false});
+            setStatus($("review-status"), said(result), !result.ok);
+            await refresh();
+          }));
+          return row;
+        }));
+      };
+      $("stop-go").addEventListener("click", async () => {
+        const username = $("stop-name").value.trim();
+        if (!username) {
+          return;
+        }
+        const result = await api("review", {action: "uploads", username, blocked: true});
+        setStatus($("review-status"), said(result), !result.ok);
+        if (result.ok) {
+          $("stop-name").value = "";
+        }
+        await refresh();
+      });
+
+      let permissions = new Set(); // what the signed-in role may do (GET /mod/api/me)
+
       const refresh = async () => {
         clearTimeout(timer);
         if (!signedIn) {
           return;
         }
         const shown = tab;
-        const counts = await api("overview");
+        const counts = permissions.has("player.view") ? await api("overview") : {ok: false};
         if (counts.ok) {
-          $("report-count").textContent = counts.data.reports ? ` (${counts.data.reports})` : "";
-          $("request-count").textContent = counts.data.requests ? ` (${counts.data.requests})` : "";
-          $("masterpiece-count").textContent = counts.data.paintings ? ` (${counts.data.paintings})` : "";
+          $("report-count").textContent = counts.data.reports ? String(counts.data.reports) : "";
+          $("request-count").textContent = counts.data.requests ? String(counts.data.requests) : "";
+          $("masterpiece-count").textContent = counts.data.paintings ? String(counts.data.paintings) : "";
           $("online-count").textContent = `${counts.data.online} playing`;
+          $("home-online").textContent = String(counts.data.online);
+          $("home-reports").textContent = String(counts.data.reports);
+          $("home-requests").textContent = String(counts.data.requests);
+          $("home-paintings").textContent = String(counts.data.paintings);
+          for (const [id, count] of [["home-reports", counts.data.reports], ["home-requests", counts.data.requests], ["home-paintings", counts.data.paintings]]) {
+            $(id).closest(".tile").classList.toggle("attention", count > 0);
+          }
           // what waits, in the page's title too, for when it is in another tab.
           const waiting = counts.data.reports + counts.data.requests + counts.data.paintings;
           document.title = waiting ? `(${waiting}) Moderators` : "Moderators";
+        }
+        if (shown === "home") {
+          if (permissions.has("items.create") && !$("quick-lock-q").value.trim()) {
+            quickLockFind();
+          }
+          const result = await api("notes");
+          const notes = result.ok ? result.data.notes : [];
+          $("home-notes").replaceChildren(...notes.map(note => {
+            const row = el("li");
+            const head = el("div", undefined, "who");
+            const about = el("button", note.about, "about");
+            about.type = "button";
+            about.addEventListener("click", () => openPlayer(note.about));
+            head.append(about, `${when(note.at)} · by ${note.by}`);
+            row.append(head, note.text);
+            return row;
+          }));
+          $("no-home-notes").hidden = notes.length > 0;
         }
         // out of sight, only the counts (for the title); the rest when it is back.
         if (document.hidden) {
@@ -1288,6 +1985,21 @@
             renderFilterHits(hits.data.players);
           }
         }
+        else if (shown === "review") {
+          const result = await api("review");
+          if (result.ok) {
+            renderReview(result.data);
+          }
+        }
+        else if (shown === "items") {
+          const result = await api("items");
+          if (result.ok) {
+            items = result.data.items;
+            lockedItems = result.data.locked;
+            renderItems();
+            renderLocked();
+          }
+        }
         if (signedIn) {
           clearTimeout(timer);
           timer = setTimeout(refresh, REFRESH_MS);
@@ -1337,6 +2049,9 @@
       const showTab = name => {
         tab = name;
         setHash();
+        const named = document.querySelector(`nav button[data-tab="${name}"]`);
+        // the tab's own words: not its icon, nor its count
+        $("page-name").textContent = named ? [...named.childNodes].filter(node => node.nodeType === 3).map(node => node.textContent).join("").trim() : "";
         for (const one of document.querySelectorAll("nav button")) {
           one.setAttribute("aria-selected", String(one.dataset.tab === name));
         }
@@ -1351,20 +2066,79 @@
           showTab(one.dataset.tab);
         });
       }
+      // the dashboard: each number opens its page; the search opens a player
+      for (const tile of document.querySelectorAll("[data-goto]")) {
+        tile.addEventListener("click", () => showTab(tile.dataset.goto));
+      }
+      const homeFind = () => {
+        const name = $("home-search").value.trim();
+        if (name) {
+          openPlayer(name);
+        }
+      };
+      $("home-search-go").addEventListener("click", homeFind);
+      $("home-search").addEventListener("keydown", event => {
+        if (event.key === "Enter") {
+          homeFind();
+        }
+      });
       document.addEventListener("visibilitychange", () => {
         if (!document.hidden) {
           refresh();
         }
       });
 
+      // the permission (lib/roles.js) each button needs: one the signed-in
+      // role does not hold is not shown. the server checks again either way.
+      const ACTION_PERMISSIONS = {
+        ban: "player.ban", banReason: "player.ban", unban: "player.ban",
+        silence: "chat.silence", unsilence: "chat.silence",
+        kick: "player.kick", message: "player.warn", warn: "player.warn", unwarn: "player.warn",
+        rejectName: "player.names", acceptName: "player.names", clearBio: "player.names",
+        banAddress: "address.ban", summon: "player.summon", goto: "player.goto",
+      };
+      const applyPermissions = async () => {
+        const result = await api("me");
+        if (!result.ok) {
+          return;
+        }
+        const allowed = new Set(result.data.permissions || []);
+        permissions = allowed;
+        for (const pressed of document.querySelectorAll("button[data-action]")) {
+          const needed = ACTION_PERMISSIONS[pressed.dataset.action];
+          pressed.hidden = Boolean(needed) && !allowed.has(needed);
+        }
+        // the pages the role may see; the first of them when the one open is not.
+        const pages = [...document.querySelectorAll("nav button")];
+        for (const page of pages) {
+          page.hidden = !allowed.has(page.dataset.needs);
+        }
+        // searching by address: for the roles that ban addresses
+        const byAddress = document.querySelector('#player-search-by option[value="address"]');
+        byAddress.hidden = byAddress.disabled = !allowed.has(byAddress.dataset.needs);
+        if (byAddress.disabled && $("player-search-by").value === "address") {
+          $("player-search-by").value = "name";
+        }
+        $("quick-lock").hidden = !allowed.has("items.create");
+        const open = pages.find(page => page.dataset.tab === tab && !page.hidden) || pages.find(page => !page.hidden);
+        if (open) {
+          tab = open.dataset.tab;
+        }
+        if (result.data.role) {
+          $("who").textContent = `${result.data.username} (${result.data.role})`;
+        }
+      };
+
       const showPanel = username => {
         signedIn = true;
         $("who").textContent = username;
         $("gate").hidden = true;
         $("panel").hidden = false;
-        if (!applyHash()) {
-          showTab(tab);
-        }
+        applyPermissions().then(() => {
+          if (!applyHash()) {
+            showTab(tab);
+          }
+        });
       };
 
       $("gate-form").addEventListener("submit", async event => {

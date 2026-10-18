@@ -1,4 +1,4 @@
-"""make-emote.py <picture.png> [name] [--black-background]
+"""make-emote.py <picture.png> [name] [--slot=N] [--black-background]
 
 Adds an emote of our own to swf/HUDAssets.swf, from a picture: the classes
 "<name>" (the emote over an animal's head and in a chat bubble) and
@@ -10,7 +10,9 @@ The game makes an emote by its class name (gui.EmoticonUtility), so the
 name also has to be in that class's lists: swf-src/EmoticonUtility.cinit.pcode,
 which tools/build-client.sh puts into the client.
 
-Running it again replaces what an earlier run added. The picture must be an
+Each emote of ours has a slot (--slot=N, 0 by default: emo_temp's), its
+own character ids and its own code: running it again for a slot replaces
+what an earlier run put there, and leaves the other slots as they are. The picture must be an
 8-bit RGBA PNG, not interlaced; --black-background is for one that came on
 black where it should be see-through. Needs nothing but Python.
 """
@@ -267,18 +269,23 @@ def main():
         sys.exit(__doc__)
     words = [word for word in sys.argv[1:] if not word.startswith("--")]
     name = words[1] if len(words) > 1 else "emo_temp"
+    slots = [word for word in sys.argv[1:] if word.startswith("--slot=")]
+    slot = int(slots[0].split("=", 1)[1]) if slots else 0
+    first_id = FIRST_ID + slot * 5
+    # slot 0 keeps the name it always had, so that a run for it replaces it
+    abc_name = ABC_NAME if slot == 0 else ABC_NAME + b"_" + str(slot).encode()
     picture = read_png(Path(words[0]))
     if "--black-background" in sys.argv:
         picture = without_background(*picture)
     width, height, pixels = shrunk(*picture, SHRINK)
-    bitmap, large_shape, small_shape, large, small = range(FIRST_ID, FIRST_ID + 5)
+    bitmap, large_shape, small_shape, large, small = range(first_id, first_id + 5)
     ours = [
         tag(36, struct.pack("<HBHH", bitmap, 5, width, height) + zlib.compress(pixels, 9)),
         picture_shape(large_shape, bitmap, width, height, LARGE_WIDTH),
         picture_shape(small_shape, bitmap, width, height, SMALL_WIDTH),
         clip(large, large_shape),
         clip(small, small_shape),
-        tag(82, struct.pack("<I", 1) + ABC_NAME + b"\0" + abc([name, f"{name}_sml"])),
+        tag(82, struct.pack("<I", 1) + abc_name + b"\0" + abc([name, f"{name}_sml"])),
         tag(76, struct.pack("<H", 2) + struct.pack("<H", large) + name.encode() + b"\0" + struct.pack("<H", small) + f"{name}_sml".encode() + b"\0"),
     ]
 
@@ -295,9 +302,9 @@ def main():
 
     def is_ours(code, whole, inner):
         if code in (2, 36, 39):
-            return FIRST_ID <= struct.unpack_from("<H", inner)[0] < FIRST_ID + 5
+            return first_id <= struct.unpack_from("<H", inner)[0] < first_id + 5
         if code == 82:
-            return inner[4:4 + len(ABC_NAME) + 1] == ABC_NAME + b"\0"
+            return inner[4:4 + len(abc_name) + 1] == abc_name + b"\0"
         return code == 76 and struct.unpack_from("<H", inner, 2)[0] == large
     kept = [entry for entry in tags if not is_ours(*entry)]
     first_frame = next(index for index, (code, _, _) in enumerate(kept) if code == 1)

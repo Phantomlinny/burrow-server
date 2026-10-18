@@ -59,7 +59,16 @@ const day = time => new Date(time).toISOString().slice(0, 10);
   fs.mkdirSync(filesDir, {recursive: true});
 
   // {builds: {build: newest sale start}, rooms: {room: {build: hash of its file}}}
-  let index = fs.existsSync(indexFile) ? JSON.parse(fs.readFileSync(indexFile)) : null;
+  // read if it is there: no separate look first, which the file could change after
+  let index = null;
+  try {
+    index = JSON.parse(fs.readFileSync(indexFile));
+  }
+  catch (err) {
+    if (err.code !== "ENOENT") {
+      throw err;
+    }
+  }
   if (!index) {
     index = {builds: {}, rooms: {}};
     const jobs = [];
@@ -83,14 +92,25 @@ const day = time => new Date(time).toISOString().slice(0, 10);
         const [build, room] = jobs.pop();
         const body = await download(build, `roomDefs/${room}.xroom`);
         const hash = body ? crypto.createHash("sha1").update(body).digest("hex").slice(0, 12) : null;
-        if (body && !fs.existsSync(path.join(filesDir, hash))) {
-          fs.writeFileSync(path.join(filesDir, hash), body);
+        // named by its own hash, so one already there is this same file: "wx"
+        // writes only a new one, in the one step.
+        if (body) {
+          try {
+            fs.writeFileSync(path.join(filesDir, hash), body, {flag: "wx"});
+          }
+          catch (err) {
+            if (err.code !== "EEXIST") {
+              throw err;
+            }
+          }
         }
         (index.rooms[room] = index.rooms[room] || {})[build] = hash;
       }
     };
     await Promise.all(Array.from({length: WORKERS}, worker));
-    fs.writeFileSync(indexFile, JSON.stringify(index));
+    // written whole under another name, then put in its place
+    fs.writeFileSync(`${indexFile}.tmp`, JSON.stringify(index));
+    fs.renameSync(`${indexFile}.tmp`, indexFile);
   }
 
   console.log("Builds, by the newest sale start in each:");

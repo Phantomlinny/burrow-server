@@ -38,9 +38,9 @@ const byId = (rows, id) => rows.find(row => String(row.id) === String(id));
 const run = async () => {
   const registerJson = body => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({avatarType: 1, agreed: true, ...body})});
   for (const username of ["Ann", "Ben"]) {
-    assert.strictEqual((await registerJson({username, password: "Password01"})).status, 200);
+    assert.strictEqual((await registerJson({username, password: "KettlePass01"})).status, 200);
   }
-  const {client: a, roomId} = await arrive("Ann", "Password01");
+  const {client: a, roomId} = await arrive("Ann", "KettlePass01");
 
   // --- Epic Dens: twenty names; asking for the den of one leads into its room
   a.xt("dh", roomId);
@@ -147,7 +147,7 @@ const run = async () => {
   a.xt("di", den);
   assert.deepStrictEqual((await a.nextXt("di")).slice(13, 24), ["111", "222", "0", "333", "0", "0", "0", "0", "0", hat, "0"]);
   // A visitor is told what the hat is: its def and colour, then its id.
-  const {client: b, roomId: benRoom} = await arrive("Ben", "Password01");
+  const {client: b, roomId: benRoom} = await arrive("Ben", "KettlePass01");
   b.xt("dj", benRoom, "denAnn", 1, -1);
   const seen = await b.untilXt("ds");
   assert.deepStrictEqual(seen.slice(5), [mannequin, "3433", "1", "300", "400", "0", "0", "", "", "-1", "",
@@ -177,8 +177,8 @@ const run = async () => {
   assert.strictEqual((await a.nextXt("di"))[22], "0");
 
   // --- a player who is not in the game: their card still shows who they are
-  assert.strictEqual((await registerJson({username: "Cat", password: "Password01"})).status, 200);
-  const {client: c, roomId: catRoom} = await arrive("Cat", "Password01");
+  assert.strictEqual((await registerJson({username: "Cat", password: "KettlePass01"})).status, 200);
+  const {client: c, roomId: catRoom} = await arrive("Cat", "KettlePass01");
   c.xt("pc", catRoom, 312, 1, 0, 0, 15386, 15428, 0); // a pet, so there is one to list
   await c.untilXt("pc");
   c.socket.destroy();
@@ -204,7 +204,7 @@ const run = async () => {
   const stamps = (await b.nextXt("gl")).slice(9);
   b.xt("es", benRoom, "Cat", cards[0], stamps[0], 0, "see you soon", 0, 0, 0);
   assert.strictEqual((await b.untilXt("es"))[2], "1");
-  const {client: c2, login: catLogin, roomId: catRoom2} = await arrive("Cat", "Password01");
+  const {client: c2, login: catLogin, roomId: catRoom2} = await arrive("Cat", "KettlePass01");
   assert.strictEqual(catLogin.params.numUnreadECards, 1);
   assert.deepStrictEqual((await c2.untilXt("ba")).slice(2), ["0", "Ben", "1"]); // asked, now that Cat is here
   c2.xt("bc", catRoom2, "Ben", 1);

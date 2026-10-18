@@ -2769,8 +2769,20 @@ package gui
          gMainFrame.stage.removeEventListener("mouseUp",clickedOutsideChatCui);
       }
       
+      // an emote from the emote window: sent on its own, as the game has it;
+      // but with words already typed in the chat box, its code goes there,
+      // after them, and the line shows it among the words (gui.ChatBalloon).
       public static function onEmoteClick(param1:Sprite) : void
       {
+         var _loc2_:String = EmoticonUtility.getEmoteString(param1);
+         var _loc3_:Object = chatHist != null ? chatHist.chatMsgText : null;
+         if(_loc2_ != null && _loc3_ != null && chatHist.enableFreeChatValue && String(_loc3_.text).replace(/\s+/g,"").length > 0)
+         {
+            _loc3_.text = String(_loc3_.text).replace(/\s+$/,"") + " " + _loc2_ + " ";
+            gMainFrame.stage.focus = _loc3_ as InteractiveObject;
+            _loc3_.setSelection(_loc3_.text.length,_loc3_.text.length);
+            return;
+         }
          UserCommXtCommManager.sendAvatarEmote(param1);
       }
       

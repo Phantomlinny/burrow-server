@@ -165,6 +165,7 @@ package gui.itemWindows
                _window.goNowBtn.mouse.up.txt.text = ServerSelector.getShardName(RoomManagerWorld.instance.shardId);
                break;
             case "itemFinder":
+            case "itemMaker":
             case "chatFilter":
             case "themeMenu":
             case "themePick":
@@ -635,6 +636,13 @@ package gui.itemWindows
                      _mySettingsCloseFunction(null);
                   }
                   AJClient.openTool(0);
+                  break;
+               case "itemMaker":
+                  if(_mySettingsCloseFunction != null)
+                  {
+                     _mySettingsCloseFunction(null);
+                  }
+                  AJClient.openTool(2);
                   break;
                case "chatFilter":
                   if(_mySettingsCloseFunction != null)

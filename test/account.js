@@ -44,7 +44,7 @@ const panel = page("admin");
 
 const run = async () => {
   const register = (username, avatarType) => fetch(`${BASE}/api/register`, {method: "POST", headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username, password: "Password01", avatarType, agreed: true})});
+    body: JSON.stringify({username, password: "KettlePass01", avatarType, agreed: true})});
   assert.strictEqual((await register("Ann", 4)).status, 200);
   assert.strictEqual((await register("Ben", 24)).status, 200);
   // what a client shows beside its login form.
@@ -55,8 +55,8 @@ const run = async () => {
   assert.match(await (await fetch(`${BASE}/account`)).text(), /Your account/);
   assert.strictEqual((await mine("me")).status, 401);
   assert.strictEqual((await mine("login", {username: "Ann", password: "wrong"})).status, 401);
-  assert.strictEqual((await mine("login", {username: "Nobody", password: "Password01"})).status, 401);
-  const signedIn = await mine("login", {username: "ann", password: "Password01"});
+  assert.strictEqual((await mine("login", {username: "Nobody", password: "KettlePass01"})).status, 401);
+  const signedIn = await mine("login", {username: "ann", password: "KettlePass01"});
   assert.strictEqual(signedIn.status, 200);
   assert.match(signedIn.cookie, /^ajc_account=[0-9a-f]{48}$/);
   const ann = signedIn.cookie;
@@ -67,8 +67,8 @@ const run = async () => {
   assert.deepStrictEqual(me.history.map(login => [login.via, login.ok]), [["web", true], ["web", false]]);
 
   // --- parts of the game switched off
-  const {client: a, roomId} = await arrive("Ann", "Password01");
-  const {client: b} = await arrive("Ben", "Password01");
+  const {client: a, roomId} = await arrive("Ann", "KettlePass01");
+  const {client: b} = await arrive("Ben", "KettlePass01");
   await a.untilXt("ac");
   const set = async (feature, on) => assert.strictEqual((await mine("act", {action: "feature", feature, on}, ann)).status, 200);
   assert.strictEqual((await mine("act", {action: "feature", feature: "flying", on: false}, ann)).status, 400);
@@ -144,7 +144,7 @@ const run = async () => {
   }
   b.xt("ts", roomId, 0, 1, 0, benHas[9]); // ben puts his scarf up for trade, in the game
   await b.untilXt("tl");
-  const benPageCookie = (await mine("login", {username: "Ben", password: "Password01"})).cookie;
+  const benPageCookie = (await mine("login", {username: "Ben", password: "KettlePass01"})).cookie;
   const tradable = (await mine("tradable?of=ben", undefined, ann)).data;
   assert.deepStrictEqual([tradable.found, tradable.theirs.map(item => item.name), tradable.mine.map(item => item.name)], [true, [scarfName], [hatName]]);
   assert.strictEqual((await mine("act", {action: "offer", to: "Ben", wanted: tradable.theirs[0], offered: []}, ann)).status, 400);
@@ -182,27 +182,27 @@ const run = async () => {
   assert.strictEqual((await panel("support", {action: "approve", id: waiting.names[0].id}, admin)).status, 200);
   assert.strictEqual((await panel("support", {action: "approve", id: waiting.names[0].id}, admin)).status, 400); // only once
   assert.strictEqual((await mine("me", undefined, ann)).status, 401); // renamed: sign in again, with the new name
-  assert.strictEqual((await authenticate("Ann", "Password01")).status, 401);
-  const annabel = (await mine("login", {username: "Annabel", password: "Password01"})).cookie;
+  assert.strictEqual((await authenticate("Ann", "KettlePass01")).status, 401);
+  const annabel = (await mine("login", {username: "Annabel", password: "KettlePass01"})).cookie;
   me = (await mine("me", undefined, annabel)).data;
   assert.deepStrictEqual([me.username, me.nameRequests[0].status, me.feedback[0].handledAt > 0], ["Annabel", "approved", true]);
 
   // --- the lock: out of the game, and no way back in until it is undone
-  const {token} = await arrive("Annabel", "Password01");
+  const {token} = await arrive("Annabel", "KettlePass01");
   assert.strictEqual((await mine("act", {action: "lock", locked: true}, annabel)).status, 200);
-  assert.strictEqual((await authenticate("Annabel", "Password01")).status, 401);
+  assert.strictEqual((await authenticate("Annabel", "KettlePass01")).status, 401);
   assert.strictEqual((await postJson(`${BASE}/authenticate`, {refresh_token: token})).status, 401); // the saved sign-in is gone
   assert.strictEqual((await panel("accounts", undefined, admin)).data.accounts.find(account => account.username === "Annabel").locked, true);
-  assert.strictEqual((await mine("login", {username: "Annabel", password: "Password01"})).status, 200); // the page still lets her in
+  assert.strictEqual((await mine("login", {username: "Annabel", password: "KettlePass01"})).status, 200); // the page still lets her in
   assert.strictEqual((await mine("act", {action: "lock", locked: false}, annabel)).status, 200);
-  assert.strictEqual((await authenticate("Annabel", "Password01")).status, 200);
+  assert.strictEqual((await authenticate("Annabel", "KettlePass01")).status, 200);
 
   // --- the password: the old one is asked for, and stops working
-  assert.strictEqual((await mine("act", {action: "password", current: "wrong", password: "Password02"}, annabel)).status, 400);
-  assert.strictEqual((await mine("act", {action: "password", current: "Password01", password: "short"}, annabel)).status, 400);
-  assert.strictEqual((await mine("act", {action: "password", current: "Password01", password: "Password02"}, annabel)).status, 200);
-  assert.strictEqual((await authenticate("Annabel", "Password01")).status, 401);
-  assert.strictEqual((await authenticate("Annabel", "Password02")).status, 200);
+  assert.strictEqual((await mine("act", {action: "password", current: "wrong", password: "KettlePass02"}, annabel)).status, 400);
+  assert.strictEqual((await mine("act", {action: "password", current: "KettlePass01", password: "short"}, annabel)).status, 400);
+  assert.strictEqual((await mine("act", {action: "password", current: "KettlePass01", password: "KettlePass02"}, annabel)).status, 200);
+  assert.strictEqual((await authenticate("Annabel", "KettlePass01")).status, 401);
+  assert.strictEqual((await authenticate("Annabel", "KettlePass02")).status, 200);
   me = (await mine("me", undefined, annabel)).data;
   assert.ok(me.history.some(login => login.via === "launcher" && !login.ok) && me.history.some(login => login.via === "game" && login.ok));
 
@@ -210,16 +210,18 @@ const run = async () => {
   assert.strictEqual((await mine("me", undefined, annabel)).status, 401);
 
   // --- deleting one's own account: the password and the name, then it is gone
-  const {client: b2} = await arrive("Ben", "Password01");
-  const ben = (await mine("login", {username: "Ben", password: "Password01"})).cookie;
+  const {client: b2} = await arrive("Ben", "KettlePass01");
+  const ben = (await mine("login", {username: "Ben", password: "KettlePass01"})).cookie;
   assert.strictEqual((await mine("act", {action: "delete", current: "wrong", confirm: "Ben"}, ben)).status, 400);
-  assert.strictEqual((await mine("act", {action: "delete", current: "Password01", confirm: "Annabel"}, ben)).status, 400);
-  const gone = await mine("act", {action: "delete", current: "Password01", confirm: "ben"}, ben);
+  assert.strictEqual((await mine("act", {action: "delete", current: "KettlePass01", confirm: "Annabel"}, ben)).status, 400);
+  const gone = await mine("act", {action: "delete", current: "KettlePass01", confirm: "ben"}, ben);
   assert.deepStrictEqual([gone.status, gone.data.deleted, gone.data.account], [200, true, undefined]);
   assert.strictEqual((await mine("me", undefined, ben)).status, 401);
-  assert.strictEqual((await authenticate("Ben", "Password01")).status, 401);
+  assert.strictEqual((await authenticate("Ben", "KettlePass01")).status, 401);
   assert.ok(!(await panel("accounts", undefined, admin)).data.accounts.some(account => account.username === "Ben"));
-  assert.strictEqual((await register("Ben", 5)).status, 200); // the name is free again
+  // the name is held for a while (lib/accounts.js, NAME_HELD_DAYS): the
+  // players Ben met still know him by it.
+  assert.deepStrictEqual(await (await register("Ben", 5)).json(), {error: "username_taken"});
   b2.socket.destroy();
   a.socket.destroy();
   b.socket.destroy();

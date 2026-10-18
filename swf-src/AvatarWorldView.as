@@ -191,6 +191,20 @@ package avatar
          "water":40,
          "set":"land",
          "flip":false
+      },{
+         // sitting facing straight forward, and straight away (the "Front"
+         // and "Back" between the arrows): animations 5 and 1, the ends of
+         // the sitting turn 1-5 (2 the back corners, 4 the front ones; the
+         // slide's spin plays them in turn). the game's own buttons never did.
+         "name":":sitS:",
+         "land":5,
+         "water":40,
+         "flip":false
+      },{
+         "name":":sitN:",
+         "land":1,
+         "water":40,
+         "flip":false
       }];
       
       // the landing puff, artwork compiled into the client. its class has a
@@ -209,6 +223,21 @@ package avatar
       private var _platformingCurVel:Number = 0;
       
       private var _chatBalloon:ChatBalloon;
+
+      // "..." where the chat bubble goes, while the player is typing
+      // (AJClient.onTyping). gone when a line arrives, when they stop, or
+      // TYPING_SHOWN ms after they last said they were, if a "stopped" is lost.
+      private static const TYPING_SHOWN:int = 8000;
+
+      private var _typing:Sprite;
+
+      private var _typingDots:Array;
+
+      private var _typingTimer:Timer;
+
+      private var _typingStep:int;
+
+      private var _typingUntil:int;
       
       private var _namebar:NameBar;
       
@@ -628,6 +657,14 @@ package avatar
          {
             _chatLayer.removeChild(_chatBalloon);
          }
+         hideTyping();
+         if(_typingTimer)
+         {
+            _typingTimer.removeEventListener("timer",onTypingTimer);
+            _typingTimer = null;
+         }
+         _typing = null;
+         _typingDots = null;
          removeChild(_namebar);
          if(_secondaryEmot && _chatLayer.contains(_secondaryEmot))
          {
@@ -1023,9 +1060,108 @@ package avatar
          return false;
       }
       
+      public function setTyping(param1:Boolean) : void
+      {
+         var _loc2_:Sprite = null;
+         var _loc3_:int = 0;
+         if(!param1 || _chatLayer == null)
+         {
+            hideTyping();
+            return;
+         }
+         if(_typing == null)
+         {
+            _typing = new Sprite();
+            _typing.mouseEnabled = false;
+            _typing.mouseChildren = false;
+            _typing.graphics.lineStyle(2,0x8C6A3C);
+            _typing.graphics.beginFill(0xFFFFFF);
+            _typing.graphics.drawRoundRect(-22,-26,44,22,20,20);
+            _typing.graphics.endFill();
+            _typing.graphics.lineStyle();
+            _typing.graphics.beginFill(0xFFFFFF);
+            _typing.graphics.moveTo(-5,-5);
+            _typing.graphics.lineTo(0,2);
+            _typing.graphics.lineTo(5,-5);
+            _typing.graphics.endFill();
+            _typingDots = [];
+            _loc3_ = 0;
+            while(_loc3_ < 3)
+            {
+               _loc2_ = new Sprite();
+               _loc2_.graphics.beginFill(0x6B5034);
+               _loc2_.graphics.drawCircle(0,0,3);
+               _loc2_.graphics.endFill();
+               _loc2_.x = -10 + _loc3_ * 10;
+               _loc2_.y = -15;
+               _typing.addChild(_loc2_);
+               _typingDots.push(_loc2_);
+               _loc3_++;
+            }
+            _typingTimer = new Timer(300);
+            _typingTimer.addEventListener("timer",onTypingTimer,false,0,true);
+         }
+         _typingUntil = getTimer() + TYPING_SHOWN;
+         if(_typing.parent != _chatLayer)
+         {
+            _chatLayer.addChild(_typing);
+         }
+         placeTyping();
+         _typing.visible = !(_chatBalloon && _chatBalloon.visible);
+         if(!_typingTimer.running)
+         {
+            _typingTimer.start();
+         }
+      }
+
+      private function hideTyping() : void
+      {
+         if(_typingTimer)
+         {
+            _typingTimer.stop();
+         }
+         if(_typing && _typing.parent)
+         {
+            _typing.parent.removeChild(_typing);
+         }
+      }
+
+      private function placeTyping() : void
+      {
+         if(_typing && _chatBalloon)
+         {
+            _typing.x = _chatBalloon.x;
+            _typing.y = _chatBalloon.y;
+         }
+      }
+
+      private function onTypingTimer(param1:TimerEvent) : void
+      {
+         var _loc2_:int = 0;
+         if(_typing == null || getTimer() > _typingUntil)
+         {
+            hideTyping();
+            return;
+         }
+         placeTyping();
+         _typing.visible = !(_chatBalloon && _chatBalloon.visible);
+         _typingStep = (_typingStep + 1) % 3;
+         _loc2_ = 0;
+         while(_loc2_ < _typingDots.length)
+         {
+            _typingDots[_loc2_].alpha = _loc2_ == _typingStep ? 1 : 0.35;
+            _typingDots[_loc2_].y = _loc2_ == _typingStep ? -17 : -15;
+            _loc2_++;
+         }
+      }
+
       public function setMessage(param1:String, param2:int) : void
       {
          var _loc3_:Boolean = false;
+         if(param1 != "...")
+         {
+            hideTyping();
+         }
          if(param2 > 1)
          {
             if(param2 == 2)
@@ -1218,6 +1354,18 @@ package avatar
          {
             // pets know ":dance:" and ":play:", not the other set's names
             _pet.setActionByName(_loc2_.replace(/(Land|Swim):$/,":"));
+         }
+      }
+
+      // The base action definitions supply their normal orientation. A local
+      // Mirror selection is applied after that, so it works for every action
+      // without changing the original sit/dance/etc. mappings.
+      public function setActionMirrored(param1:Boolean) : void
+      {
+         if(_lastIdleAnim > 0 && param1)
+         {
+            _lastIdleFlip = !_lastIdleFlip;
+            playAnim(_lastIdleAnim,_lastIdleFlip);
          }
       }
       

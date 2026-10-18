@@ -23,6 +23,7 @@ cd "$(dirname "$(readlink -f "$0")")/.."
 out=${1:-swf/ajclient.swf}
 set -- \
   AJClient AJClient.as \
+  com.sbi.client.KeepAlive KeepAlive.as \
   GlobalErrorCatch GlobalErrorCatch.as \
   XtReplyDemuxer XtReplyDemuxer.as \
   loader.MediaHelper MediaHelper.as \
@@ -56,6 +57,7 @@ set -- \
   gui.PetInventory PetInventory.as \
   gui.DenEditor DenEditor.as \
   gui.TradeManager TradeManager.as \
+  avatar.AvatarView AvatarView.as \
   avatar.AvatarWorldView AvatarWorldView.as \
   room.RoomManagerWorld RoomManagerWorld.as \
   gskinner.motion.GTween GTween.as \
@@ -75,10 +77,18 @@ set -- \
   ecard.ECard ECard.as \
   game.ArtStudioKit ArtStudioKit.as \
   game.artStudioPainting.ArtStudioPainting ArtStudioPainting.as \
-  game.artStudioGridDrawing.ArtStudioGridDrawing ArtStudioGridDrawing.as
+  game.artStudioGridDrawing.ArtStudioGridDrawing ArtStudioGridDrawing.as \
+  item.ItemXtCommManager ItemXtCommManager.as \
+  den.DenXtCommManager DenXtCommManager.as \
+  gui.ActionManager ActionManager.as \
+  gui.SitForwardAction SitForwardAction.as \
+  avatar.AvatarUtility AvatarUtility.as \
+  item.Item Item.as \
+  loader.DenItemHelper DenItemHelper.as
 # not in the game: added before the replace (game.ArtStudioKit is Strawberry
-# Jam's, shared by its two art studio painters)
-NEW_CLASSES="game.ArtStudioKit"
+# Jam's, shared by its two art studio painters; gui.SitForwardAction is the
+# action of sitting facing forward)
+NEW_CLASSES="game.ArtStudioKit gui.SitForwardAction"
 args=""
 while [ $# -gt 0 ]; do
   args="$args $1 swf-src/$2"

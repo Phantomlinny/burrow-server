@@ -10,6 +10,7 @@ const chatlog = require("./lib/chatlog.js");
 const modlog = require("./lib/modlog.js");
 const retention = require("./lib/retention.js");
 const colours = require("./lib/colours.js");
+const customItems = require("./lib/customitems.js");
 const config = require("./config.js");
 const defpacks = require("./lib/defpacks.js");
 const http = require("./lib/http.js");
@@ -38,6 +39,7 @@ const main = async () => {
   fs.chmodSync(config.dataDir, 0o700);
   accounts.startBackups();
   colours.load();
+  customItems.load();
   reports.load();
   support.load();
   bans.load();

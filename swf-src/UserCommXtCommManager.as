@@ -215,6 +215,7 @@ package avatar
          {
             return;
          }
+         _actionMgr.rememberAction(param1);
          AvatarManager.setAvatarAction(param1);
          if(!_actionMgr.getActionString(param1))
          {
@@ -222,8 +223,15 @@ package avatar
          }
          addChatMessage(_actionMgr.getActionString(param1));
          var _loc2_:AvatarWorldView = AvatarManager.avatarViewList[AvatarManager.playerSfsUserId];
+         if(_loc2_ && _actionMgr.mirrorActions)
+         {
+            _loc2_.setActionMirrored(true);
+         }
          var _loc3_:int = _loc2_.lastIdleAnim;
-         gMainFrame.server.sendMessage(_actionMgr.getActionString(param1) + RAW_STR + 3 + RAW_STR + _loc3_);
+         // m0/m1 is deliberately a new marker: old clients sent the
+         // animation number here. New clients use it to mirror every action
+         // consistently on every screen.
+         gMainFrame.server.sendMessage(_actionMgr.getActionString(param1) + RAW_STR + 3 + RAW_STR + "m" + (_actionMgr.mirrorActions ? "1" : "0"));
          if(_chatHist.enableFreeChatValue)
          {
             _chatHist.resetTreeSearch();
@@ -263,14 +271,21 @@ package avatar
          }
          param2 = fixMispellings(param2);
          param2 = adjustCamelCase(param2);
+         AJClient.typingSent();
          AvatarManager.addAvatarMessage("...",param1,0);
          param2 = adjustSpecialWords(param2);
+         // ":fire:" and the like as the emoji (AJClient's emoji)
+         param2 = AJClient.emojiShortcodes(param2);
+         // and every emoji as "\{code points}" (AJClient.emojiToTokens)
+         param2 = AJClient.emojiToTokens(param2);
          var _loc3_:int = gMainFrame.userInfo.sgChatType == 1 ? 0 : 9;
          gMainFrame.server.sendMessage(param2 + RAW_STR + _loc3_);
          if(_chatHist.enableFreeChatValue)
          {
             _chatHist.resetTreeSearch();
             _chatHist.chatMsgText.text = "";
+            // emptied: back to the game's font (ChatHistory.showEmojiInInput)
+            _chatHist.showEmojiInInput();
             gMainFrame.stage.focus = _chatHist.chatMsgText;
          }
       }
@@ -750,6 +765,10 @@ package avatar
                         if(_loc5_)
                         {
                            AvatarManager.setAvatarAction(_loc5_,_loc19_);
+                           if(String(param1[5]) == "m1")
+                           {
+                              AvatarManager.avatarViewList[_loc19_].setActionMirrored(true);
+                           }
                         }
                         else
                         {

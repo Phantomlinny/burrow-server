@@ -3,6 +3,7 @@
 const path = require("path");
 
 const env = process.env;
+const googleVisionApiKey = env.AJ_GOOGLE_VISION_API_KEY;
 const LOOPBACK_NAMES = ["127.0.0.1", "::1", "localhost"];
 const bindAddress = env.AJ_BIND || "127.0.0.1";
 const httpPort = Number(env.AJ_HTTP_PORT || 8080);
@@ -84,6 +85,13 @@ module.exports = {
   // cookies are only sent back over an encrypted connection when players
   // have one, whoever does the encrypting.
   secureCookies: baseUrl.startsWith("https:"),
+  // Google Cloud Vision SafeSearch, used for player-uploaded custom item art
+  // and masterpieces. Off when no key is configured (useful for local work).
+  // When on, a Google outage rejects uploads rather than letting unscanned
+  // images through.
+  googleVision: googleVisionApiKey ? {
+    endpoint: `https://vision.googleapis.com/v1/images:annotate?key=${encodeURIComponent(googleVisionApiKey)}`,
+  } : null,
   // the admin panel answers this machine alone on a public server (reach it
   // through an SSH tunnel), plus the addresses listed in AJ_ADMIN_ALLOW,
   // separated by commas. on a local server it answers whoever can reach it.
@@ -97,6 +105,8 @@ module.exports = {
   // asset mirror: anything not served locally is fetched once from here and
   // cached in cacheDir. set AJ_OFFLINE=1 to serve from the cache only.
   upstreamContent: env.AJ_UPSTREAM || "https://ajcontent.akamaized.net/",
+  // emoji pictures for chat (lib/emoji.js): Twemoji's, at one version
+  emojiUpstream: env.AJ_EMOJI_UPSTREAM || "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/",
   offline: env.AJ_OFFLINE === "1",
   // the client's device ids (lib/devices.js): with AJ_REQUIRE_DEVICE=1, a
   // sign-in without them (a client from before 1.3.0, the official
@@ -263,9 +273,11 @@ module.exports = {
   // can switch in the settings menu (gui.ServerSelector). the game names
   // world N after the Nth name of its own list (551 Aldan, 552 Congo...,
   // generic list 16), so the names here are only for the panels and logs.
-  // AJ_WORLDS: how many (the tests' is one).
+  // AJ_WORLDS: how many. A local server starts with one shared world so two
+  // players in the same land can always see one another; set AJ_WORLDS=2 or
+  // more to opt into separate copies of every land.
   shards: ["Aldan", "Congo", "Draa", "Grande", "Kama", "Nile", "Pecos", "Ramu", "Tigris", "Zambezi"]
-    .slice(0, Math.min(10, Math.max(1, Number(env.AJ_WORLDS) || 2))).map((name, i) => ({id: i + 1, name})),
+    .slice(0, Math.min(10, Math.max(1, Number(env.AJ_WORLDS) || 1))).map((name, i) => ({id: i + 1, name})),
   maxUsersPerRoom: 40,
   // everything in every shop for nothing (AJ_FREE_SHOPS=1). off unless
   // asked for: what the game's shops make of a price of 0 has not been seen.
@@ -301,9 +313,22 @@ module.exports = {
   tlsHandshakeTimeoutMs: 10000,
   maxMessagesPerTenSeconds: 400, // per game socket; walking sends a few a second
   loginTimeoutMs: 30000, // a game socket must log in within this
-  idleTimeoutMs: 15 * 60000, // the client sends a keep-alive far more often
+  // a client sends nothing while its player is away, and signs itself out
+  // after 75 minutes of that (com.sbi.client.KeepAlive): the socket waits longer.
+  idleTimeoutMs: 80 * 60000,
   tokenLifetimeDays: 30, // login tokens kept by the launcher's "remember me"
-  maxChatLength: 300,
+  // a line as sent: the client's chat box takes 200 (gui.ChatHistory), and
+  // each emoji goes as a tag of 8 or more ("\{1f600}"). lib/chatspam.js
+  // cuts down what is long for no good reason.
+  maxChatLength: 600,
+  // how old an account must be before it may give its items pictures
+  // (lib/playeritems.js), so a picture turned away is not simply sent again
+  // from a new account. not for this machine's own requests (AJ_ITEM_ART_MIN_HOURS).
+  itemArtMinAccountHours: Number(env.AJ_ITEM_ART_MIN_HOURS || 24),
+  // warnings (lib/moderation.js warn): the Nth one within `days` also
+  // silences the player for that many minutes, [[N, minutes], ...]. a
+  // longer silence already on them stays. steps [] turns it off.
+  warningSilence: {days: 30, steps: [[3, 60], [5, 24 * 60]]},
   // days typed chat and whispers are kept for the moderator panel's chat
   // history (lib/chatlog.js); 0 keeps none.
   chatLogDays: env.AJ_CHAT_LOG_DAYS === undefined ? 30 : Math.max(0, Number(env.AJ_CHAT_LOG_DAYS) || 0),
