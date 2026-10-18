@@ -579,17 +579,31 @@ package
       // the pictures as bitmaps, for wearing: "kind:id" -> {bmp, art, waiting}
       private static var _artBitmaps:Object = {};
 
+      // "Custom pictures" in the settings menu (gui.ItemWindowToggle): the
+      // pictures players give their items, shown (the default) or not, when
+      // every item is drawn with its base's art. user var 9006, 1 for hidden.
+      public static function customArtOn() : Boolean
+      {
+         return settingOf(9006) != 1;
+      }
+
+      // an item's picture version, or null for none or with them hidden
+      private static function artOf(param1:String, param2:int) : String
+      {
+         return customArtOn() ? _customArt[param1 + ":" + param2] : null;
+      }
+
       // the look a worn item has, or null for one drawn as the game draws it
       public static function customArtMode(param1:String, param2:int) : String
       {
-         return _customArt[param1 + ":" + param2] == null ? null : _customArtMode[param1 + ":" + param2];
+         return artOf(param1,param2) == null ? null : _customArtMode[param1 + ":" + param2];
       }
 
       // what makes a painted frame of it different from its base's, for a
       // cache key ("" for none)
       public static function customArtKey(param1:String, param2:int) : String
       {
-         var _loc3_:String = _customArt[param1 + ":" + param2];
+         var _loc3_:String = artOf(param1,param2);
          return _loc3_ == null ? "" : param2 + ":" + _loc3_ + ":" + _customArtMode[param1 + ":" + param2];
       }
 
@@ -598,7 +612,7 @@ package
       public static function customArtBitmap(param1:String, param2:int, param3:Object = null) : BitmapData
       {
          var _loc4_:String = param1 + ":" + param2;
-         var _loc5_:String = _customArt[_loc4_];
+         var _loc5_:String = artOf(param1,param2);
          var _loc6_:Object = _artBitmaps[_loc4_];
          if(_loc5_ == null)
          {
@@ -653,7 +667,7 @@ package
       // the picture's address, or null when the item has none.
       public static function customArtUrl(param1:String, param2:int) : String
       {
-         var _loc3_:String = _customArt[param1 + ":" + param2];
+         var _loc3_:String = artOf(param1,param2);
          return _loc3_ == null ? null : gMainFrame.clientInfo.websiteURL + "itemart/" + param1 + "/" + param2 + ".png?v=" + encodeURIComponent(_loc3_);
       }
 

@@ -133,7 +133,8 @@ module.exports = {
   // 48: the item giver (the item finder renamed) with previews and hex colours;
   // 49 and 50: its link to a colour picker.
   // 61: the Owner, Moderator and Verified name tag badges seen by everyone.
-  buildVersion: env.AJ_BUILD_VERSION || "61",
+  // 62: "Custom pictures" in the settings menu, to hide players' item pictures.
+  buildVersion: env.AJ_BUILD_VERSION || "62",
   // what the official CDN is asked for; not ours to change.
   upstreamBuildVersion: "3",
 
