@@ -132,7 +132,8 @@ module.exports = {
   // 41: the game's text says "Burrow" where it said Animal Jam.
   // 48: the item giver (the item finder renamed) with previews and hex colours;
   // 49 and 50: its link to a colour picker.
-  buildVersion: env.AJ_BUILD_VERSION || "60",
+  // 61: the Owner, Moderator and Verified name tag badges seen by everyone.
+  buildVersion: env.AJ_BUILD_VERSION || "61",
   // what the official CDN is asked for; not ours to change.
   upstreamBuildVersion: "3",
 
