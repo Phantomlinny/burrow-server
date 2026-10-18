@@ -67,6 +67,7 @@ set -- \
   room.RoomManagerWorld RoomManagerWorld.as \
   gskinner.motion.GTween GTween.as \
   playerWall.PostMessage PostMessage.as \
+  gui.itemWindows.ItemWindowPost ItemWindowPost.as \
   shop.BundleShop BundleShop.as \
   gui.GenericListGuiManager GenericListGuiManager.as \
   gui.DenSwitcher DenSwitcher.as \
@@ -77,6 +78,8 @@ set -- \
   Party.PartyPopup PartyPopup.as \
   gui.ECardInbox ECardInbox.as \
   game.SoundManager SoundManager.as \
+  com.sbi.corelib.audio.SBMusic SBMusic.as \
+  com.sbi.corelib.audio.SBSound SBSound.as \
   com.sbi.graphics.LayerAnim LayerAnim.as \
   com.sbi.graphics.LayerBitmap LayerBitmap.as \
   ecard.ECard ECard.as \

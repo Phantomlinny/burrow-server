@@ -2,6 +2,11 @@ package
 {
    import avatar.AvatarManager;
    import avatar.AvatarWorldView;
+   import buddy.Buddy;
+   import buddy.BuddyManager;
+   import com.sbi.corelib.audio.SBAudio;
+   import com.sbi.corelib.audio.SBMusic;
+   import com.sbi.corelib.audio.SBSound;
    import com.sbi.debug.DebugUtility;
    import com.sbi.graphics.PaletteHelper;
    import den.DenXtCommManager;
@@ -27,9 +32,11 @@ package
    import flash.geom.Matrix;
    import flash.utils.ByteArray;
    import flash.geom.Point;
+   import flash.geom.Rectangle;
    import flash.events.KeyboardEvent;
    import flash.events.MouseEvent;
    import flash.events.TimerEvent;
+   import flash.media.SoundTransform;
    import flash.net.FileFilter;
    import flash.net.FileReference;
    import flash.net.URLLoader;
@@ -47,6 +54,7 @@ package
    import flash.utils.Dictionary;
    import flash.utils.Timer;
    import flash.utils.getTimer;
+   import flash.utils.setTimeout;
    import game.MinigameManager;
    import gamePlayFlow.GamePlay;
    import gskinner.motion.GTween;
@@ -2291,7 +2299,8 @@ package
          finderButtonText(_finderKindButton,"All items");
          _finderKindButton.addEventListener("mouseDown",onFinderKindClick);
          _loc2_.addChild(_finderKindButton);
-         _finderColourBar = finderSearchBar(93,-160,156,"Colour ID or #hex","0-9a-fA-F# ,",31,false);
+         // a colour id may be negative: the signed way of writing it (lib/admin.js)
+         _finderColourBar = finderSearchBar(93,-160,156,"Colour ID or #hex","0-9a-fA-F# ,\\-",31,false);
          _finderColourInput = _finderColourBar.searchTxt;
          _finderColourInput.addEventListener("change",onFinderColourTyped);
          _loc2_.addChild(_finderColourBar);
@@ -2878,6 +2887,499 @@ package
             }
             return ":emoji:";
          });
+      }
+
+      // tags: "@name" in chat and on Jammer Walls, when the name is a
+      // player's, is drawn light blue and underlined, and opens that player's
+      // card when clicked. which names are players' the server says (xmn,
+      // lib/world.js): the longest name the text after the "@" starts with,
+      // spaces and all ("@John Smith hi"), ending where a word does. a "@"
+      // counts at the start or after a character no name has ("me@home" is
+      // no tag). what is no player's name stays plain text.
+      public static const MENTION_COLOR:uint = 4895732; // #4ab3f4
+
+      private static const MENTION_TEXT:int = 40; // characters after an "@" asked about
+
+      private static const MENTION_ASK_MOST:int = 10; // texts in one question, as the server takes
+
+      private static const MENTION_WAIT_MS:int = 3000; // no answer by then: no tags in that text
+
+      private static const MENTION_KEEP:int = 2000; // answers kept before starting over
+
+      private static var _mentionKnown:Object = {}; // lowercased text after an "@" -> {length, name} or null
+
+      private static var _mentionKnownCount:int = 0;
+
+      private static var _mentionOnline:Object = {}; // lowercased name -> 1 | 0, as last heard
+
+      private static var _mentionAsks:Object = {}; // question id -> {texts, finish}
+
+      private static var _mentionNextId:int = 1;
+
+      // the "@"s that could start a tag: [{at, text}], `text` what follows,
+      // up to a "%" or a line's end (neither is in a name).
+      private static function mentionStarts(param1:String) : Array
+      {
+         var _loc2_:Array = [];
+         var _loc3_:int = param1 == null ? -1 : param1.indexOf("@");
+         var _loc4_:String = null;
+         var _loc5_:String = null;
+         while(_loc3_ != -1)
+         {
+            _loc4_ = _loc3_ > 0 ? param1.charAt(_loc3_ - 1) : " ";
+            if(!/[A-Za-z0-9.\-@]/.test(_loc4_) && /[A-Za-z0-9]/.test(param1.charAt(_loc3_ + 1)))
+            {
+               _loc5_ = param1.substr(_loc3_ + 1,MENTION_TEXT).split("%")[0].split("\r")[0].split("\n")[0];
+               _loc2_.push({
+                  "at":_loc3_,
+                  "text":_loc5_
+               });
+            }
+            _loc3_ = param1.indexOf("@",_loc3_ + 1);
+         }
+         return _loc2_;
+      }
+
+      // [{at, length, name}] for the starts the server has said are tags:
+      // `at` at the "@", `length` with it, `name` as the account spells it.
+      private static function mentionsFound(param1:Array) : Array
+      {
+         var _loc2_:Array = [];
+         var _loc3_:Object = null;
+         var _loc4_:Object = null;
+         for each(_loc3_ in param1)
+         {
+            _loc4_ = _mentionKnown[String(_loc3_.text).toLowerCase()];
+            if(_loc4_ != null)
+            {
+               _loc2_.push({
+                  "at":_loc3_.at,
+                  "length":_loc4_.length + 1,
+                  "name":_loc4_.name
+               });
+            }
+         }
+         return _loc2_;
+      }
+
+      // the tags in a text, given to `param2` as [{at, length, name}]: at
+      // once when every name in it is known, else when the server answers
+      // (or does not, in MENTION_WAIT_MS: then only the known ones).
+      public static function resolveMentions(param1:String, param2:Function) : void
+      {
+         var _loc3_:Array = mentionStarts(param1);
+         var _loc4_:Array = [];
+         var _loc5_:Array = [];
+         var _loc6_:Object = null;
+         var _loc7_:String = null;
+         var _loc8_:int = 0;
+         var _loc9_:Function = null;
+         for each(_loc6_ in _loc3_)
+         {
+            _loc7_ = String(_loc6_.text).toLowerCase();
+            if(!(_loc7_ in _mentionKnown) && _loc5_.indexOf(_loc7_) == -1 && _loc4_.length < MENTION_ASK_MOST)
+            {
+               _loc5_.push(_loc7_);
+               _loc4_.push(_loc6_.text);
+            }
+         }
+         if(_loc4_.length == 0)
+         {
+            param2(mentionsFound(_loc3_));
+            return;
+         }
+         _loc8_ = _mentionNextId++;
+         _loc9_ = function():void
+         {
+            if(_loc8_ in _mentionAsks)
+            {
+               delete _mentionAsks[_loc8_];
+               param2(mentionsFound(_loc3_));
+            }
+         };
+         _mentionAsks[_loc8_] = {
+            "texts":_loc4_,
+            "finish":_loc9_
+         };
+         gMainFrame.server.setXtObject_Str("xmn",[_loc8_].concat(_loc4_));
+         setTimeout(_loc9_,MENTION_WAIT_MS);
+      }
+
+      // "xmn": [.., .., id, then for each text asked about: length of the
+      // name it starts with (0: none), the name, 1 if they are online].
+      public static function onMentions(param1:Object) : void
+      {
+         var _loc2_:Object = _mentionAsks[int(param1[2])];
+         var _loc3_:int = 0;
+         var _loc4_:int = 0;
+         var _loc5_:String = null;
+         if(_loc2_ == null)
+         {
+            return;
+         }
+         if(_mentionKnownCount > MENTION_KEEP)
+         {
+            _mentionKnown = {};
+            _mentionKnownCount = 0;
+         }
+         _loc3_ = 0;
+         while(_loc3_ < _loc2_.texts.length && 5 + _loc3_ * 3 < param1.length)
+         {
+            _loc4_ = int(param1[3 + _loc3_ * 3]);
+            _loc5_ = String(param1[4 + _loc3_ * 3]);
+            _mentionKnown[String(_loc2_.texts[_loc3_]).toLowerCase()] = _loc4_ > 0 ? {
+               "length":_loc4_,
+               "name":_loc5_
+            } : null;
+            _mentionKnownCount++;
+            if(_loc4_ > 0)
+            {
+               _mentionOnline[_loc5_.toLowerCase()] = int(param1[5 + _loc3_ * 3]);
+            }
+            _loc3_++;
+         }
+         _loc2_.finish();
+      }
+
+      // colours tags (resolveMentions) in a text field that reads as it did
+      // then: MENTION_COLOR, or `param4` when given. with `param3`, each is
+      // also a link ("event:@name", heard as a "link" event).
+      public static function styleMentions(param1:TextField, param2:Array, param3:Boolean, param4:int = -1) : void
+      {
+         var _loc4_:Object = null;
+         var _loc5_:TextFormat = null;
+         if(param1 == null || param2 == null)
+         {
+            return;
+         }
+         for each(_loc4_ in param2)
+         {
+            if(_loc4_.at + _loc4_.length <= param1.length)
+            {
+               _loc5_ = new TextFormat();
+               _loc5_.color = param4 >= 0 ? param4 : MENTION_COLOR;
+               _loc5_.underline = true;
+               if(param3)
+               {
+                  _loc5_.url = "event:@" + _loc4_.name;
+               }
+               param1.setTextFormat(_loc5_,_loc4_.at,_loc4_.at + _loc4_.length);
+            }
+         }
+      }
+
+      // the name of the tag under the mouse in a text field, or null.
+      public static function mentionAt(param1:TextField, param2:Array) : String
+      {
+         var _loc3_:int = param1 == null || param2 == null ? -1 : param1.getCharIndexAtPoint(param1.mouseX,param1.mouseY);
+         var _loc4_:Object = null;
+         if(_loc3_ < 0)
+         {
+            return null;
+         }
+         for each(_loc4_ in param2)
+         {
+            if(_loc3_ >= _loc4_.at && _loc3_ < _loc4_.at + _loc4_.length)
+            {
+               return _loc4_.name;
+            }
+         }
+         return null;
+      }
+
+      // a tagged player's card (the server has said the name is theirs).
+      public static function openProfile(param1:String) : void
+      {
+         var _loc2_:Buddy = null;
+         if(param1 == null || param1 == "")
+         {
+            return;
+         }
+         _loc2_ = BuddyManager.getBuddyByUserName(param1);
+         BuddyManager.showBuddyCard({
+            "userName":(_loc2_ != null ? _loc2_.userName : param1),
+            "onlineStatus":(_loc2_ != null ? _loc2_.onlineStatus : int(_mentionOnline[param1.toLowerCase()]))
+         });
+      }
+
+      // a tag's background, as Discord draws a mention: a rounded box of
+      // the tag's colour, see-through, behind its words (one a line, should a
+      // tag wrap). a text field has no background for part of its text, so
+      // it is drawn on a Shape just under the field (over it, faintly, if
+      // the field paints its own background), kept a field.
+      // how strong the box is: the chat log's dark panel shows a fainter one
+      // well, the white balloons and the wall posts need it stronger (a
+      // balloon is see-through itself).
+      public static const MENTION_BACK_DARK:Number = 0.4;
+
+      public static const MENTION_BACK_LIGHT:Number = 0.6;
+
+      private static var _mentionBacks:Dictionary = new Dictionary(true); // text field -> Shape
+
+      // the tags in a text field whose tags are links ("event:@name", the
+      // chat log's): [{at, length}].
+      public static function mentionLinks(param1:TextField) : Array
+      {
+         var _loc2_:Array = [];
+         var _loc3_:String = param1 == null ? "" : param1.text;
+         var _loc4_:int = _loc3_.indexOf("@");
+         var _loc5_:String = null;
+         var _loc6_:int = 0;
+         while(_loc4_ != -1)
+         {
+            _loc5_ = param1.getTextFormat(_loc4_,_loc4_ + 1).url;
+            if(_loc5_ != null && _loc5_.indexOf("event:@") == 0)
+            {
+               _loc6_ = _loc4_ + 1;
+               while(_loc6_ < _loc3_.length && param1.getTextFormat(_loc6_,_loc6_ + 1).url == _loc5_)
+               {
+                  _loc6_++;
+               }
+               _loc2_.push({
+                  "at":_loc4_,
+                  "length":_loc6_ - _loc4_
+               });
+               _loc4_ = _loc3_.indexOf("@",_loc6_);
+            }
+            else
+            {
+               _loc4_ = _loc3_.indexOf("@",_loc4_ + 1);
+            }
+         }
+         return _loc2_;
+      }
+
+      // draws the backgrounds of `param2` ([{at, length}]) for a text field
+      // as it is laid out and scrolled now, `param3` strong; none, with no tags.
+      public static function drawMentionBacks(param1:TextField, param2:Array, param3:Number = 0.6) : void
+      {
+         var _loc3_:Shape = _mentionBacks[param1];
+         var _loc4_:Object = null;
+         var _loc5_:Object = null;
+         var _loc6_:Object = null;
+         var _loc7_:Rectangle = null;
+         var _loc8_:int = 0;
+         var _loc9_:int = 0;
+         var _loc10_:int = 0;
+         var _loc11_:int = 0;
+         var _loc12_:Number = 0;
+         var _loc13_:int = 0;
+         if(param1 == null)
+         {
+            return;
+         }
+         if(_loc3_ == null)
+         {
+            if(param2 == null || param2.length == 0)
+            {
+               return;
+            }
+            _loc3_ = new Shape();
+            _mentionBacks[param1] = _loc3_;
+         }
+         _loc3_.graphics.clear();
+         if(param1.parent == null || param2 == null || param2.length == 0)
+         {
+            return;
+         }
+         if(_loc3_.parent != null)
+         {
+            _loc3_.parent.removeChild(_loc3_);
+         }
+         _loc13_ = param1.parent.getChildIndex(param1);
+         param1.parent.addChildAt(_loc3_,param1.background ? _loc13_ + 1 : _loc13_);
+         _loc3_.transform.matrix = param1.transform.matrix;
+         // only the lines in view; their place as the field is scrolled now
+         _loc9_ = param1.scrollV - 1;
+         _loc10_ = param1.bottomScrollV - 1;
+         if(_loc9_ > 0)
+         {
+            _loc7_ = param1.getCharBoundaries(param1.getLineOffset(_loc9_));
+            _loc12_ = _loc7_ != null ? _loc7_.y - 2 : 0;
+         }
+         for each(_loc4_ in param2)
+         {
+            _loc5_ = {};
+            _loc8_ = _loc4_.at;
+            while(_loc8_ < _loc4_.at + _loc4_.length && _loc8_ < param1.length)
+            {
+               _loc11_ = param1.getLineIndexOfChar(_loc8_);
+               _loc7_ = _loc11_ >= _loc9_ && _loc11_ <= _loc10_ ? param1.getCharBoundaries(_loc8_) : null;
+               if(_loc7_ != null && _loc7_.width > 0)
+               {
+                  _loc6_ = _loc5_[_loc11_];
+                  if(_loc6_ == null)
+                  {
+                     _loc5_[_loc11_] = {
+                        "left":_loc7_.x,
+                        "right":_loc7_.x + _loc7_.width,
+                        "top":_loc7_.y,
+                        "height":_loc7_.height
+                     };
+                  }
+                  else
+                  {
+                     _loc6_.left = Math.min(_loc6_.left,_loc7_.x);
+                     _loc6_.right = Math.max(_loc6_.right,_loc7_.x + _loc7_.width);
+                     _loc6_.height = Math.max(_loc6_.height,_loc7_.height);
+                  }
+               }
+               _loc8_++;
+            }
+            for each(_loc6_ in _loc5_)
+            {
+               _loc3_.graphics.beginFill(MENTION_COLOR,param3);
+               _loc3_.graphics.drawRoundRect(_loc6_.left - 3,_loc6_.top - _loc12_,_loc6_.right - _loc6_.left + 6,_loc6_.height,8,8);
+               _loc3_.graphics.endFill();
+            }
+         }
+      }
+
+      // sound settings (MySettings' Music and SFX sliders): music and sound
+      // effects apart, each a volume from 0 to 1, kept on this computer in
+      // the game's shared object (musicVolume, sfxVolume). both start at the
+      // game's one old volume ("volume"), which is then left at full under
+      // them.
+      // music: every SBMusic (the rooms', the minigames' streams). sound
+      // effects: every SBSound (the interface's too), the minigames'
+      // SoundManager sounds, and what artwork plays by itself (gMainFrame's
+      // soundTransform; music plays apart from the display, so not under it).
+      // the HUD's speaker button still turns everything off and on.
+      private static var _musicVolume:Number = 1;
+
+      private static var _sfxVolume:Number = 1;
+
+      public static function musicLevel() : Number
+      {
+         return _musicVolume;
+      }
+
+      public static function sfxLevel() : Number
+      {
+         return _sfxVolume;
+      }
+
+      // "music" or "sfx"
+      public static function soundVolume(param1:String) : Number
+      {
+         return param1 == "music" ? _musicVolume : _sfxVolume;
+      }
+
+      private static function volumeFrom(param1:*, param2:Number) : Number
+      {
+         var _loc3_:Number = param1 == null ? param2 : Number(param1);
+         return isNaN(_loc3_) ? param2 : Math.max(0,Math.min(1,_loc3_));
+      }
+
+      // once the game has read its shared object (GuiManager.setupSharedObject)
+      public static function loadSoundSettings() : void
+      {
+         var _loc1_:Object = GuiManager.sharedObj != null ? GuiManager.sharedObj.data : null;
+         var _loc2_:Number = volumeFrom(_loc1_ != null ? _loc1_.volume : null,1);
+         _musicVolume = volumeFrom(_loc1_ != null ? _loc1_.musicVolume : null,_loc2_);
+         _sfxVolume = volumeFrom(_loc1_ != null ? _loc1_.sfxVolume : null,_loc2_);
+         if(SBAudio.currentVolume != 1)
+         {
+            SBAudio.setVolumeAll(1);
+         }
+         applySoundSettings();
+      }
+
+      // a volume (0 to 1); `param3` keeps it (a slider being dragged does
+      // not, until it is let go)
+      public static function setSoundVolume(param1:String, param2:Number, param3:Boolean = true) : void
+      {
+         param2 = volumeFrom(param2,1);
+         if(param1 == "music")
+         {
+            _musicVolume = param2;
+         }
+         else
+         {
+            _sfxVolume = param2;
+         }
+         applySoundSettings();
+         if(param3)
+         {
+            saveSoundSettings();
+         }
+      }
+
+      public static function saveSoundSettings() : void
+      {
+         if(GuiManager.sharedObj == null)
+         {
+            return;
+         }
+         GuiManager.sharedObj.data.musicVolume = _musicVolume;
+         GuiManager.sharedObj.data.sfxVolume = _sfxVolume;
+         try
+         {
+            GuiManager.sharedObj.flush();
+         }
+         catch(e:Error)
+         {
+         }
+      }
+
+      private static function applySoundSettings() : void
+      {
+         SBMusic.refreshAll();
+         SBSound.refreshAll();
+         if(gMainFrame != null)
+         {
+            gMainFrame.soundTransform = new SoundTransform(sfxLevel());
+         }
+      }
+
+      // where the player is, for the client's Discord rich presence (game.html
+      // ajPresence, the client's app/discord.js): the room's name as the game
+      // shows it, but never another player's name: a den or a player's party
+      // is named after its owner, so it is only "In their den", "Visiting a
+      // den" and the like. which room it is goes by its name on the server
+      // (lib/world.js): "den<owner>", "pparty<host>", "party<id>_<den>".
+      private static var _presenceShown:String = null;
+
+      public static function presenceRoom(param1:String) : void
+      {
+         var _loc2_:String = "";
+         var _loc3_:String = gMainFrame.userInfo.myUserName != null ? String(gMainFrame.userInfo.myUserName).toLowerCase() : "";
+         var _loc4_:String = null;
+         try
+         {
+            _loc2_ = String(gMainFrame.server.getCurrentRoomName() || "");
+         }
+         catch(e:Error)
+         {
+         }
+         if(_loc2_.indexOf("den") == 0)
+         {
+            _loc4_ = _loc2_.substr(3).toLowerCase() == _loc3_ ? "In their den" : "Visiting a den";
+         }
+         else if(_loc2_.indexOf("pparty") == 0)
+         {
+            _loc4_ = _loc2_.substr(6).toLowerCase() == _loc3_ ? "Hosting a party" : "At a party";
+         }
+         else if(_loc2_.indexOf("party") == 0 && _loc2_.indexOf("_") != -1)
+         {
+            _loc4_ = "At a party";
+         }
+         else
+         {
+            _loc4_ = param1 != null && param1 != "" ? "In " + param1 : "Playing";
+         }
+         if(_loc4_ == _presenceShown || !ExternalInterface.available)
+         {
+            return;
+         }
+         _presenceShown = _loc4_;
+         try
+         {
+            ExternalInterface.call("ajPresence",_loc4_);
+         }
+         catch(e:Error)
+         {
+         }
       }
 
       private function startEmojiButton() : void
@@ -3940,7 +4442,7 @@ package
          };
          if(_finderColourInput.text.length > 0 && _loc2_.kind != "den")
          {
-            if(_finderColourInput.text.indexOf("#") >= 0 ? finderHexColours(_finderColourInput.text) == null : !/^\s*[0-9]+\s*$/.test(_finderColourInput.text))
+            if(_finderColourInput.text.indexOf("#") >= 0 ? finderHexColours(_finderColourInput.text) == null : !/^\s*-?[0-9]+\s*$/.test(_finderColourInput.text))
             {
                _finderStatus.text = "Colour: an id, or #RRGGBB";
                return;
@@ -4001,8 +4503,9 @@ package
                return _finderHexId;
             }
          }
-         else if(/^[0-9]+$/.test(_loc2_))
+         else if(/^-?[0-9]+$/.test(_loc2_))
          {
+            // a negative id is the same colour written signed
             return uint(Number(_loc2_));
          }
          _loc4_ = ItemXtCommManager.getItemDef(int(param1.id));
@@ -4104,7 +4607,7 @@ package
       private function onFinderColourTyped(param1:Event) : void
       {
          var _loc2_:String = _finderColourInput.text.replace(/^\s+|\s+$/g,"");
-         if(_loc2_.length == 0 || /^[0-9]+$/.test(_loc2_) || finderHexColours(_loc2_) != null)
+         if(_loc2_.length == 0 || /^-?[0-9]+$/.test(_loc2_) || finderHexColours(_loc2_) != null)
          {
             for(var _loc3_:String in _finderIcons)
             {

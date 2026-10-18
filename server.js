@@ -6,6 +6,7 @@ const fs = require("fs");
 const accounts = require("./lib/accounts.js");
 const bans = require("./lib/bans.js");
 const devices = require("./lib/devices.js");
+const discord = require("./lib/discord.js");
 const chatlog = require("./lib/chatlog.js");
 const modlog = require("./lib/modlog.js");
 const retention = require("./lib/retention.js");
@@ -44,6 +45,7 @@ const main = async () => {
   support.load();
   bans.load();
   devices.load();
+  discord.startup();
   chatlog.load();
   modlog.load();
   masterpieces.load();

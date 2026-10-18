@@ -108,12 +108,23 @@ module.exports = {
   // emoji pictures for chat (lib/emoji.js): Twemoji's, at one version
   emojiUpstream: env.AJ_EMOJI_UPSTREAM || "https://cdn.jsdelivr.net/gh/jdecked/twemoji@15.1.0/assets/72x72/",
   offline: env.AJ_OFFLINE === "1",
-  // the client's device ids (lib/devices.js): with AJ_REQUIRE_DEVICE=1, a
-  // sign-in without them (a client from before 1.3.0, the official
-  // launcher, or one that left them out) is refused. off for now, while
-  // players update to 1.3.0: they are let in, and an account seen on banned
-  // hardware before is still kept out.
-  requireDevice: env.AJ_REQUIRE_DEVICE === "1",
+  // the client's device ids (lib/devices.js): a game whose launcher sent none
+  // (a client from before 1.3.0, the official launcher, or one that left
+  // them out) is turned away at its login, its popup saying to update.
+  // AJ_REQUIRE_DEVICE=0 lets them in (an account seen on banned hardware
+  // before is still kept out).
+  requireDevice: env.AJ_REQUIRE_DEVICE !== "0",
+  // Discord (lib/discord.js): an application's id and secret for linking a
+  // player's Discord account on the account page (its OAuth2 redirect must
+  // be <siteUrl>account/discord/callback), and a bot in Burrow's Discord
+  // server for the booster badge. linking is off without the first two, the
+  // booster badge left alone without the last two.
+  discord: {
+    clientId: env.AJ_DISCORD_CLIENT_ID || "",
+    clientSecret: env.AJ_DISCORD_CLIENT_SECRET || "",
+    botToken: env.AJ_DISCORD_BOT_TOKEN || "",
+    guildId: env.AJ_DISCORD_GUILD_ID || "",
+  },
   deployVersion: env.AJ_DEPLOY_VERSION || "1830",
   // older builds the CDN still serves, asked in turn for a room file the
   // current build has dropped. 1828 is the last with the Summer Carnival.
@@ -134,7 +145,7 @@ module.exports = {
   // 49 and 50: its link to a colour picker.
   // 61: the Owner, Moderator and Verified name tag badges seen by everyone.
   // 62: "Custom pictures" in the settings menu, to hide players' item pictures.
-  buildVersion: env.AJ_BUILD_VERSION || "62",
+  buildVersion: env.AJ_BUILD_VERSION || "71",
   // what the official CDN is asked for; not ours to change.
   upstreamBuildVersion: "3",
 

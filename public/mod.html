@@ -477,11 +477,13 @@
                 <button type="button" data-action="goto">Go to them</button></div>
             </div>
             <div class="action">
-              <h3>Username and bio</h3>
+              <h3>Username, bio and wall posts</h3>
               <div class="row">
                 <button type="button" data-action="rejectName" class="danger">Reject username</button>
                 <button type="button" data-action="acceptName">Take back</button>
                 <button type="button" data-action="clearBio">Clear bio</button></div>
+              <div class="row" style="margin-top:8px" title="Every post they wrote on anyone's Jammer Wall, and the replies to those">
+                <button type="button" data-action="clearWallPosts" class="danger">Clear wall posts</button></div>
             </div>
           </div>
           <h3 style="margin:16px 0 4px">Other accounts</h3>
@@ -1117,6 +1119,7 @@
         unbanDevices: name => `Lift the hardware bans on ${name}?`,
         rejectName: name => `Reject the username ${name}? They are signed out and must pick another.`,
         unwarn: name => `Take back ${name}'s latest warning?`,
+        clearWallPosts: name => `Remove every post ${name} wrote on any Jammer Wall, and the replies to them? This cannot be undone.`,
       };
 
       $("detail").addEventListener("click", async event => {
@@ -1404,7 +1407,13 @@
           box.append(picture, el("h3", painting.creator),
             el("div", `${when(painting.createdAt)}${which === "all" ? (painting.status === "waiting" ? " · waiting" : " · on show") : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
+          // rejecting or removing asks first; approving does not
+          const sure = action => action === "approve" || confirm(action === "reject"
+            ? `Reject this painting by ${painting.creator}?` : `Remove this painting by ${painting.creator} from show?`);
           const does = (label, action, className) => button(label, async () => {
+            if (!sure(action)) {
+              return;
+            }
             const result = await api("masterpiece", {id: painting.id, action});
             setStatus($("masterpiece-status"), said(result), !result.ok);
             refresh();
@@ -1843,6 +1852,10 @@
             el("div", `by ${entry.maker} · ${when(entry.createdAt)}${entry.makerStrikes ? ` · ${entry.makerStrikes} of ${data.strikes} pictures turned away before` : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
           const decide = approve => async () => {
+            // turning away asks first; approving does not
+            if (!approve && !confirm(`Turn away ${entry.waiting === "item" ? "the item" : "the picture of"} "${entry.name}" by ${entry.maker}?`)) {
+              return;
+            }
             const result = await api("review", {kind: entry.kind, id: entry.id, approve});
             setStatus($("review-status"), said(result), !result.ok);
             await refresh();
@@ -2095,7 +2108,7 @@
         silence: "chat.silence", unsilence: "chat.silence",
         kick: "player.kick", message: "player.warn", warn: "player.warn", unwarn: "player.warn",
         rejectName: "player.names", acceptName: "player.names", clearBio: "player.names",
-        banAddress: "address.ban", summon: "player.summon", goto: "player.goto",
+        clearWallPosts: "player.names", banAddress: "address.ban", summon: "player.summon", goto: "player.goto",
       };
       const applyPermissions = async () => {
         const result = await api("me");

@@ -138,7 +138,13 @@ package gui.itemWindows
                _window.scrubBtn.scrubBG.gotoAndStop("up");
                _window.scrubBtn.addEventListener("rollOver",handleMouseOver,false,0,true);
                _window.scrubBtn.addEventListener("rollOut",handleMouseOut,false,0,true);
-               if(GuiManager.sharedObj && GuiManager.sharedObj.data.volume != null)
+               if(_currItem.sound)
+               {
+                  // music or sound effects (AJClient's sound settings)
+                  _window.scrubBtn.scrubKnob.x = AJClient.soundVolume(_currItem.sound) * 82 + 15;
+                  _window.labelTxtCont.labelTxt.text = _currItem.labelLabel;
+               }
+               else if(GuiManager.sharedObj && GuiManager.sharedObj.data.volume != null)
                {
                   _window.scrubBtn.scrubKnob.x = GuiManager.sharedObj.data.volume * 82 + 15;
                }
@@ -767,7 +773,15 @@ package gui.itemWindows
          param1.stopPropagation();
          if(_currItem.type == MySettings.TOGGLE_TYPE_SCRUB && _window.scrubBtn.scrubKnob.dragging)
          {
-            SBAudio.setVolumeAll((int(_window.scrubBtn.scrubKnob.x - 15)) / 82);
+            if(_currItem.sound)
+            {
+               // heard as it moves, kept when let go (handleStopScrubbing)
+               AJClient.setSoundVolume(_currItem.sound,(int(_window.scrubBtn.scrubKnob.x - 15)) / 82,false);
+            }
+            else
+            {
+               SBAudio.setVolumeAll((int(_window.scrubBtn.scrubKnob.x - 15)) / 82);
+            }
          }
       }
       
@@ -843,7 +857,13 @@ package gui.itemWindows
       
       private function handleStopScrubbing() : void
       {
-         if(_window.scrubBtn.scrubKnob.dragging)
+         if(_window.scrubBtn.scrubKnob.dragging && _currItem.sound)
+         {
+            _window.scrubBtn.scrubKnob.dragging = false;
+            _window.scrubBtn.scrubKnob.stopDrag();
+            AJClient.setSoundVolume(_currItem.sound,(int(_window.scrubBtn.scrubKnob.x - 15)) / 82);
+         }
+         else if(_window.scrubBtn.scrubKnob.dragging)
          {
             _window.scrubBtn.scrubKnob.dragging = false;
             _window.scrubBtn.scrubKnob.stopDrag();

@@ -382,6 +382,8 @@ package gui
             }
          }
          AJAudio.setupSharedObject(_sharedObj);
+         // music and sound effects apart (AJClient's sound settings)
+         AJClient.loadSoundSettings();
          PlayerWallManager.init(mainHud.playerWall);
       }
       
@@ -2829,6 +2831,8 @@ package gui
          var _loc5_:UserInfo = null;
          _currRoomDisplayName = param1;
          _currRoomDisplayNameId = param2;
+         // for the client's Discord rich presence
+         AJClient.presenceRoom(param1);
          if(mainHud.zoneNameTxt)
          {
             if(param1.indexOf(gMainFrame.userInfo.myUserName) == 0)

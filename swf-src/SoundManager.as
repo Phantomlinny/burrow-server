@@ -194,7 +194,8 @@ package game
             }
             else
             {
-               _loc5_ = Number(_soundVolume[_loc8_]);
+               // times the sound effects setting (AJClient.sfxLevel)
+               _loc5_ = Number(_soundVolume[_loc8_]) * AJClient.sfxLevel();
             }
             _loc7_ = new SoundTransform(_loc5_,0);
             if(_soundLimit > 0)
@@ -234,7 +235,7 @@ package game
             }
             else
             {
-               _loc4_ = Number(_soundVolume[_loc7_]);
+               _loc4_ = Number(_soundVolume[_loc7_]) * AJClient.sfxLevel();
             }
             _loc6_ = new SoundTransform(_loc4_,0);
             if(_soundLimit > 0)
@@ -276,9 +277,8 @@ package game
             gMainFrame.stage.removeEventListener("enterFrame",doFadeIn);
          }
          var _loc2_:Number = _musicVolume[_fadeInStream] * _loc4_;
-         var _loc5_:SoundChannel = _fadeInStream.sc;
-         var _loc3_:SoundTransform = new SoundTransform(_loc2_,0);
-         _fadeInStream.sc.soundTransform = _loc3_;
+         // through SBMusic's volume, which takes the music setting
+         _fadeInStream.volume = _loc2_;
          if(_loc4_ == 1)
          {
             _fadeInStream = null;
@@ -301,8 +301,7 @@ package game
             gMainFrame.stage.removeEventListener("enterFrame",doFadeOut);
          }
          var _loc2_:Number = _musicVolume[_fadeOutStream] * (1 - _loc4_);
-         var _loc3_:SoundTransform = new SoundTransform(_loc2_,0);
-         _fadeOutStream.sc.soundTransform = _loc3_;
+         _fadeOutStream.volume = _loc2_;
          if(_loc4_ == 1)
          {
             _fadeOutStream.sc.stop();
@@ -374,7 +373,7 @@ package game
             _loc6_ = new SoundTransform(_loc5_,0);
             if(_fadeOutStream.sc != null)
             {
-               _fadeOutStream.sc.soundTransform = _loc6_;
+               _fadeOutStream.volume = _loc5_;
                return _fadeOutStream.sc;
             }
             return null;
@@ -397,7 +396,8 @@ package game
             return null;
          }
          _musicChannel[param1] = param1.sc;
-         param1.sc.soundTransform = _loc6_;
+         // the stream's volume through SBMusic, which takes the music setting
+         param1.volume = _loc6_.volume;
          if(SBAudio.isMusicMuted)
          {
             param1.mute();

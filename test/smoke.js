@@ -339,7 +339,10 @@ const run = async () => {
   a.xt("al", denId, "Alice");
   assert.deepStrictEqual((await a.nextXt("al")).slice(5, 7), ["2", aa[3]]);
   a.xt("ak", denId, aa[3]); // cannot remove the animal in use
-  assert.strictEqual((await a.nextXt("ak"))[2], "0");
+  const notRemoved = await a.nextXt("ak");
+  assert.strictEqual(notRemoved[2], "0");
+  // the second field is the gems the animal switcher then shows: the total
+  assert.ok(Number(notRemoved[3]) > 0, `gems after "ak": ${notRemoved[3]}`);
 
   a.xt("gl", denId, 312);
   const petShop = await a.nextXt("gl");
@@ -427,6 +430,10 @@ const run = async () => {
   assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, colorIndex: 0})).status, 200);
   const pushed = await a.nextXt("il");
   assert.deepStrictEqual([pushed[2], pushed[10]], ["2", String(hat.id)]);
+  // a colour id written signed is the same colour, kept unsigned (lib/admin.js)
+  assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, color: "-16777216"})).status, 200);
+  assert.strictEqual((await a.nextXt("il"))[6], "4278190080");
+  assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, color: "-99999999999"})).status, 400);
   assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: 1})).status, 400);
   assert.strictEqual((await giveJson({username: "Nobody", kind: "den", id: 6})).status, 404);
   assert.strictEqual((await giveJson({username: "Alice", kind: "den", id: 6})).status, 200);
@@ -608,7 +615,10 @@ const run = async () => {
   await a.untilXt("il");
   a.xt("il", denId, "Alice", 1, 1);
   assert.ok((await a.untilXt("il")).includes("123456789"));
-  assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, color: "-5"})).status, 400);
+  // negative: the same colour written signed (-5 is 4294967291); not a number at all is refused
+  assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, color: "-5"})).status, 200);
+  assert.ok((await a.untilXt("il")).includes("4294967291"));
+  assert.strictEqual((await giveJson({username: "Alice", kind: "clothing", id: hat.id, color: "5x"})).status, 400);
 
   // --- the item defs clients get: ocean eyes (314) allowed on every animal
   const {decode} = require("../lib/amf3.js");

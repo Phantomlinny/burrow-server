@@ -164,8 +164,10 @@ const run = async () => {
   assert.match(await told(a), /0 read Jam-A-Grams deleted/);
   say(a, roomId, "!music all");
   const tracks = await a.untilXt("di");
-  assert.match(await told(a), /66 music tracks added/);
-  assert.ok(Number(tracks[3]) >= 66);
+  // the game's 55 tracks and this server's own (lib/extramusic.js)
+  const allTracks = 55 + require("../lib/extramusic.js").TRACKS.length;
+  assert.match(await told(a), new RegExp(`${allTracks} music tracks added`));
+  assert.ok(Number(tracks[3]) >= allTracks);
   say(a, roomId, "!music all");
   await a.untilXt("di");
   assert.match(await told(a), /every music track already/);

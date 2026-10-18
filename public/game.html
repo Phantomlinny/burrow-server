@@ -84,6 +84,12 @@
         }
       }
 
+      // where the player is, for the client's Discord rich presence
+      // (AJClient.presenceRoom): a short line such as "In Jamaa Township".
+      function ajPresence(text) {
+        window.ipc.sendToHost("presence", String(text).slice(0, 100));
+      }
+
       function ajPrint(imageData) {
         window.ipc.sendToHost("printImage", imageData);
       }

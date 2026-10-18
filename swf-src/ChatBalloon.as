@@ -3,9 +3,11 @@ package gui
    import flash.display.MovieClip;
    import flash.display.Sprite;
    import flash.events.MouseEvent;
+   import flash.events.TextEvent;
    import flash.geom.ColorTransform;
    import flash.geom.Point;
    import flash.geom.Rectangle;
+   import flash.text.TextField;
    import flash.utils.setTimeout;
    import loader.MediaHelper;
    import localization.LocalizationManager;
@@ -133,6 +135,7 @@ package gui
             this.visible = true;
          }
          clearInline();
+         clearMentionBacks();
          _msgTxt.text = inlineEmotes(param1);
          _msgTxt.height;
          // AJClient.whisperNext is set by the server's "xw" just ahead of a
@@ -166,6 +169,33 @@ package gui
          else
          {
             _msgTxt.textColor = 4477529;
+         }
+         // tags (AJClient.resolveMentions): once the server says which "@"s
+         // are players', light blue and underlined, each a link to that
+         // player's card, if the balloon still says the same. (the field is
+         // another on some frames.)
+         if(!param2 && _msgTxt is TextField && _msgTxt.text.indexOf("@") != -1)
+         {
+            var field:TextField = TextField(_msgTxt);
+            var shown:String = field.text;
+            field.addEventListener("link",onMentionLink,false,0,true);
+            AJClient.resolveMentions(shown,function(param1:Array):void
+            {
+               if(field.text == shown)
+               {
+                  // in the message's own colour here: the blue box marks it
+                  AJClient.styleMentions(field,param1,true,4477529);
+                  // and their backgrounds, now and once laid out for sure
+                  AJClient.drawMentionBacks(field,param1,AJClient.MENTION_BACK_LIGHT);
+                  setTimeout(function():void
+                  {
+                     if(field.text == shown)
+                     {
+                        AJClient.drawMentionBacks(field,param1,AJClient.MENTION_BACK_LIGHT);
+                     }
+                  },42);
+               }
+            });
          }
          _timeout = 8000;
          if(param3 && this.parent)
@@ -438,6 +468,7 @@ package gui
       
       public function setCustomAdventureMessage(param1:String, param2:String, param3:int, param4:Boolean = false, param5:Boolean = false) : void
       {
+         clearMentionBacks();
          var _loc6_:int = 0;
          var _loc7_:int = 0;
          var _loc8_:Array = param2.split("|");
@@ -582,6 +613,25 @@ package gui
          }
       }
       
+      // the backgrounds of the tags of the text before (setText)
+      private function clearMentionBacks() : void
+      {
+         if(_msgTxt is TextField)
+         {
+            AJClient.drawMentionBacks(TextField(_msgTxt),null);
+         }
+      }
+
+      // a tag clicked: "@name" (setText)
+      private function onMentionLink(param1:TextEvent) : void
+      {
+         param1.stopPropagation();
+         if(param1.text && param1.text.charAt(0) == "@")
+         {
+            AJClient.openProfile(param1.text.substr(1));
+         }
+      }
+
       private function onBtnBG(param1:MouseEvent) : void
       {
          param1.stopPropagation();
@@ -610,6 +660,7 @@ package gui
       
       public function setEmote(param1:Sprite, param2:int = -1) : void
       {
+         clearMentionBacks();
          if(this.currentFrameLabel != "advBtn")
          {
             _permEmoteMediaId = param2;

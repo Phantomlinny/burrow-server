@@ -503,8 +503,9 @@
                 <h3>Badges</h3>
                 <div class="buttons" id="badge-boxes"></div>
                 <div class="row" style="margin-top:8px"><button type="button" data-action="badges">Set</button></div>
-                <div class="row" style="margin-top:8px"><input id="discord-name" maxlength="33" placeholder="Discord username" autocomplete="off" spellcheck="false" aria-label="Discord username">
-                  <button type="button" data-action="discord">Set</button></div>
+                <div class="row" style="margin-top:8px" title="Players link their Discord themselves, on the account page">
+                  <span class="hint" id="discord-name"></span>
+                  <button type="button" data-action="discord">Unlink Discord</button></div>
               </div>
               <div class="action">
                 <h3>Ban</h3>
@@ -576,6 +577,7 @@
                   </select>
                   <button type="button" data-action="role">Set role</button>
                   <button type="button" data-action="clearDen">Clear den</button>
+                  <button type="button" data-action="clearWallPosts" title="Every post they wrote on anyone's Jammer Wall, and the replies to those">Clear wall posts</button>
                   <button type="button" data-action="delete" class="danger">Delete</button>
                 </div>
               </div>
@@ -1440,7 +1442,7 @@
           label.append(box, ` ${badge.label}`);
           return label;
         }));
-        $("discord-name").value = current ? current.discord : "";
+        $("discord-name").textContent = current && current.discord ? `Discord: ${current.discord}` : "No Discord linked";
         $("bio-text").value = current ? current.bio : "";
         $("quest-level").value = current ? current.level : "";
         $("ban-reason").value = current ? current.banReason : "";
@@ -1628,7 +1630,7 @@
           case "gems": return {amount: numberFrom("gems-amount")};
           case "gift": return giftBody();
           case "badges": return {badges: [...$("badge-boxes").querySelectorAll("input:checked")].map(box => box.value)};
-          case "discord": return {name: $("discord-name").value};
+          case "discord": return {name: ""};
           case "bio": return {text: $("bio-text").value};
           case "level": return {level: numberFrom("quest-level")};
           default: return {};
@@ -1656,6 +1658,9 @@
           return;
         }
         if (action === "unbanDevices" && !window.confirm(`Lift the hardware bans on ${selected}?`)) {
+          return;
+        }
+        if (action === "clearWallPosts" && !window.confirm(`Remove every post ${selected} wrote on any Jammer Wall, and the replies to them? This cannot be undone.`)) {
           return;
         }
         if (action === "banDevices" && !window.confirm(`Hardware ban ${selected}? Everyone on their hardware is put out.`)) {
@@ -1999,10 +2004,16 @@
             el("div", `${when(painting.createdAt)}${painting.status === "approved" ? `, ${painting.likes} like${painting.likes === 1 ? "" : "s"}` : ""}`
               + `${which === "all" ? (painting.status === "waiting" ? " · waiting" : " · approved") : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
+          // rejecting or removing asks first; approving does not
+          const sure = action => action === "approve" || confirm(action === "reject"
+            ? `Reject this painting by ${painting.creator}?` : `Remove this painting by ${painting.creator} from show?`);
           const button = (label, action, className) => {
             const node = el("button", label, className);
             node.type = "button";
             node.addEventListener("click", async () => {
+              if (!sure(action)) {
+                return;
+              }
               node.disabled = true;
               const result = await api("masterpiece", {id: painting.id, action});
               setStatus($("masterpiece-status"), result.data.ok || result.data.error || "That did not work.", !result.ok);
@@ -2335,6 +2346,10 @@
             el("div", `by ${entry.maker} · ${when(entry.createdAt)}${entry.makerStrikes ? ` · ${entry.makerStrikes} of ${data.strikes} pictures turned away before` : ""}`, "hint"));
           const buttons = el("div", undefined, "buttons");
           const decide = approve => async () => {
+            // turning away asks first; approving does not
+            if (!approve && !confirm(`Turn away ${entry.waiting === "item" ? "the item" : "the picture of"} "${entry.name}" by ${entry.maker}?`)) {
+              return;
+            }
             const result = await api("review", {kind: entry.kind, id: entry.id, approve});
             setStatus($("review-status"), said(result), !result.ok);
             await refresh();

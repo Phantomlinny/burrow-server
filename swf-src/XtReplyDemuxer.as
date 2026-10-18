@@ -119,6 +119,11 @@ package
             AJClient.onInvisible(param1.obj);
             return;
          }
+         if(param1.obj[0] == "xmn")
+         {
+            AJClient.onMentions(param1.obj);
+            return;
+         }
          if(param1.obj[0] == "xty")
          {
             AJClient.onTyping(param1.obj);

@@ -367,12 +367,10 @@
         <section>
           <h2>Discord</h2>
           <p id="badges" hidden></p>
-          <form id="discord-form">
-            <label for="discord-name">Username</label>
-            <input id="discord-name" maxlength="33" autocomplete="off" spellcheck="false">
-            <div class="row"><button class="primary" type="submit">Save</button>
-              <button id="discord-remove" type="button">Remove</button></div>
-          </form>
+          <p id="discord-shown"></p>
+          <p class="hint" id="discord-about">Shown on your card in the game. Sign in to Discord to link your account; boosting Burrow's Discord server gives you the Server Booster badge while you boost.</p>
+          <div class="row"><button class="primary" id="discord-link" type="button">Link Discord</button>
+            <button id="discord-remove" type="button">Unlink</button></div>
           <p class="status" id="discord-status" role="status"></p>
         </section>
 
@@ -805,11 +803,11 @@
         $("bio-text").maxLength = account.bioLimit + 20; // room for the line ends a browser counts double
         $("bio-remove").hidden = !account.bio;
         bioCount();
-        // not while it is being typed in: every answer from the server draws the page again.
-        if (document.activeElement !== $("discord-name")) {
-          $("discord-name").value = account.discord;
-        }
-        $("discord-remove").hidden = !account.discord;
+        // linked by signing in to Discord (lib/discord.js), not typed in
+        $("discord-shown").textContent = account.discordLinked ? `Linked: ${account.discord}` : "Not linked.";
+        $("discord-link").textContent = account.discordLinked ? "Link another" : "Link Discord";
+        $("discord-link").hidden = !account.discordLinking;
+        $("discord-remove").hidden = !account.discordLinked;
         $("badges").hidden = account.badges.length === 0;
         $("badges").textContent = `Badges: ${account.badges.join(", ")}`;
 
@@ -938,6 +936,11 @@
         if (result.ok) {
           account = result.data;
           render();
+          // back from linking Discord: how it went, once
+          if (discordResult && Object.hasOwn(DISCORD_RESULTS, discordResult)) {
+            setStatus("discord-status", DISCORD_RESULTS[discordResult], discordResult !== "linked");
+            history.replaceState(null, "", location.pathname + location.hash);
+          }
         }
         else {
           showGate(result.status === 0 ? result.data.error : "");
@@ -1340,12 +1343,24 @@
       });
       $("bio-remove").addEventListener("click", () => act({action: "bio", text: ""}, "bio-status"));
 
-      $("discord-form").addEventListener("submit", async event => {
-        event.preventDefault();
-        $("discord-name").blur();
-        await act({action: "discord", name: $("discord-name").value}, "discord-status");
+      // off to Discord's sign-in; it comes back to /account?discord=<how it went>
+      $("discord-link").addEventListener("click", () => {
+        location.href = "/account/discord/link";
       });
-      $("discord-remove").addEventListener("click", () => act({action: "discord", name: ""}, "discord-status"));
+      $("discord-remove").addEventListener("click", () => {
+        if (confirm("Unlink your Discord account? It comes off your card, and so does the Server Booster badge.")) {
+          act({action: "discord", name: ""}, "discord-status");
+        }
+      });
+      const DISCORD_RESULTS = {
+        linked: "Discord linked.",
+        cancelled: "Linking was cancelled.",
+        expired: "That took too long, or was started in another browser. Try again.",
+        taken: "That Discord account is linked to another Burrow account.",
+        discord: "Discord did not answer. Try again later.",
+        off: "Linking Discord is not available right now.",
+      };
+      const discordResult = new URLSearchParams(location.search).get("discord");
 
       $("lock").addEventListener("click", () => {
         if (!account.locked && !window.confirm("Lock the account? Nobody gets in until you unlock it here.")) {

@@ -209,6 +209,82 @@ package gui
          }
          return param1.split("&").join("&amp;").split("<").join("&lt;").split(">").join("&gt;").split("\"").join("&quot;");
       }
+
+      // a line's words as plain() makes them, with each tag (`param2`,
+      // AJClient.resolveMentions) as typed, made a link to that player's card.
+      private static function withMentions(param1:String, param2:Array) : String
+      {
+         var _loc3_:String = "";
+         var _loc4_:int = 0;
+         var _loc5_:Object = null;
+         if(param1 == null)
+         {
+            return "";
+         }
+         for each(_loc5_ in param2)
+         {
+            _loc3_ += plain(param1.substring(_loc4_,_loc5_.at)) + "<a href=\"event:@" + plain(_loc5_.name) + "\"><span class=\"mention\">" + plain(param1.substr(_loc5_.at,_loc5_.length)) + "</span></a>";
+            _loc4_ = _loc5_.at + _loc5_.length;
+         }
+         return _loc3_ + plain(param1.substr(_loc4_));
+      }
+
+      // lines wait here, in the order they came, while the server is asked
+      // which "@"s in them are players' (AJClient.resolveMentions; a line
+      // without one goes on at once, unless one ahead of it is waiting).
+      // each is {before, words, after: HTML around the words, found}.
+      private var _lines:Array = [];
+
+      private function addLine(param1:String, param2:String, param3:String) : void
+      {
+         var line:Object = {
+            "before":param1,
+            "words":param2,
+            "after":param3,
+            "found":null
+         };
+         _lines.push(line);
+         AJClient.resolveMentions(param2,function(param1:Array):void
+         {
+            line.found = param1;
+            showLines();
+         });
+      }
+
+      private function showLines() : void
+      {
+         var _loc1_:Object = null;
+         var _loc2_:String = null;
+         while(_lines.length > 0 && _lines[0].found != null)
+         {
+            _loc1_ = _lines.shift();
+            if(_chatText == null)
+            {
+               continue;
+            }
+            _chatText.htmlText += _loc1_.before + withMentions(_loc1_.words,_loc1_.found) + _loc1_.after;
+            if(_chatText.numLines >= 100)
+            {
+               _loc2_ = _chatText.htmlText;
+               _chatText.htmlText = _loc2_.substr(_loc2_.indexOf("\n") + 1);
+            }
+            if(!_isOverChatText)
+            {
+               _chatText.scrollV = _chatText.maxScrollV;
+            }
+         }
+         drawMentionBacks();
+      }
+
+      // the tags' backgrounds (AJClient.drawMentionBacks), for the lines in
+      // view: again after each new line and each scroll.
+      private function drawMentionBacks(param1:Event = null) : void
+      {
+         if(_chatText != null)
+         {
+            AJClient.drawMentionBacks(_chatText,AJClient.mentionLinks(_chatText),AJClient.MENTION_BACK_DARK);
+         }
+      }
       
       public function addMessage(param1:String, param2:String, param3:String, param4:String) : void
       {
@@ -217,10 +293,9 @@ package gui
          var _loc5_:Boolean = false;
          var _loc6_:* = 0;
          var _loc7_:int = 0;
-         var _loc8_:String = null;
          if(_chatText && param1 != null && param1.length > 0 && param2 && param4)
          {
-            _chatText.htmlText += "<a href=\"event:" + plain(param2) + "\">" + plain(Utility.isSettingOn(MySettings.SETTINGS_USERNAME_BADGE) ? param3 : param1) + ": " + "</a>" + plain(param4) + "\n";
+            addLine("<a href=\"event:" + plain(param2) + "\">" + plain(Utility.isSettingOn(MySettings.SETTINGS_USERNAME_BADGE) ? param3 : param1) + ": " + "</a>",param4,"\n");
             if(_chatRepeatWindow && AvatarManager.playerAvatar && param2.toLowerCase() == AvatarManager.playerAvatar.userName.toLowerCase())
             {
                _loc7_ = 0;
@@ -254,16 +329,7 @@ package gui
          }
          else
          {
-            _chatText.htmlText += "\"" + plain(param4) + "\"" + "\n";
-         }
-         if(_chatText.numLines >= 100)
-         {
-            _loc8_ = _chatText.htmlText;
-            _chatText.htmlText = _loc8_.substr(_loc8_.indexOf("\n") + 1);
-         }
-         if(!_isOverChatText)
-         {
-            _chatText.scrollV = _chatText.maxScrollV;
+            addLine("\"",param4,"\"" + "\n");
          }
       }
       
@@ -293,11 +359,11 @@ package gui
          {
             if(param2 == null)
             {
-               _chatText.htmlText += plain(param1) + ": " + plain(param3) + "\n";
+               addLine(plain(param1) + ": ",param3,"\n");
             }
             else
             {
-               _chatText.htmlText += plain(param1) + " to " + plain(param2) + ": " + plain(param3) + "\n";
+               addLine(plain(param1) + " to " + plain(param2) + ": ",param3,"\n");
             }
          }
       }
@@ -322,9 +388,11 @@ package gui
       
       public function clearChat() : void
       {
+         _lines = [];
          if(_chatText)
          {
             _chatText.htmlText = "";
+            AJClient.drawMentionBacks(_chatText,null);
          }
          _chatRepeatArray = [];
          setupRepeatChat();
@@ -582,12 +650,18 @@ package gui
          {
             _chatText.addEventListener("mouseDown",chatClickHandler,false,0,true);
             _chatText.addEventListener("link",onChatLink,false,0,true);
+            _chatText.addEventListener("scroll",drawMentionBacks,false,0,true);
             _chatText.addEventListener("mouseOver",overChatText,false,0,true);
             _chatText.addEventListener("mouseOut",outChatText,false,0,true);
             _loc13_ = new StyleSheet();
             _loc12_ = {};
             _loc12_.color = "#ff9900";
             _loc13_.setStyle("a:hover",_loc12_);
+            // tags (withMentions)
+            _loc13_.setStyle(".mention",{
+               "color":"#4ab3f4",
+               "textDecoration":"underline"
+            });
             _chatText.styleSheet = _loc13_;
          }
          chatMsgText.addEventListener("change",onTextFieldChanged,false,0,true);
@@ -732,6 +806,12 @@ package gui
       
       private function onChatLink(param1:TextEvent) : void
       {
+         // a tag: "@name" (withMentions)
+         if(param1.text && param1.text.charAt(0) == "@")
+         {
+            AJClient.openProfile(param1.text.substr(1));
+            return;
+         }
          if(param1.text && param1.text != "" && param1.text != gMainFrame.userInfo.myUserName)
          {
             BuddyManager.showBuddyCard({

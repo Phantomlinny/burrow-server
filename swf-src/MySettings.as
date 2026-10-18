@@ -268,15 +268,17 @@ package gui
             "onTxt":6324,
             "offTxt":6322
          },{
-            "type":TOGGLE_TYPE_TOGGLE_BTN,
-            "frame":"music",
-            "labelTxt":6373,
-            "onTxt":6324,
-            "offTxt":6322
+            // music and sound effects apart, a volume each (AJClient's
+            // sound settings), for the game's one sound switch and volume
+            "type":TOGGLE_TYPE_SCRUB,
+            "frame":"",
+            "sound":"music",
+            "labelLabel":"Music"
          },{
             "type":TOGGLE_TYPE_SCRUB,
             "frame":"",
-            "labelTxt":14666
+            "sound":"sfx",
+            "labelLabel":"SFX"
          },{
             "type":TOGGLE_TYPE_CURSOR,
             "frame":"",
