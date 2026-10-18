@@ -63,6 +63,11 @@ package avatar
       private static const ATTACHMENT_Y_OFFSET:int = -320;
       
       private static const SLIDE_FRAME_TIME:Number = 41.666666666666664;
+
+      // name tag badges everyone sees, buddy or not, as the game shows its
+      // News Crew camera (NameBar.isVIPBadge): the Owner, Moderator and
+      // Verified badges of lib/badges.js, by their def ids.
+      private static const PUBLIC_BADGE_IDS:Array = [63,64,76];
       
       private static const GLOW_LAND_DEFAULT_COLOR:int = 5586479;
       
@@ -2185,7 +2190,7 @@ package avatar
             {
                _loc2_ = param1;
             }
-            if(BuddyManager.isBuddy(_avatar.userName) || isSelf || _isMember && NameBar.isVIPBadge(_loc2_))
+            if(BuddyManager.isBuddy(_avatar.userName) || isSelf || _isMember && (NameBar.isVIPBadge(_loc2_) || PUBLIC_BADGE_IDS.indexOf((_loc2_ >> 8 & 0xFF) + 1) != -1))
             {
                _namebar.setNubType(NameBar.BUDDY);
             }

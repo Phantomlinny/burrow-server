@@ -179,6 +179,9 @@ package gui.itemWindows
             case "hideBlocked":
                showHideBlocked();
                break;
+            case "customArt":
+               showCustomArt();
+               break;
             case "wasd":
                showWasd();
                break;
@@ -457,6 +460,24 @@ package gui.itemWindows
          showHideBlocked();
       }
       
+      // "Custom pictures": the pictures players give their items, or every
+      // item with its base's art (AJClient.customArtOn). user var 9006.
+      private function showCustomArt() : void
+      {
+         var _loc1_:String = AJClient.customArtOn() ? "Hide" : "Show";
+         _window.goNowBtn.down.txt.text = _loc1_;
+         _window.goNowBtn.mouse.mouse.txt.text = _loc1_;
+         _window.goNowBtn.mouse.up.txt.text = _loc1_;
+         _window.labelTxtCont.labelTxt.text = AJClient.customArtOn() ? "Custom pictures: shown" : "Custom pictures: hidden";
+      }
+      
+      private function setCustomArt(param1:Boolean) : void
+      {
+         gMainFrame.userInfo.userVarCache.updateUserVar(9006,param1 ? 0 : 1);
+         AchievementXtCommManager.requestSetUserVar(9006,param1 ? 0 : 1);
+         showCustomArt();
+      }
+      
       private function handleMouseDown(param1:MouseEvent) : void
       {
          var _loc2_:Number = NaN;
@@ -681,6 +702,9 @@ package gui.itemWindows
                   break;
                case "hideBlocked":
                   setHideBlocked(!blockedAreHidden());
+                  break;
+               case "customArt":
+                  setCustomArt(!AJClient.customArtOn());
                   break;
                case "wasd":
                   setWasd(!AJClient.wasdOn());

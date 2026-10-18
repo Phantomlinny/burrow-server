@@ -221,6 +221,11 @@ package gui
             "frame":"hideBlocked",
             "iconFrame":"buddyRequest"
          },{
+            // the pictures players give their items (AJClient.customArtOn)
+            "type":TOGGLE_TYPE_JOIN,
+            "frame":"customArt",
+            "iconFrame":"redeemCode"
+         },{
             "type":TOGGLE_TYPE_JOIN,
             "frame":"redeemCode",
             "labelTxt":24819,
