@@ -85,6 +85,21 @@ const run = async () => {
   await a.untilXt("ac");
   await a.nextXt("il");
 
+  // Actions are normally live type-3 chat packets. A player who enters after
+  // one has started must receive the current action after the avatar itself,
+  // including its mirror marker, rather than seeing an idle animal.
+  say(a, roomId, ":dance:%3%m1");
+  assert.deepStrictEqual((await b.untilXt("uc")).slice(2), [String(annLogin.params.userId), ":dance:", "3", "m1"]);
+  const {client: c} = await arrive("Cat", "KettlePass01");
+  assert.deepStrictEqual((await c.untilXt("uc")).slice(2), [String(annLogin.params.userId), ":dance:", "3", "m1"]);
+  await a.untilXt("ac"); // Cat appearing in the room
+  await a.nextXt("il");
+  await b.untilXt("ac");
+  await b.nextXt("il");
+  c.socket.destroy();
+  await a.untilXt("ar");
+  await b.untilXt("ar");
+
   // the shop's name and stalls come from its room file (lib/roominfo.js),
   // read the first time anyone goes in; until then the name is made from its
   // path. a scout goes in first and comes back until the file has been read,
