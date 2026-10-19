@@ -216,9 +216,25 @@
       .page-title h1 { font-size: 26px; }
       @media (max-width: 860px) {
         #panel { grid-template-columns: 1fr; }
-        #side { position: static; height: auto; flex-direction: column; }
-        nav { flex-direction: row; flex-wrap: wrap; }
-        nav button { width: auto; }
+        #side { position: static; height: auto; gap: 12px; padding: 12px; }
+        nav { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; scrollbar-width: thin; }
+        nav button { flex: 0 0 auto; width: auto; }
+        #main { padding: 16px 12px 32px; }
+        section { padding: 15px; border-radius: 14px; }
+        .page-title { align-items: flex-start; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+        .columns, .actions { grid-template-columns: minmax(0, 1fr); }
+        .toolbar input[type="search"] { flex-basis: 100%; min-width: 0; width: 100%; }
+        .table-wrap { max-width: 100%; }
+      }
+      @media (max-width: 520px) {
+        body { font-size: 14px; overflow-x: hidden; }
+        .brand { padding: 0; }
+        .tiles, .paintings { grid-template-columns: minmax(0, 1fr); }
+        .tile { padding: 14px; }
+        .tile .value { font-size: 26px; }
+        dl { grid-template-columns: 1fr; gap: 2px; }
+        dd { margin-bottom: 9px; }
+        .preview { padding: 8px; }
       }
 
       section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow); }
@@ -1020,6 +1036,8 @@
       let tab = "home";
       let selected = null; // the username of the player whose box is open
       let players = [];
+      // Older responses must never overwrite a newer player search.
+      let playerSearchRun = 0;
       let chatQuery = null; // what the Chat page shows: {username, room, text}
       let chatLines = [];
       let timer = null;
@@ -1560,6 +1578,7 @@
       $("player-only").addEventListener("click", event => {
         const chip = event.target.closest("button[data-only]");
         if (chip) {
+          playerSearchRun++;
           setListOnly(chip.dataset.only);
           refresh();
         }
@@ -1567,6 +1586,7 @@
 
       // from another page: that player's box, whether or not the search shows them.
       const openPlayer = username => {
+        playerSearchRun++;
         $("player-search").value = username;
         $("player-search-by").value = "name";
         $("player-search").placeholder = "Search";
@@ -1582,6 +1602,7 @@
 
       // every account that used a hardware ID: the player list, searched by it.
       const searchDevice = id => {
+        playerSearchRun++;
         $("player-search-by").value = "device";
         $("player-search").placeholder = "Hardware ID, or the start of one";
         $("player-search").value = id;
@@ -1664,6 +1685,7 @@
       // by address, asked once typing stops: each search is written down.
       let searchWait = null;
       $("player-search").addEventListener("input", () => {
+        playerSearchRun++;
         clearTimeout(searchWait);
         searchWait = setTimeout(refresh, $("player-search-by").value === "name" ? 250 : 700);
       });
@@ -1687,6 +1709,7 @@
         }
       });
       $("player-search-by").addEventListener("change", () => {
+        playerSearchRun++;
         $("player-search").placeholder = {address: "203.0.113.7, or the start of one", device: "Hardware ID, or the start of one"}[$("player-search-by").value] || "Search";
         refresh();
       });
@@ -1966,7 +1989,7 @@
       let recentList = [];
       let paintingsShown = "";
       let recentShown = "";
-      const paintingSrc = painting => `/mod/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
+      const paintingSrc = painting => `/dashboard/api/staff/masterpiece?id=${encodeURIComponent(painting.id)}`;
       const paintingWords = painting => (painting.status === "waiting" ? `Waiting · painted ${ago(painting.createdAt)}`
         : `Approved${painting.approvedAt ? ` ${ago(painting.approvedAt)}` : ""}${painting.approvedBy ? ` by ${painting.approvedBy === myName ? "you" : painting.approvedBy}` : ""}`
           + `${painting.likes ? ` · ${painting.likes} ${painting.likes === 1 ? "like" : "likes"}` : ""}`);
@@ -2766,9 +2789,13 @@
           const searchBy = $("player-search-by").value;
           const byAddress = searchBy !== "name";
           const query = $("player-search").value.trim();
+          const searchRun = ++playerSearchRun;
           $("address-hint").hidden = searchBy !== "address";
           $("player-only").hidden = byAddress;
           if (byAddress && query === "") {
+            if (searchRun !== playerSearchRun || tab !== "players") {
+              return;
+            }
             players = [];
             renderPlayers();
             $("players-more").hidden = true;
@@ -2777,6 +2804,12 @@
           else {
             const only = listOnly();
             const result = await api(`players?q=${encodeURIComponent(query)}${byAddress ? `&by=${searchBy}` : only ? `&only=${only}` : ""}`);
+            if (searchRun !== playerSearchRun || tab !== "players"
+              || searchBy !== $("player-search-by").value
+              || query !== $("player-search").value.trim()
+              || (!byAddress && only !== listOnly())) {
+              return;
+            }
             players = result.ok ? result.data.players : [];
             renderPlayers();
             const total = result.ok && result.data.total ? result.data.total : players.length;

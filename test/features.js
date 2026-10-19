@@ -529,6 +529,7 @@ const run = async () => {
   a.xt("fr", own[4], "Ben", 2);
   assert.deepStrictEqual((await a.nextXt("fr")).slice(2), ["1"]);
   const waiting = (await panel("reports", undefined, admin)).data;
+  const reportId = waiting.reports[0].id;
   assert.strictEqual(waiting.open, 1);
   assert.strictEqual(waiting.reports.length, 1);
   assert.deepStrictEqual([waiting.reports[0].reporter, waiting.reports[0].target, waiting.reports[0].reason, waiting.reports[0].detail, waiting.reports[0].room],
@@ -704,6 +705,12 @@ const run = async () => {
   assert.strictEqual(await dated(1030), 0);
   await panel("debug", {action: "everythingOnSale", on: false}, admin);
   assert.ok(await dated(1030) > 0);
+
+  // Renames must carry the names shown on existing moderation records.
+  // The admin action disconnects Ben before making this change.
+  assert.strictEqual((await panel("account", {username: "Ben", action: "rename", newName: "Benny"}, admin)).status, 200);
+  const renamedReport = (await panel("reports?handled=1", undefined, admin)).data.reports.find(report => report.id === reportId);
+  assert.strictEqual(renamedReport.target, "Benny");
 
   a.socket.destroy();
   b.socket.destroy();

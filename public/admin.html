@@ -215,9 +215,25 @@
       .page-title h1 { font-size: 26px; }
       @media (max-width: 860px) {
         #panel { grid-template-columns: 1fr; }
-        #side { position: static; height: auto; flex-direction: column; }
-        nav { flex-direction: row; flex-wrap: wrap; }
-        nav button { width: auto; }
+        #side { position: static; height: auto; gap: 12px; padding: 12px; }
+        nav { flex-direction: row; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; padding-bottom: 2px; scrollbar-width: thin; }
+        nav button { flex: 0 0 auto; width: auto; }
+        #main { padding: 16px 12px 32px; }
+        section { padding: 15px; border-radius: 14px; }
+        .page-title { align-items: flex-start; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+        .columns, .actions { grid-template-columns: minmax(0, 1fr); }
+        .toolbar input[type="search"] { flex-basis: 100%; min-width: 0; width: 100%; }
+        .table-wrap { max-width: 100%; }
+      }
+      @media (max-width: 520px) {
+        body { font-size: 14px; overflow-x: hidden; }
+        .brand { padding: 0; }
+        .tiles, .paintings { grid-template-columns: minmax(0, 1fr); }
+        .tile { padding: 14px; }
+        .tile .value { font-size: 26px; }
+        dl { grid-template-columns: 1fr; gap: 2px; }
+        dd { margin-bottom: 9px; }
+        .preview { padding: 8px; }
       }
 
       section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 20px; margin-bottom: 18px; box-shadow: var(--shadow); }
@@ -1002,6 +1018,8 @@
       let tab = "overview";
       let lastLogId = 0;
       let timer = null;
+      // Older responses must never overwrite a newer account search.
+      let accountSearchRun = 0;
 
       const api = async (path, body) => {
         const response = await fetch(`/dashboard/api/admin/${path}`, body === undefined ? {} : {
@@ -1735,6 +1753,7 @@
       // the server searches, once typing stops for a moment.
       let addressWait = null;
       $("account-search").addEventListener("input", () => {
+        accountSearchRun++;
         clearTimeout(addressWait);
         addressWait = setTimeout($("account-search-by").value !== "name" ? searchByAddress : refresh, $("account-search-by").value !== "name" ? 400 : 250);
       });
@@ -1752,6 +1771,7 @@
         }
       });
       $("account-search-by").addEventListener("change", () => {
+        accountSearchRun++;
         const byAddress = $("account-search-by").value !== "name";
         $("account-search").placeholder = {address: "203.0.113.7, or the start of one", device: "Hardware ID, or the start of one"}[$("account-search-by").value] || "Search";
         if (byAddress) {
@@ -1761,7 +1781,10 @@
           refresh();
         }
       });
-      $("account-filter").addEventListener("change", () => refresh());
+      $("account-filter").addEventListener("change", () => {
+        accountSearchRun++;
+        refresh();
+      });
 
       const act = async (username, action, extra, statusElement) => {
         const result = await api("account", {username, action, ...extra});
@@ -2041,7 +2064,7 @@
         $("masterpieces").replaceChildren(...paintings.map(painting => {
           const box = el("div", undefined, "painting");
           const picture = el("img");
-          picture.src = `/admin/api/masterpiece?id=${encodeURIComponent(painting.id)}`;
+          picture.src = `/dashboard/api/admin/masterpiece?id=${encodeURIComponent(painting.id)}`;
           picture.alt = `Painting by ${painting.creator}`;
           picture.loading = "lazy";
           picture.addEventListener("click", () => showPreview(picture.src));
@@ -2861,14 +2884,23 @@
           }
         }
         else if (tab === "accounts") {
-          const query = $("account-search-by").value !== "name" ? "" : $("account-search").value.trim();
-          result = await api(`accounts?q=${encodeURIComponent(query)}&filter=${$("account-filter").value}`);
-          if (result.ok) {
+          const searchBy = $("account-search-by").value;
+          const query = searchBy !== "name" ? "" : $("account-search").value.trim();
+          const filter = $("account-filter").value;
+          const searchRun = ++accountSearchRun;
+          result = await api(`accounts?q=${encodeURIComponent(query)}&filter=${filter}`);
+          // A slower earlier search must not replace what the person just typed.
+          if (result.ok && searchRun === accountSearchRun && tab === "accounts"
+            && searchBy === $("account-search-by").value
+            && query === (searchBy !== "name" ? "" : $("account-search").value.trim())
+            && filter === $("account-filter").value) {
             accounts = result.data.accounts;
             accountTotal = result.data.total;
             badges = result.data.badges || [];
             await loadCurrent();
-            renderAccounts();
+            if (searchRun === accountSearchRun && tab === "accounts") {
+              renderAccounts();
+            }
           }
         }
         else if (tab === "stats") {
