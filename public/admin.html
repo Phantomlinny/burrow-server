@@ -143,6 +143,14 @@
       .lock-results .meta { color: var(--muted); font-size: 12px; }
       .lock-results button { margin-left: auto; }
       .lock-results .is-locked { font-size: 11px; padding: 1px 7px; border: 1px solid var(--text); border-radius: 999px; }
+      #wear-rule-animals { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; }
+      #wear-rule-animals label.check { display: inline-flex; align-items: center; gap: 5px; }
+      #wear-rule-animal { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      #wear-rule-animal button { margin: 0; }
+      #wear-rule-animal button[aria-pressed="true"] { color: #000; background: var(--text); border-color: var(--text); }
+      #wear-rule-results li, #wear-rule-active li { display: flex; gap: 10px; align-items: center; }
+      #wear-rule-results .meta, #wear-rule-active .meta { color: var(--muted); font-size: 12px; }
+      #wear-rule-results button, #wear-rule-active button { margin-left: auto; }
 
       /* signing in */
       #gate {
@@ -368,6 +376,8 @@
         </div>
         <button class="primary" id="gate-button">Sign in</button>
       </form>
+      <button type="button" id="discord-sign-in" hidden>Sign in with Discord</button>
+      <p class="hint" id="discord-gate-hint" hidden>Only Discord accounts explicitly allowed by the owner can use this.</p>
       <p class="status" id="gate-status" role="status"></p>
     </main>
 
@@ -375,7 +385,7 @@
       <aside id="side">
         <div class="brand">
           <img class="mark" src="/logo.png" alt="">
-          <div><h1>Server admin</h1><span class="hint" id="updated"></span></div>
+          <div><h1>Burrow dashboard</h1><span class="hint" id="updated">Owner controls</span></div>
         </div>
         <nav role="tablist" aria-orientation="vertical">
           <button role="tab" data-tab="overview" aria-selected="true"><span class="icon" aria-hidden="true">&#9673;</span>Overview</button>
@@ -386,6 +396,7 @@
           <button role="tab" data-tab="support" aria-selected="false"><span class="icon" aria-hidden="true">&#9998;</span>Requests<span id="support-count"></span></button>
           <button role="tab" data-tab="masterpieces" aria-selected="false"><span class="icon" aria-hidden="true">&#9635;</span>Masterpieces<span id="masterpiece-count"></span></button>
           <button role="tab" data-tab="items" aria-selected="false"><span class="icon" aria-hidden="true">&#10070;</span>Items</button>
+          <button role="tab" data-tab="wear-rules" aria-selected="false"><span class="icon" aria-hidden="true">&#9873;</span>Wear rules</button>
           <button role="tab" data-tab="bans" aria-selected="false"><span class="icon" aria-hidden="true">&#8856;</span>Bans</button>
           <button role="tab" data-tab="moderators" aria-selected="false"><span class="icon" aria-hidden="true">&#9733;</span>Moderators</button>
           <button role="tab" data-tab="messages" aria-selected="false"><span class="icon" aria-hidden="true">&#9993;</span>Messages</button>
@@ -475,11 +486,6 @@
                   <button type="button" data-action="rename">Rename</button></div>
               </div>
               <div class="action">
-                <h3>Password</h3>
-                <div class="row"><input id="new-password" type="password" placeholder="New password" autocomplete="new-password" aria-label="New password">
-                  <button type="button" data-action="password">Set</button></div>
-              </div>
-              <div class="action">
                 <h3>Adventure level</h3>
                 <div class="row"><input id="quest-level" type="number" min="0" max="100" step="1" aria-label="Adventure level of the animal in use">
                   <button type="button" data-action="level">Set</button></div>
@@ -564,7 +570,6 @@
                 <div class="buttons">
                   <button type="button" data-action="kick">Disconnect</button>
                   <button type="button" data-action="unlock">Unlock</button>
-                  <button type="button" data-action="twoStepOff">Turn off 2FA</button>
                   <button type="button" data-action="rejectName">Reject username</button>
                   <button type="button" data-action="acceptName">Take rejection back</button>
                   <button type="button" data-action="moderator" id="moderator-toggle">Make moderator</button>
@@ -617,6 +622,8 @@
               <p class="hint">Each one as their role has it, or given or taken for them alone. What they may do now is marked.</p>
               <div class="perm-list" id="perm-list"></div>
               <div class="row" style="margin-top:10px"><button type="button" class="primary" data-action="permissions">Save permissions</button></div>
+              <div class="row" style="margin-top:12px"><button type="button" data-action="adminDashboardAccess" id="admin-dashboard-access"></button></div>
+              <p class="hint" id="admin-dashboard-access-hint"></p>
             </div>
             <div id="owned"></div>
           </div>
@@ -685,6 +692,30 @@
           <h2 style="margin-top:20px">Feedback</h2>
           <div id="feedback"></div>
           <div class="empty" id="no-feedback" hidden>Nothing here.</div>
+        </section>
+      </div>
+
+      <div data-view="wear-rules" hidden>
+        <section>
+          <h2>Animal wear rules</h2>
+          <p class="hint">Choose an animal below, then control which clothing it may wear. A rule never changes the other animals.</p>
+          <div id="wear-rule-animal" aria-label="Animal to control"></div>
+          <div class="toolbar"><input id="wear-rule-q" type="search" placeholder="Clothing name or id" aria-label="Find clothing to restrict" disabled></div>
+          <ul class="plain lock-results" id="wear-rule-results"></ul>
+          <p class="hint" id="wear-rule-more" hidden></p>
+        </section>
+        <section id="wear-rule-editor" hidden>
+          <h2 id="wear-rule-title"></h2>
+          <p class="hint">Tick every animal that must not wear this item. Leaving them all clear lets every animal wear it again.</p>
+          <div id="wear-rule-animals"></div>
+          <div class="toolbar" style="margin-top:14px"><button type="button" class="primary" id="wear-rule-save">Save rules</button>
+            <button type="button" id="wear-rule-close">Close</button></div>
+          <p class="status" id="wear-rule-status" role="status"></p>
+        </section>
+        <section>
+          <h2>Restricted for this animal</h2>
+          <ul class="plain lock-results" id="wear-rule-active"></ul>
+          <div class="empty" id="no-wear-rules">No animal wear rules yet.</div>
         </section>
       </div>
 
@@ -973,7 +1004,7 @@
       let timer = null;
 
       const api = async (path, body) => {
-        const response = await fetch(`/admin/api/${path}`, body === undefined ? {} : {
+        const response = await fetch(`/dashboard/api/admin/${path}`, body === undefined ? {} : {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify(body),
@@ -1040,6 +1071,13 @@
         $("confirm-field").hidden = !setup;
         $("code-field").hidden = !(setup && state.needsSetupCode);
         $("gate-button").textContent = setup ? "Set password" : "Sign in";
+        $("discord-sign-in").hidden = setup;
+        $("discord-sign-in").disabled = !state.discordLogin;
+        $("discord-sign-in").textContent = state.discordLogin ? "Sign in with Discord" : "Discord sign-in is not configured";
+        $("discord-gate-hint").hidden = setup;
+        $("discord-gate-hint").textContent = state.discordLogin
+          ? "Only Discord accounts explicitly allowed by the owner can use this."
+          : "Set AJ_DISCORD_CLIENT_ID and AJ_DISCORD_CLIENT_SECRET, then add both admin callback URLs in your Discord application.";
         $("password").value = "";
         $("confirm").value = "";
         setStatus($("gate-status"), message || "");
@@ -1064,6 +1102,9 @@
         }
         state = {needsSetup: false, needsSetupCode: false, signedIn: true};
         showPanel();
+      });
+      $("discord-sign-in").addEventListener("click", () => {
+        location.href = "/dashboard/admin/discord/login";
       });
 
       $("sign-out").addEventListener("click", async () => {
@@ -1443,6 +1484,11 @@
           return label;
         }));
         $("discord-name").textContent = current && current.discord ? `Discord: ${current.discord}` : "No Discord linked";
+        $("admin-dashboard-access").textContent = current && current.adminDashboardAccess ? "Remove Discord dashboard access" : "Allow Discord dashboard access";
+        $("admin-dashboard-access").disabled = !current || (!current.discord && !current.adminDashboardAccess);
+        $("admin-dashboard-access-hint").textContent = current && current.discord
+          ? "Lets this linked Discord account open the full owner dashboard without the shared admin password."
+          : "They must link Discord on their account page first.";
         $("bio-text").value = current ? current.bio : "";
         $("quest-level").value = current ? current.level : "";
         $("ban-reason").value = current ? current.banReason : "";
@@ -1473,7 +1519,7 @@
         selected = username;
         current = null;
         setStatus($("detail-status"), "");
-        for (const id of ["new-name", "new-password", "ban-hours", "silence-hours", "message-text", "gems-amount", "gift-value", "gift-text"]) {
+        for (const id of ["new-name", "ban-hours", "silence-hours", "message-text", "gems-amount", "gift-value", "gift-text"]) {
           $(id).value = "";
         }
         hashArg = username;
@@ -1618,7 +1664,6 @@
       const actionBody = action => {
         switch (action) {
           case "rename": return {newName: $("new-name").value};
-          case "password": return {password: $("new-password").value};
           case "lastSeen": return {when: Math.floor(new Date($("last-seen").value).getTime() / 1000)};
           case "ban": return {hours: numberFrom("ban-hours"), reason: $("ban-reason").value};
           case "banReason": case "banDevices": return {reason: $("ban-reason").value};
@@ -1626,6 +1671,7 @@
           case "moderator": return {on: !(current || {}).moderator};
           case "role": return {role: $("role-select").value};
           case "permissions": return permissionChoices();
+          case "adminDashboardAccess": return {on: !(current || {}).adminDashboardAccess};
           case "message": return {text: $("message-text").value};
           case "gems": return {amount: numberFrom("gems-amount")};
           case "gift": return giftBody();
@@ -1678,7 +1724,6 @@
           $("new-name").value = "";
         }
         if (result.ok) {
-          $("new-password").value = "";
           await refresh();
           fillCard();
           loadOwned();
@@ -2590,6 +2635,130 @@
         file.click();
       };
 
+      // ---- animal wear rules: the same server-side moderation control the
+      // moderator dashboard uses (items.restrict in lib/roles.js).
+      let wearAnimals = [];
+      let wearRuleEntries = [];
+      let wearSelected = null;
+      let wearSelectedTypes = new Set();
+      let wearAnimal = "";
+      let wearRuleTimer = null;
+      let wearRuleAsked = 0;
+
+      const wearRuleFor = id => wearRuleEntries.find(rule => rule.id === Number(id));
+      const wearAnimalName = id => (wearAnimals.find(animal => animal.id === Number(id)) || {name: `Animal ${id}`}).name;
+      const wearNames = types => types.map(wearAnimalName).join(", ");
+      const selectedWearAnimal = () => Number(wearAnimal) || 0;
+
+      const toggleWearRule = async item => {
+        const animal = selectedWearAnimal();
+        if (!animal) return;
+        const current = item.blockedTypes || (wearRuleFor(item.id) || {}).blockedTypes || [];
+        const blocked = current.includes(animal) ? current.filter(type => type !== animal) : [...current, animal];
+        const result = await api("items/wear-rules", {id: item.id, blockedTypes: blocked.sort((one, two) => one - two)});
+        setStatus($("wear-rule-status"), said(result), !result.ok);
+        if (result.ok) await loadWearRules();
+      };
+      const chooseWearAnimal = animal => {
+        wearAnimal = String(animal);
+        wearSelected = null;
+        $("wear-rule-q").disabled = !selectedWearAnimal();
+        renderWearRuleEditor();
+        loadWearRules();
+      };
+
+      const renderWearRuleEditor = () => {
+        $("wear-rule-editor").hidden = !wearSelected;
+        if (!wearSelected) {
+          return;
+        }
+        $("wear-rule-title").textContent = `Where ${wearSelected.name || `clothing ${wearSelected.id}`} cannot be worn`;
+        $("wear-rule-animals").replaceChildren(...wearAnimals.map(animal => {
+          const box = el("input");
+          box.type = "checkbox";
+          box.checked = wearSelectedTypes.has(animal.id);
+          box.addEventListener("change", () => {
+            wearSelectedTypes[box.checked ? "add" : "delete"](animal.id);
+          });
+          const label = el("label", undefined, "check");
+          label.append(box, animal.name);
+          return label;
+        }));
+      };
+
+      const chooseWearRule = item => {
+        wearSelected = {id: Number(item.id), name: item.name || `clothing ${item.id}`};
+        const current = item.blockedTypes || (wearRuleFor(item.id) || {}).blockedTypes || [];
+        wearSelectedTypes = new Set(current);
+        setStatus($("wear-rule-status"), "");
+        renderWearRuleEditor();
+      };
+
+      const renderWearRules = (results, query, total) => {
+        const animal = selectedWearAnimal();
+        $("wear-rule-results").replaceChildren(...results.map(item => {
+          const row = el("li");
+          const blocked = item.blockedTypes || (wearRuleFor(item.id) || {}).blockedTypes || [];
+          row.append(el("span", item.name || "(no name)"), el("span", `clothing ${item.id}${item.custom ? ", custom" : ""}${blocked.length ? ` · blocked for ${wearNames(blocked)}` : ""}`, "meta"),
+            button(animal && blocked.includes(animal) ? `Allow ${wearAnimalName(animal)}` : `Block ${wearAnimalName(animal)}`,
+              () => toggleWearRule({...item, blockedTypes: blocked}), animal && blocked.includes(animal) ? "" : "primary"));
+          return row;
+        }));
+        $("wear-rule-more").hidden = Boolean(animal && query && results.length > 0 && total <= results.length);
+        $("wear-rule-more").textContent = !animal ? "Choose an animal, then search for clothing."
+          : !query ? "Search for clothing to control for this animal."
+          : results.length === 0 ? "No clothing matches."
+          : `${total} clothing items match; these are the first ${results.length}. Type more of the name.`;
+        const active = animal ? wearRuleEntries.filter(rule => rule.blockedTypes.includes(animal)) : [];
+        $("wear-rule-active").replaceChildren(...active.map(rule => {
+          const row = el("li");
+          row.append(el("span", rule.name || "(no name)"), el("span", `clothing ${rule.id} · blocked for ${wearNames(rule.blockedTypes)}`, "meta"),
+            button("Edit", () => chooseWearRule(rule)));
+          return row;
+        }));
+        $("no-wear-rules").hidden = active.length > 0;
+      };
+
+      const loadWearRules = async () => {
+        const query = $("wear-rule-q").value.trim();
+        const asked = ++wearRuleAsked;
+        const result = await api(`items/wear-rules?q=${encodeURIComponent(query)}`);
+        if (asked !== wearRuleAsked || !result.ok) {
+          return;
+        }
+        wearAnimals = result.data.animals || [];
+        $("wear-rule-animal").replaceChildren(...wearAnimals.map(animal => {
+          const button = el("button", animal.name, selectedWearAnimal() === animal.id ? "primary" : "");
+          button.type = "button";
+          button.setAttribute("aria-pressed", String(selectedWearAnimal() === animal.id));
+          button.addEventListener("click", () => chooseWearAnimal(animal.id));
+          return button;
+        }));
+        wearRuleEntries = result.data.rules || [];
+        renderWearRules(selectedWearAnimal() && query ? result.data.results || [] : [], query, result.data.total || 0);
+        renderWearRuleEditor();
+      };
+
+      $("wear-rule-q").addEventListener("input", () => {
+        clearTimeout(wearRuleTimer);
+        wearRuleTimer = setTimeout(loadWearRules, 250);
+      });
+      $("wear-rule-save").addEventListener("click", async () => {
+        if (!wearSelected) {
+          return;
+        }
+        const result = await api("items/wear-rules", {id: wearSelected.id, blockedTypes: [...wearSelectedTypes].sort((one, two) => one - two)});
+        setStatus($("wear-rule-status"), said(result), !result.ok);
+        if (result.ok) {
+          await loadWearRules();
+        }
+      });
+      $("wear-rule-close").addEventListener("click", () => {
+        wearSelected = null;
+        setStatus($("wear-rule-status"), "");
+        renderWearRuleEditor();
+      });
+
       // ---- the overview's item lock: any item by name or id, locked or
       // unlocked where it is found (the Items page lists every locked one).
       let quickLockTimer = null;
@@ -2716,6 +2885,9 @@
           if (result.ok) {
             renderSupport(result.data);
           }
+        }
+        else if (tab === "wear-rules") {
+          await loadWearRules();
         }
         else if (tab === "items") {
           result = await api("items");

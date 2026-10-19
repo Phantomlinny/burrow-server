@@ -102,6 +102,13 @@ module.exports = {
   turnstile: env.AJ_TURNSTILE_SITE_KEY && env.AJ_TURNSTILE_SECRET
     ? {siteKey: env.AJ_TURNSTILE_SITE_KEY, secret: env.AJ_TURNSTILE_SECRET} : null,
 
+  // Account-recovery mail is delivered to this HTTPS webhook.  It receives
+  // {to, subject, text}; point it at the transactional-mail provider or
+  // small mail relay you use.  Recovery is deliberately unavailable until
+  // both values are set, rather than ever exposing a reset link in a page.
+  recoveryMail: env.AJ_RECOVERY_MAIL_URL && env.AJ_RECOVERY_MAIL_TOKEN
+    ? {url: env.AJ_RECOVERY_MAIL_URL, token: env.AJ_RECOVERY_MAIL_TOKEN} : null,
+
   // asset mirror: anything not served locally is fetched once from here and
   // cached in cacheDir. set AJ_OFFLINE=1 to serve from the cache only.
   upstreamContent: env.AJ_UPSTREAM || "https://ajcontent.akamaized.net/",
@@ -115,8 +122,11 @@ module.exports = {
   // before is still kept out).
   requireDevice: env.AJ_REQUIRE_DEVICE !== "0",
   // Discord (lib/discord.js): an application's id and secret for linking a
-  // player's Discord account on the account page (its OAuth2 redirect must
-  // be <siteUrl>account/discord/callback), and a bot in Burrow's Discord
+  // player's Discord account on the account page and for allowed accounts to
+  // sign in to /dashboard/admin (OAuth2 redirects:
+  // <siteUrl>account/discord/callback,
+  // <siteUrl>dashboard/admin/discord/callback, and
+  // <siteUrl>dashboard/staff/discord/callback), and a bot in Burrow's Discord
   // server for the booster badge. linking is off without the first two, the
   // booster badge left alone without the last two.
   discord: {

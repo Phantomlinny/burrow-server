@@ -1,6 +1,10 @@
 # Burrow
 Burrow is a private server for AJ Classic.
 
+## Account-recovery email
+
+Set `AJ_RECOVERY_MAIL_URL` and `AJ_RECOVERY_MAIL_TOKEN` to an HTTPS mail-relay or transactional-email webhook. Burrow posts `{to, subject, text}` with a Bearer token. Until both are configured, email recovery intentionally does not issue a usable reset link. New web sign-ups are asked for a recovery email; password and 2FA recovery require the one-time link sent there.
+
 # Security
 An independent security audit by a Strawberry Jam contributor, who is not part of the Burrow team, found no malware in the Burrow client or server (client v1.2.0, server as of 17 October 2026). Every file in every installer was checked against its source and against the official Electron, NSIS and Adobe Flash releases. The report also lists the weaknesses found, with fixes, and every check can be repeated by anyone.
 

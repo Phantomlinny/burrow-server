@@ -88,6 +88,28 @@ const pack = async id => Object.values(decode(zlib.inflateRawSync(Buffer.from(aw
 const strings = async () => decode(zlib.inflateRawSync(Buffer.from(await (await fetch(`${BASE}/${cdn.hashedPath("defPacks/10230")}`)).arrayBuffer())));
 const byId = (rows, id) => rows.find(row => String(row.id) === String(id));
 
+// Ask for the same full clothing list the item editor does, then find one
+// inventory entry in its five-field rows. Keeping this on the real protocol
+// lets the rule tests cover both server state and what an open game receives.
+const ownInventory = async (client, roomId, username, perUserAvId = 1) => {
+  client.xt("il", roomId, username, perUserAvId, 1);
+  for (;;) {
+    const list = await client.untilXt("il");
+    if (list[2] === "0" && list[5] === username) {
+      return list;
+    }
+  }
+};
+const inventoryPiece = (list, defId) => {
+  for (let index = 0; index < Number(list[8]); index++) {
+    const at = 9 + index * 5;
+    if (Number(list[at]) === Number(defId)) {
+      return {inv: Number(list[at + 1]), equipped: list[at + 3]};
+    }
+  }
+  return null;
+};
+
 // "xdi" [.., .., kind, rows as JSON], the next one of `kind`.
 const untilDefs = async (client, kind) => {
   for (;;) {
@@ -412,6 +434,56 @@ const first = async () => {
   assert.strictEqual(wornAs.mine.find(entry => entry.kind === "clothing" && entry.id === hatEntry.id).artMode, "texture");
   assert.match((await maker("look", "clothing", hatEntry.id, "melted")).said, /sticker or texture/);
 
+  // --- animal wear rules: a live custom item keeps its xdi-only name and
+  // picture, existing use is removed, and neither packet nor saved-outfit
+  // routes may put it back on the animal that staff blocked.
+  const partyHat = wornAs.mine.find(sameItem);
+  assert.ok(partyHat && partyHat.art, "the custom clothing to restrict is missing its picture");
+  const partyPiece = inventoryPiece(await ownInventory(pat.client, pat.roomId, "Pat"), partyHat.id);
+  assert.ok(partyPiece, "Pat does not own Party Hat");
+  pat.client.xt("iu", pat.roomId, 1, 0, partyPiece.inv);
+  assert.strictEqual((await pat.client.untilXt("iu"))[2], "1");
+  let changedWear = await pat.client.untilXt("il");
+  assert.deepStrictEqual(changedWear.slice(2), ["3", "1", "1", "Pat", "0", "1", "0", String(partyPiece.inv), String(partyHat.id)]);
+  say(pat.client, pat.roomId, "!outfit save partyhat");
+  assert.strictEqual(await nextBox(pat.client), "Outfit partyhat saved (1 items).");
+  // A no-op item-editor request records what was worn for !outfit undo,
+  // without taking Party Hat off before the dashboard removes it.
+  pat.client.xt("iu", pat.roomId, 0, 0);
+  await pat.client.untilXt("iu");
+  await pat.client.untilXt("il");
+  assert.strictEqual(byId(await pack(1000), partyHat.id).avatarUseFlags, "9007199254740991");
+  assert.strictEqual((await admin("/admin/api/items/wear-rules", {id: partyHat.id, blockedTypes: ["1"]})).status, 400);
+  assert.strictEqual((await admin("/admin/api/items/wear-rules", {id: bodyPart.id, blockedTypes: [1]})).status, 400);
+  const partyRule = await admin("/admin/api/items/wear-rules", {id: partyHat.id, blockedTypes: [1]});
+  assert.match(partyRule.data.ok, /cannot be worn/);
+  // The owner receives a fresh full list immediately, with the old equipped
+  // bit actually gone rather than merely hidden in the renderer.
+  const afterRule = await pat.client.untilXt("il");
+  assert.strictEqual(afterRule[2], "0");
+  assert.strictEqual(inventoryPiece(afterRule, partyHat.id).equipped, "0");
+  const partyUpdate = byId(await untilDefs(pat.client, "clothing"), partyHat.id);
+  assert.deepStrictEqual([partyUpdate.avatarUseFlags, partyUpdate.name, partyUpdate.art, partyUpdate.artMode],
+    ["9007199254740990", "Party Hat", partyHat.art, "texture"]);
+  assert.strictEqual(byId(await pack(1000), partyHat.id).avatarUseFlags, "9007199254740990"); // cached pack was invalidated
+  say(pat.client, pat.roomId, "!outfit undo");
+  changedWear = await pat.client.untilXt("il");
+  assert.strictEqual(changedWear[7], "0");
+  assert.ok(!changedWear.includes(String(partyHat.id)));
+  assert.match(await nextBox(pat.client), /Back to what you wore before/);
+  say(pat.client, pat.roomId, "!outfit wear partyhat");
+  changedWear = await pat.client.untilXt("il");
+  assert.strictEqual(changedWear[7], "0");
+  assert.ok(!changedWear.includes(String(partyHat.id)));
+  assert.match(await nextBox(pat.client), /Wearing partyhat/);
+  // A crafted/stale editor packet still succeeds as a request but cannot add
+  // a blocked inventory entry to the response or persisted outfit.
+  pat.client.xt("iu", pat.roomId, 1, 0, partyPiece.inv);
+  assert.strictEqual((await pat.client.untilXt("iu"))[2], "1");
+  changedWear = await pat.client.untilXt("il");
+  assert.strictEqual(changedWear[7], "0");
+  assert.ok(!changedWear.includes(String(partyHat.id)));
+
   // deleting: their own only, and gone from everyone
   assert.match((await maker("delete", "clothing", 50001)).said, /not one of your items/);
   for (const entry of full.mine) {
@@ -420,6 +492,8 @@ const first = async () => {
   assert.deepStrictEqual((await maker("info")).mine, []);
   assert.strictEqual((await fetch(`${BASE}/itemart/clothing/${hatEntry.id}.png`)).status, 404);
   assert.strictEqual((await dev("/mod/api/items")).data.items.length, 3);
+  assert.ok(!(await admin(`/admin/api/items/wear-rules?q=${hatEntry.id}`)).data.rules.some(rule => rule.id === hatEntry.id),
+    "deleting custom clothing should remove its wear rule");
 
   // --- the admin's switches: what players make waits for a moderator first,
   // out of the game till then; or the Item Maker is off
@@ -465,6 +539,20 @@ const first = async () => {
   assert.strictEqual((await admin("/admin/api/item-switches", {enabled: true})).status, 200);
   assert.match((await maker("delete", "clothing", waitingHat.id)).said, /^Deleted /);
 
+  // A developer can create items but is not silently granted the moderation
+  // control. Once made a moderator, the existing panel session is checked
+  // against the new role and can create a rule that survives the restart.
+  assert.strictEqual((await dev("/mod/api/items/wear-rules")).status, 403);
+  assert.strictEqual((await dev("/mod/api/items/wear-rules", {id: 50000, blockedTypes: [1]})).status, 403);
+  assert.match((await admin("/admin/api/account", {username: "Dev", action: "role", role: "moderator"})).data.ok, /moderator/);
+  const moderatorMe = (await dev("/mod/api/me")).data;
+  assert.ok(moderatorMe.permissions.includes("items.restrict") && !moderatorMe.permissions.includes("items.create"));
+  const crownRule = await dev("/mod/api/items/wear-rules", {id: 50000, blockedTypes: [1]});
+  assert.match(crownRule.data.ok, /cannot be worn/);
+  const moderatorRules = (await dev("/mod/api/items/wear-rules?q=Gold%20Crown")).data;
+  assert.deepStrictEqual(moderatorRules.results.find(entry => entry.id === 50000).blockedTypes, [1]);
+  assert.strictEqual(byId(await pack(1000), 50000).avatarUseFlags, "9007199254740990");
+
   // written down under the maker's name
   const log = (await admin("/admin/api/moderators")).data.log.map(entry => `${entry.by} ${entry.action} ${entry.detail}`);
   for (const line of ["Dev item made clothing 50000 Test Crown", "Dev item made den 50000 Test Chair", "Dev item changed clothing 50000 Gold Crown",
@@ -472,7 +560,7 @@ const first = async () => {
     "Dev item taken den 50000 x1", "Dev item deleted clothing 50002"]) {
     assert.ok(log.includes(line), `missing from the log: ${line}\n${log.join("\n")}`);
   }
-  made = {base};
+  made = {base, restrictedId: 50000};
   for (const {client} of [pat, devGame, hal]) {
     client.socket.destroy();
   }
@@ -488,6 +576,8 @@ const second = async () => {
   assert.deepStrictEqual(atLogin.clothing.map(entry => `${entry.id} ${entry.name}`), ["50000 Gold Crown", "50001 Quick Hat"]);
   assert.deepStrictEqual(atLogin.den.map(entry => entry.name), ["Test Chair"]);
   assert.strictEqual(byId(await pack(1000), 50001).layerDefId, made.base.layerDefId);
+  assert.strictEqual(byId(atLogin.clothing, made.restrictedId).avatarUseFlags, "9007199254740990");
+  assert.strictEqual(byId(await pack(1000), made.restrictedId).avatarUseFlags, "9007199254740990");
   assert.strictEqual((await strings())[9100001], "Quick Hat");
   const shop = await shopList(lou.client, lou.roomId, ODD_CLOTHING_SHOP);
   assert.ok(shop.includes("50001") && !shop.includes("50000"));

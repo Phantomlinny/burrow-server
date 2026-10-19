@@ -464,8 +464,19 @@ const run = async () => {
     });
     return {status: response.status, data: await response.json(), cookie: (response.headers.get("set-cookie") || "").split(";")[0]};
   };
-  assert.match(await (await fetch(`${BASE}/admin`)).text(), /Server admin/);
-  assert.deepStrictEqual((await panel("state")).data, {needsSetup: true, needsSetupCode: false, signedIn: false});
+  const oldAdmin = await fetch(`${BASE}/admin`, {redirect: "manual"});
+  assert.strictEqual(oldAdmin.status, 302);
+  assert.strictEqual(oldAdmin.headers.get("location"), "/dashboard/admin");
+  const oldMod = await fetch(`${BASE}/mod`, {redirect: "manual"});
+  assert.strictEqual(oldMod.status, 302);
+  assert.strictEqual(oldMod.headers.get("location"), "/dashboard/staff");
+  assert.match(await (await fetch(`${BASE}/dashboard`)).text(), /Burrow dashboard/);
+  const dashboardSlash = await fetch(`${BASE}/dashboard/`, {redirect: "manual"});
+  assert.strictEqual(dashboardSlash.status, 302);
+  assert.strictEqual(dashboardSlash.headers.get("location"), "/dashboard");
+  assert.match(await (await fetch(`${BASE}/dashboard/admin`)).text(), /Server admin/);
+  assert.match(await (await fetch(`${BASE}/dashboard/staff`)).text(), /Moderators/);
+  assert.deepStrictEqual((await panel("state")).data, {needsSetup: true, needsSetupCode: false, signedIn: false, discordLogin: false});
   assert.strictEqual((await panel("overview")).status, 401);
   assert.strictEqual((await panel("login", {password: "anything"})).status, 401);
   assert.strictEqual((await panel("setup", {password: "short"})).status, 400);
@@ -544,14 +555,14 @@ const run = async () => {
   assert.strictEqual((await panel("account", {username: "Robert", action: "rename", newName: "ROBERT"}, admin)).status, 200);
   assert.strictEqual((await panel("account", {username: "robert", action: "rename", newName: "Bob"}, admin)).status, 200);
 
-  // A new password for a player: the old one and old tokens stop working.
+  // Staff cannot take over an account by setting its password; recovery is
+  // email-only from the account recovery page.
   assert.strictEqual((await panel("account", {username: "foo", action: "password", password: "short"}, admin)).status, 400);
-  assert.strictEqual((await panel("account", {username: "foo", action: "password", password: "New-password-4"}, admin)).status, 200);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "KettlePass04"})).status, 401);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {refresh_token: foo.refresh_token})).status, 401);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "New-password-4"})).status, 200);
+  assert.strictEqual((await panel("account", {username: "foo", action: "password", password: "New-password-4"}, admin)).status, 400);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "KettlePass04"})).status, 200);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {refresh_token: foo.refresh_token})).status, 200);
   assert.strictEqual((await panel("account", {username: "foo", action: "delete"}, admin)).status, 200);
-  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "New-password-4"})).status, 401);
+  assert.strictEqual((await postJson(`${BASE}/authenticate`, {username: "foo", password: "KettlePass04"})).status, 401);
 
   // changing the admin password signs every other session out.
   assert.strictEqual((await panel("password", {current: "nope", password: "admin-password-2"}, admin)).status, 403);

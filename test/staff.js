@@ -82,7 +82,7 @@ const arrive = async (username, password, room, totp, onLogin = async () => {}) 
     await client.untilXt("rp");
   }
   client.xt("au", rj[4], 1, 400, 400, 14, 1);
-  return {client, login, roomId: rj[4], room: rj[3]};
+  return {client, login, roomId: rj[4], room: rj[3], token: auth.auth_token};
 };
 
 // the next moderator popup ("fd") of this kind, skipping earlier ones (a
@@ -240,9 +240,36 @@ const run = async () => {
   assert.strictEqual((await halPage("/mod/api/login", {username: "Hal", password: people.Hal, code: codeAt(secrets.Hal, usedStep.Hal)})).status, 200);
   const halMe = (await halPage("/mod/api/me")).data;
   assert.strictEqual(halMe.role, "helper");
+  assert.ok(halMe.permissions.includes("server.view"));
   assert.ok(!halMe.permissions.includes("player.ban"));
+  const health = await halPage("/mod/api/server");
+  assert.strictEqual(health.status, 200);
+  assert.ok(Number.isInteger(health.data.players));
+  assert.ok(Number.isInteger(health.data.sockets.openConnections));
+  assert.strictEqual(typeof health.data.update.needsPublish, "boolean");
+  assert.ok(Array.isArray(health.data.update.changed));
   assert.strictEqual((await halPage("/mod/api/act", {username: "Pip", action: "ban", hours: 1, reason: "x"})).data.error, "Your role cannot do that.");
   assert.match((await halPage("/mod/api/act", {username: "Mira", action: "silence", hours: 1})).data.error, /your rank or above/);
+  // the Players page's list, narrowed to who is online, staff, banned or
+  // silenced (Ann was put out above); an unknown narrowing is everyone
+  const listed = async only => (await modPage(`/mod/api/players?only=${only}`)).data.players.map(player => player.username).sort();
+  assert.deepStrictEqual(await listed("staff"), ["Hal", "Mira"]);
+  const online = await listed("online");
+  assert.ok(["Hal", "Mira", "Pip"].every(name => online.includes(name)), online.join(", "));
+  assert.deepStrictEqual(await listed("banned"), []);
+  assert.deepStrictEqual(await listed("everything"), ["Ann", "Hal", "Mira", "Pip"]);
+  // the Masterpieces page: those waiting, and the last approved (by anyone,
+  // or only by this moderator), to take one back from
+  const paintings = (await modPage("/mod/api/masterpieces?mine=1")).data;
+  assert.deepStrictEqual([paintings.waiting, paintings.approved, paintings.recent], [[], [], []]);
+  // signed in through the game (a client the moderator is playing in hands
+  // over its login token): staff in the game now, from the game's address
+  const viaGame = webSession();
+  assert.strictEqual((await viaGame("/mod/api/game-login", {token: mira.token})).status, 200);
+  assert.strictEqual((await viaGame("/mod/api/me")).data.username, "Mira");
+  // a player's token, or none that is good, opens nothing
+  assert.strictEqual((await webSession()("/mod/api/game-login", {token: pip.token})).status, 401);
+  assert.strictEqual((await webSession()("/mod/api/game-login", {token: "0".repeat(64)})).status, 401);
   // searching by address (against ban evasion) is for the roles that ban addresses
   assert.strictEqual((await halPage("/mod/api/players?by=address&q=127.0.0.")).status, 403);
   assert.ok(Array.isArray((await modPage("/mod/api/players?by=address&q=127.0.0.")).data.players));
@@ -305,6 +332,7 @@ const run = async () => {
   const annAway = (await modPage("/mod/api/player?username=Ann")).data;
   assert.strictEqual(annAway.warnings, 4);
   assert.strictEqual(annAway.warningList[0].seen, false);
+  assert.deepStrictEqual(await listed("silenced"), ["Ann"]);
   const annBack = await arrive("Ann", people.Ann, SAREPIA);
   assert.deepStrictEqual((await untilPopup(annBack.client, "fw")).slice(2, 4), ["fw", "1"]); // the bullying one
   assert.strictEqual((await modPage("/mod/api/player?username=Ann")).data.warningList[0].seen, true);

@@ -200,6 +200,8 @@
           <input id="password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="100" required>
           <label for="confirm">Password again</label>
           <input id="confirm" name="confirm" type="password" autocomplete="new-password" required>
+          <label for="email">Recovery email <span class="hint">Used only to recover your password or 2FA</span></label>
+          <input id="email" name="email" type="email" autocomplete="email" maxlength="254" required>
           <label class="agree"><input id="agreed" name="agreed" type="checkbox" required>
             <span>I am 13 or older, and old enough in my country to agree to this myself. I agree to the <a href="/terms" target="_blank" rel="noopener">Terms of Service</a> and the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
           <div class="captcha" id="captcha"></div>
@@ -242,6 +244,7 @@
         captcha_required: "Complete the captcha.",
         captcha_failed: "Captcha failed. Try again.",
         captcha_unavailable: "Captcha unavailable. Try again later.",
+        invalid_email: "Enter a valid recovery email address.",
       };
 
       const $ = id => document.getElementById(id);
@@ -335,7 +338,7 @@
           const response = await fetch("/api/register", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username: form.username.value, password: form.password.value, avatarType: chosen[0], agreed: form.agreed.checked,
+            body: JSON.stringify({username: form.username.value, password: form.password.value, email: form.email.value, avatarType: chosen[0], agreed: form.agreed.checked,
               captcha: answer}),
           });
           check.reset();
