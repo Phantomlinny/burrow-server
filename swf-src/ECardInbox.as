@@ -690,6 +690,7 @@ package gui
          var _loc5_:String = null;
          var _loc4_:Array = null;
          var _loc3_:Object = null;
+         var _loc9_:Object = null;
          var _loc6_:ECard = _inbox[_currCardIdx];
          if(_loc6_)
          {
@@ -709,8 +710,12 @@ package gui
                         });
                         break;
                      }
+                     // A card records the historical layer id. Prefer the
+                     // attached item's current accId when it is available,
+                     // so items with shared or changed layers draw correctly.
+                     _loc9_ = ItemXtCommManager.getItemDef(giftItemDefId(_loc6_));
                      _clothingIconHelper = new SimpleIcon();
-                     _clothingIconHelper.init(_loc6_.giftColor,_loc6_.giftId,1,true,false,clothingIconReceived);
+                     _clothingIconHelper.init(_loc6_.giftColor,_loc9_ ? _loc9_.accId : _loc6_.giftId,1,true,false,clothingIconReceived);
                      break;
                   case 3:
                   case 99:

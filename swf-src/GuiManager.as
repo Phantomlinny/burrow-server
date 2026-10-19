@@ -180,6 +180,10 @@ package gui
       private static var _imageDisplayPopup:ImageDisplayPopup;
       
       private static var _petInventory:PetInventory;
+
+      // A player's voluntary pet form.  Party and quest pet forms remain
+      // room-wide and are still reported by isBeYourPetRoom().
+      private static var _personalPetMode:Boolean = false;
       
       private static var _joeyPopup:MovieClip;
       
@@ -2905,6 +2909,24 @@ package gui
       public static function isBeYourPetRoom() : Boolean
       {
          return QuestManager.isBeYourPetQuest() || PartyManager.isBeYourPetParty();
+      }
+
+      public static function isPlayingAsPet() : Boolean
+      {
+         return _personalPetMode || isBeYourPetRoom();
+      }
+
+      public static function setPersonalPetMode(param1:Boolean) : void
+      {
+         if(_personalPetMode == param1)
+         {
+            return;
+         }
+         _personalPetMode = param1;
+         if(mainHud)
+         {
+            showHudAvt();
+         }
       }
       
       public static function addQuestXP(param1:Number) : void

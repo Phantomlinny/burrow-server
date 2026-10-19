@@ -89,6 +89,16 @@ package
             AJClient.onStaff(param1.obj);
             return;
          }
+         if(param1.obj[0] == "xtv")
+         {
+            AJClient.onTheatreVideo(param1.obj);
+            return;
+         }
+         if(param1.obj[0] == "xui")
+         {
+            AJClient.onStaffUi(param1.obj);
+            return;
+         }
          if(param1.obj[0] == "xdi")
          {
             AJClient.onItemDefs(param1.obj);

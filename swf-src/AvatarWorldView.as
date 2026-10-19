@@ -605,7 +605,7 @@ package avatar
                _hudViewHolder.mouse.gotoAndStop(offScreenDefaultMouseFrameLabel());
             }
          }
-         _shouldShowPetOnly = GuiManager.isBeYourPetRoom();
+         _shouldShowPetOnly = GuiManager.isBeYourPetRoom() || userId == AvatarManager.playerSfsUserId && GuiManager.isPlayingAsPet();
          if(_shouldShowPetOnly)
          {
             _layerAnim.alpha = 0;
@@ -2079,6 +2079,7 @@ package avatar
             if(param2 != 0 && PetManager.canCurrAvatarUsePet(_avatar.enviroTypeFlag,PetManager.getPetDef(param2 & 0xFF),param1))
             {
                _pet = new WorldPet(this,param1,param2,param3,param4,param6,param8,param7,param9);
+               _currPetName = LocalizationManager.translatePetName(param5);
             }
             if(_shouldShowPetOnly)
             {
@@ -2093,6 +2094,34 @@ package avatar
             {
                _splash.showShadow(true);
             }
+         }
+      }
+
+      // Called from the type-13 user communication message.  Unlike the
+      // party/quest form this belongs to one avatar, so each view keeps its
+      // own state instead of asking the room-wide GuiManager predicate.
+      public function setPetPlayerMode(param1:Boolean) : void
+      {
+         var _loc2_:Boolean = param1 && _pet != null;
+         _shouldShowPetOnly = _loc2_ || GuiManager.isBeYourPetRoom();
+         _layerAnim.alpha = _shouldShowPetOnly ? 0 : 1;
+         _layerAnim.avatarEnabled = !_shouldShowPetOnly;
+         if(_shouldShowPetOnly && _pet)
+         {
+            if(!isActivePetGroundPet())
+            {
+               _splash.showShadow(false);
+            }
+            _namebar.setAvName(_currPetName);
+         }
+         else
+         {
+            _splash.showShadow(true);
+            _namebar.setAvName(_avatar.avName);
+         }
+         if(userId == AvatarManager.playerSfsUserId)
+         {
+            GuiManager.setPersonalPetMode(_loc2_);
          }
       }
       

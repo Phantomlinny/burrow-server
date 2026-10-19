@@ -206,6 +206,10 @@ package gui
             "iconFrame":"world"
          },{
             "type":TOGGLE_TYPE_JOIN,
+            "frame":"performance",
+            "iconFrame":"world"
+         },{
+            "type":TOGGLE_TYPE_JOIN,
             "frame":"graphics",
             "iconFrame":"world"
          },{

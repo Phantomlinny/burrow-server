@@ -2526,7 +2526,26 @@ package room
                         }
                         _theaterLayer = _scene.getLayer("movie_player_streaming");
                      }
-                     GenericListGuiManager.genericListVolumeClicked(_loc5_.typeDefId,_loc9_);
+                     // The stock theatre asks the server for a legacy FLV
+                     // playlist, which this server intentionally does not
+                     // fabricate for arbitrary web URLs.  Let the VIDEOS
+                     // sign open the staff YouTube control instead; its SWF
+                     // callback verifies the staff permission.
+                     if(_loc4_.typeId == 1037 && ExternalInterface.available)
+                     {
+                        try
+                        {
+                           ExternalInterface.call("ajOpenTheatreControl");
+                        }
+                        catch(e:Error)
+                        {
+                           GenericListGuiManager.genericListVolumeClicked(_loc5_.typeDefId,_loc9_);
+                        }
+                     }
+                     else
+                     {
+                        GenericListGuiManager.genericListVolumeClicked(_loc5_.typeDefId,_loc9_);
+                     }
                   }
                   break;
                case 13:

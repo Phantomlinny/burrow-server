@@ -1103,7 +1103,11 @@ package gui
          var _loc4_:int = int(param1[2]);
          if(_loc4_ == 0)
          {
-            if(isCurrentlyTrading || gMainFrame.clientInfo.extCallsActive)
+            // The desktop client keeps extCallsActive set while its host is
+            // available.  It is not an indication that this player has a
+            // modal dialog open; treating it as one made every incoming
+            // trade request look like a busy response.
+            if(isCurrentlyTrading)
             {
                TradeXtCommManager.sendTradeItemAcceptOrReject(2);
             }

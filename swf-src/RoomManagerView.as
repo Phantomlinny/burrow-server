@@ -151,6 +151,7 @@ package room
          gMainFrame.stage.removeEventListener("deactivate",onDeactivate);
          gMainFrame.stage.removeEventListener("keyDown",onKeyDownEvt);
          gMainFrame.stage.removeEventListener("keyUp",onKeyUpEvt);
+         removeAndClearMiniMap();
       }
       
       override public function exitRoom(param1:Boolean = false) : void
@@ -380,12 +381,47 @@ package room
       
       public function removeAndClearMiniMap() : void
       {
+         var _loc1_:MovieClip = null;
+         for each(_loc1_ in _miniMaps)
+         {
+            disposeMiniMap(_loc1_);
+         }
          if(_miniMap && _miniMap.parent)
          {
             _miniMap.parent.removeChild(_miniMap);
          }
          _miniMap = null;
          _miniMaps = new Dictionary();
+      }
+
+      // The minimap grid and trail are BitmapData made for this room.  Flash
+      // may keep their native allocations after the display clips are dropped,
+      // particularly after visiting many rooms, so release only those buffers
+      // when the cache is intentionally cleared.
+      private function disposeMiniMap(param1:MovieClip) : void
+      {
+         var _loc1_:Bitmap = null;
+         try
+         {
+            if(param1 != null && param1.numChildren > 1)
+            {
+               _loc1_ = param1.getChildAt(1) as Bitmap;
+               if(_loc1_ != null && _loc1_.bitmapData != null)
+               {
+                  _loc1_.bitmapData.dispose();
+                  _loc1_.bitmapData = null;
+               }
+            }
+            _loc1_ = param1 != null && param1.overlay is Bitmap ? Bitmap(param1.overlay) : null;
+            if(_loc1_ != null && _loc1_.bitmapData != null)
+            {
+               _loc1_.bitmapData.dispose();
+               _loc1_.bitmapData = null;
+            }
+         }
+         catch(e:Error)
+         {
+         }
       }
       
       public function removeMiniMap() : void

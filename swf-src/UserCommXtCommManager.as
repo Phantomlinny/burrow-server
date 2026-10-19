@@ -523,6 +523,13 @@ package avatar
          _customPVPPassback = param4;
          gMainFrame.server.sendMessage((param1 ? "on" : "off") + RAW_STR + 12 + RAW_STR + param2);
       }
+
+      // A per-player counterpart to the party's room-wide pet form.  The
+      // server relays this as a normal user-communication message (type 13).
+      public static function sendPetPlayerMode(param1:Boolean) : void
+      {
+         gMainFrame.server.sendMessage((param1 ? "on" : "off") + RAW_STR + 13);
+      }
       
       public static function onSendMessage(param1:MouseEvent, param2:String = "") : void
       {
@@ -714,6 +721,13 @@ package avatar
                   _customPVPMessageCallback = null;
                }
             }
+            else if(_loc20_ == 13)
+            {
+               if(AvatarManager.avatarViewList[_loc19_])
+               {
+                  AvatarManager.avatarViewList[_loc19_].setPetPlayerMode(_loc2_ == "on");
+               }
+            }
             else
             {
                _loc2_ = param1[3];
@@ -785,6 +799,17 @@ package avatar
                         return;
                      case 10:
                         AvatarManager._setAvatarAlphaLevel(_loc19_,uint(param1[3]));
+                        return;
+                     // Server room effects: a temporary display-only scale.
+                     // Kept here (rather than in avatar state) so it never
+                     // becomes part of an animal's saved appearance.
+                     case 14:
+                        _loc3_ = Math.max(0.5,Math.min(1.5,Number(param1[3])));
+                        if(AvatarManager.avatarViewList[_loc19_])
+                        {
+                           AvatarManager.avatarViewList[_loc19_].scaleX = _loc3_;
+                           AvatarManager.avatarViewList[_loc19_].scaleY = _loc3_;
+                        }
                         return;
                      default:
                         _loc14_ = true;

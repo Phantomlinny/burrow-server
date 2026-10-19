@@ -96,6 +96,22 @@ package loader
       
       public function get sortOffset() : int
       {
+         // The low two flip bits are used by the original client.  Den editing
+         // also uses bits 2-3 as an explicit stacking choice: 1 = behind and
+         // 2 = in front.  A very large offset lets that choice win over the
+         // normal y-position depth sort without visibly moving the item.
+         if(_denStateItem != null)
+         {
+            var _loc1_:int = _denStateItem.flipped >> 2 & 3;
+            if(_loc1_ == 1)
+            {
+               return _sortOffset + 1000000;
+            }
+            if(_loc1_ == 2)
+            {
+               return _sortOffset - 1000000;
+            }
+         }
          return _sortOffset;
       }
       

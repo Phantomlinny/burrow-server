@@ -71,7 +71,9 @@ package gui
       // emoji panel, say), which the game's font has none of: each is drawn
       // as a picture of it, from the server (/emoji/<code points>.png,
       // Twemoji's). each is {at, clip}: where its gap starts in the text shown.
-      private static const INLINE_GAP:String = "    ";
+      // Three spaces fit the line-height-sized emoji without the noticeably
+      // wide hole four spaces left between neighbouring words or emoji.
+      private static const INLINE_GAP:String = "   ";
       
       private static const LONGEST_EMOTE_CODE:int = 16;
       

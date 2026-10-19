@@ -148,6 +148,40 @@ package room
       {
          return _dragItem != null;
       }
+
+      // The original editor only sorted furniture from its y position.  These
+      // helpers give the replacement editor an explicit, persisted choice.
+      // Bits 2-3 of `flipped` are unused by the game's flip code, so the
+      // normal horizontal/vertical flip bits remain intact in bits 0-1.
+      public function sendSelectedBehind() : Boolean
+      {
+         return setSelectedStacking(1);
+      }
+
+      public function bringSelectedToFront() : Boolean
+      {
+         return setSelectedStacking(2);
+      }
+
+      public function resetSelectedStacking() : Boolean
+      {
+         return setSelectedStacking(0);
+      }
+
+      private function setSelectedStacking(param1:int) : Boolean
+      {
+         if(_dragItem == null || _dragItem.layerId == 1 || isTheme(_dragItem.sortCatId) || _dragItem.sortCatId == 4)
+         {
+            return false;
+         }
+         _dragItem.flipped = _dragItem.flipped & -13 | param1 << 2;
+         if(_dragItem.denItemHelper && _dragItem.denItemHelper.displayObject)
+         {
+            _dragItem.denItemHelper.displayObject.name = String(_dragItem.denItemHelper.sortOffset);
+         }
+         saveState(_dragItem.invIdx);
+         return true;
+      }
       
       public function get lastSelectedItem() : DenStateItem
       {

@@ -191,6 +191,9 @@ package gui.itemWindows
             case "wasd":
                showWasd();
                break;
+            case "performance":
+               showPerformance();
+               break;
             case "graphics":
                showGraphics();
                break;
@@ -415,6 +418,18 @@ package gui.itemWindows
       private function showGraphics() : void
       {
          showChoice("Graphics",AJClient.smoothOn() ? "Smooth" : "Default");
+      }
+
+      private function showPerformance() : void
+      {
+         showChoice("Performance",AJClient.performanceProfileLabel());
+      }
+
+      private function nextPerformance() : void
+      {
+         var _loc1_:int = AJClient.performanceProfile();
+         setChoice(9007,_loc1_ == 0 ? 1 : (_loc1_ == 1 ? 2 : 0));
+         showPerformance();
       }
       
       private function showFrameRate() : void
@@ -714,6 +729,9 @@ package gui.itemWindows
                   break;
                case "wasd":
                   setWasd(!AJClient.wasdOn());
+                  break;
+               case "performance":
+                  nextPerformance();
                   break;
                case "graphics":
                   setChoice(9003,AJClient.smoothOn() ? 1 : 2);

@@ -10,8 +10,28 @@
         margin: 0;
         overflow: hidden;
       }
+      #flash-content {
+        position: relative;
+        z-index: 1;
+      }
+      #theatre-video {
+        position: fixed;
+        z-index: 2;
+        display: none;
+        left: 8.4vw;
+        top: 6.2vh;
+        width: 56.8vw;
+        height: 52.8vh;
+        border: 0;
+        background: #000;
+        pointer-events: auto;
+      }
+      #theatre-video.visible {
+        display: block;
+      }
     </style>
     <embed id="flash-content"></embed>
+    <iframe id="theatre-video" title="Theatre video" allow="autoplay; encrypted-media" referrerpolicy="strict-origin-when-cross-origin"></iframe>
     <script>
       "use strict";
 
@@ -19,11 +39,15 @@
       // same contract with the launcher (gui/gamePreload.js) and the SWF.
 
       const flashContent = document.getElementById("flash-content");
+      const theatreVideo = document.getElementById("theatre-video");
       // only a SWF from this server may call into this page. with "always"
       // any SWF the game came to load, from anywhere, could: and this page
       // is handed the player's login token.
       flashContent.setAttribute("allowScriptAccess", "sameDomain");
-      flashContent.setAttribute("wmode", "window");
+      // The theatre's staff-controlled browser video must be able to appear
+      // over the SWF screen. "window" puts Flash above every HTML element;
+      // opaque keeps the normal game drawing while allowing that overlay.
+      flashContent.setAttribute("wmode", "opaque");
       flashContent.style.width = "100vw";
       flashContent.style.height = "100vh";
 
@@ -92,6 +116,31 @@
 
       function ajPrint(imageData) {
         window.ipc.sendToHost("printImage", imageData);
+      }
+
+      // The server validates the id and decides who in the theatre gets this
+      // call. The page merely displays it over the theatre's screen area.
+      function ajTheatreVideo(videoId) {
+        const id = String(videoId || "");
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) {
+          theatreVideo.removeAttribute("src");
+          theatreVideo.classList.remove("visible");
+          return;
+        }
+        theatreVideo.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
+        theatreVideo.classList.add("visible");
+      }
+
+      // The native theatre sign calls this through ExternalInterface. The
+      // SWF performs its own permission check before showing the controls.
+      function ajOpenTheatreControl() {
+        if (flashContent && typeof flashContent.openTheatreControl === "function") {
+          try {
+            flashContent.openTheatreControl();
+          }
+          catch (err) {
+          }
+        }
       }
 
       function reloadSwfOrGetIP(reloadSwf, params) {

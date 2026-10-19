@@ -127,6 +127,17 @@ package
 
       private var _moderateButtons:Array;
 
+      // Staff-only YouTube control for the theatre. The video itself is a
+      // browser overlay, called through ExternalInterface below.
+      private var _theatreButton:Sprite;
+
+      private var _theatreControl:Sprite;
+
+      private var _theatreInput:TextField;
+
+      // Owner/developer room-effect controls, opened by !event or !host.
+      private var _roomControl:Sprite;
+
       public static var staffRole:String = "";
 
       public static var staffPermissions:Array = [];
@@ -164,6 +175,7 @@ package
             if(ExternalInterface.available)
             {
                ExternalInterface.addCallback("ajHud",setHudShown);
+               ExternalInterface.addCallback("openTheatreControl",openTheatreControl);
             }
          }
          catch(e:Error)
@@ -327,6 +339,7 @@ package
          gMainFrame.stage.addEventListener("keyDown",onFinderKey,true,1000);
          gMainFrame.stage.addEventListener("keyDown",onFinderKey,false,1000);
          startEmojiButton();
+         placeTheatreButton();
       }
       
       public static function openTool(param1:int) : void
@@ -826,6 +839,278 @@ package
       {
          staffRole = String(param1[2]);
          staffPermissions = String(param1[3]).length > 0 ? String(param1[3]).split(",") : [];
+         if(_toolsInstance != null)
+         {
+            _toolsInstance.placeTheatreButton();
+         }
+      }
+
+      // "xui": a permission-checked server command asks for a staff panel.
+      // It is never acted on merely because a browser or another player asks.
+      public static function onStaffUi(param1:Object) : void
+      {
+         if(_toolsInstance == null)
+         {
+            return;
+         }
+         var _loc1_:String = param1.length > 2 ? String(param1[2]) : "";
+         if(_loc1_ == "moderate" && param1.length > 3 && canModerate())
+         {
+            openModerate(String(param1[3]));
+         }
+         else if(_loc1_ == "event" && staffMay("room.effects"))
+         {
+            _toolsInstance.openRoomControl();
+         }
+      }
+
+      // "xtv": a server-authorized YouTube id for this theatre, or empty to
+      // stop it. The desktop game's web page owns the actual iframe.
+      public static function onTheatreVideo(param1:Object) : void
+      {
+         try
+         {
+            if(ExternalInterface.available)
+            {
+               ExternalInterface.call("ajTheatreVideo",param1.length > 2 ? String(param1[2]) : "");
+            }
+         }
+         catch(e:Error)
+         {
+         }
+      }
+
+      private function placeTheatreButton() : void
+      {
+         // Video playback belongs to the theatre's own VIDEOS sign. A HUD
+         // button existed in every room and den for staff, which was both
+         // misleading and able to cover other interfaces.
+         if(_theatreButton != null)
+         {
+            _theatreButton.visible = false;
+         }
+      }
+
+      private function onTheatreButton(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         if(_theatreControl == null)
+         {
+            buildTheatreControl();
+         }
+         _theatreControl.visible = !_theatreControl.visible;
+         if(_theatreControl.visible)
+         {
+            setChildIndex(_theatreControl,numChildren - 1);
+            gMainFrame.stage.focus = _theatreInput;
+         }
+      }
+
+      // Called by the theatre's VIDEOS sign through game.html.  This needs to
+      // remain public for ExternalInterface, but permission is still derived
+      // from the signed-in server role, never from the browser call.
+      public function openTheatreControl() : void
+      {
+         if(!staffMay("theater.control"))
+         {
+            return;
+         }
+         if(_theatreControl == null)
+         {
+            buildTheatreControl();
+         }
+         _theatreControl.visible = true;
+         setChildIndex(_theatreControl,numChildren - 1);
+         gMainFrame.stage.focus = _theatreInput;
+      }
+
+      private function buildTheatreControl() : void
+      {
+         _theatreControl = new Sprite();
+         _theatreControl.graphics.beginFill(0,0.55);
+         _theatreControl.graphics.drawRect(0,0,900,550);
+         _theatreControl.graphics.endFill();
+         var _loc1_:Sprite = new Sprite();
+         _loc1_.x = 225;
+         _loc1_.y = 170;
+         _loc1_.graphics.lineStyle(2,0x7B4D24);
+         _loc1_.graphics.beginFill(0x27221D);
+         _loc1_.graphics.drawRoundRect(0,0,450,210,22,22);
+         _loc1_.graphics.endFill();
+         _theatreControl.addChild(_loc1_);
+         theatreCloseButton(_loc1_);
+         var _loc2_:TextField = modText("THEATRE VIDEO",22,0xFFFFFF);
+         _loc2_.x = 24;
+         _loc2_.y = 22;
+         _loc1_.addChild(_loc2_);
+         var _loc3_:TextField = modText("Paste a YouTube link. Everyone in this theatre will see it.",12,0xD5C5AE,false);
+         _loc3_.x = 24;
+         _loc3_.y = 58;
+         _loc1_.addChild(_loc3_);
+         var _loc4_:Sprite = new Sprite();
+         _loc4_.x = 24;
+         _loc4_.y = 94;
+         _loc4_.graphics.lineStyle(1,0x7B4D24);
+         _loc4_.graphics.beginFill(0x111111);
+         _loc4_.graphics.drawRoundRect(0,0,402,34,10,10);
+         _loc4_.graphics.endFill();
+         _loc1_.addChild(_loc4_);
+         _theatreInput = new TextField();
+         _theatreInput.type = "input";
+         _theatreInput.embedFonts = hasGameFont();
+         _theatreInput.defaultTextFormat = new TextFormat("CCDigitalDelivery",13,0xFFFFFF,false);
+         _theatreInput.maxChars = 200;
+         _theatreInput.x = 10;
+         _theatreInput.y = 7;
+         _theatreInput.width = 382;
+         _theatreInput.height = 22;
+         _loc4_.addChild(_theatreInput);
+         theatreControlButton(_loc1_,"play","Play for room",24,150,186,0x357A45);
+         theatreControlButton(_loc1_,"stop","Stop video",240,150,186,0x8E3D3D);
+         _theatreControl.addEventListener("mouseDown",onFinderMouse);
+         _theatreControl.addEventListener("mouseUp",onFinderMouse);
+         _theatreControl.addEventListener("click",onFinderMouse);
+         _theatreControl.visible = false;
+         addChild(_theatreControl);
+      }
+
+      private function theatreControlButton(param1:Sprite, param2:String, param3:String, param4:Number, param5:Number, param6:Number, param7:uint) : void
+      {
+         var _loc1_:Sprite = new Sprite();
+         _loc1_.name = param2;
+         _loc1_.x = param4;
+         _loc1_.y = param5;
+         _loc1_.buttonMode = true;
+         _loc1_.mouseChildren = false;
+         paintFlatButton(_loc1_,param6,param7);
+         var _loc2_:TextField = modText(param3,14,0xFFFFFF);
+         _loc2_.name = "label";
+         _loc1_.addChild(_loc2_);
+         paintFlatButton(_loc1_,param6,param7);
+         _loc1_.addEventListener("mouseDown",onTheatreControl,false,0,true);
+         param1.addChild(_loc1_);
+      }
+
+      private function onTheatreControl(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         var _loc1_:String = Sprite(param1.currentTarget).name;
+         if(_loc1 == "play" && _theatreInput.text.replace(/^\s+|\s+$/g,"").length == 0)
+         {
+            gMainFrame.stage.focus = _theatreInput;
+            return;
+         }
+         gMainFrame.server.setXtObject_Str("xtv",[_loc1,_loc1 == "play" ? _theatreInput.text.split("%").join("") : ""]);
+         _theatreControl.visible = false;
+         gMainFrame.stage.focus = null;
+      }
+
+      private function openRoomControl() : void
+      {
+         if(!staffMay("room.effects"))
+         {
+            return;
+         }
+         if(_roomControl == null)
+         {
+            buildRoomControl();
+         }
+         _roomControl.visible = true;
+         setChildIndex(_roomControl,numChildren - 1);
+      }
+
+      private function buildRoomControl() : void
+      {
+         _roomControl = new Sprite();
+         _roomControl.graphics.beginFill(0,0.55);
+         _roomControl.graphics.drawRect(0,0,900,550);
+         _roomControl.graphics.endFill();
+         var _loc1_:Sprite = new Sprite();
+         _loc1_.x = 225;
+         _loc1_.y = 150;
+         _loc1_.graphics.lineStyle(2,0x7B4D24);
+         _loc1_.graphics.beginFill(0x27221D);
+         _loc1_.graphics.drawRoundRect(0,0,450,250,22,22);
+         _loc1_.graphics.endFill();
+         _roomControl.addChild(_loc1_);
+         theatreCloseButton(_loc1_);
+         var _loc2_:TextField = modText("HOST / EVENT CONTROLS",22,0xFFFFFF);
+         _loc2_.x = 24;
+         _loc2_.y = 22;
+         _loc1_.addChild(_loc2_);
+         var _loc3_:TextField = modText("Change the whole room. Clear resets size and colour.",12,0xD5C5AE,false);
+         _loc3_.x = 24;
+         _loc3_.y = 58;
+         _loc1_.addChild(_loc3_);
+         roomControlButton(_loc1_,"small","Make everyone small",24,98,126,0x357A45);
+         roomControlButton(_loc1_,"normal","Normal size",162,98,126,0x496B91);
+         roomControlButton(_loc1_,"big","Make everyone big",300,98,126,0x7A5FBD);
+         roomControlButton(_loc1_,"rainbow","Rainbow room",24,150,196,0xA54E96);
+         roomControlButton(_loc1_,"clear","Clear effects",230,150,196,0x8E3D3D);
+         _roomControl.addEventListener("mouseDown",onFinderMouse);
+         _roomControl.addEventListener("mouseUp",onFinderMouse);
+         _roomControl.addEventListener("click",onFinderMouse);
+         _roomControl.visible = false;
+         addChild(_roomControl);
+      }
+
+      private function roomControlButton(param1:Sprite, param2:String, param3:String, param4:Number, param5:Number, param6:Number, param7:uint) : void
+      {
+         var _loc1_:Sprite = new Sprite();
+         _loc1_.name = param2;
+         _loc1_.x = param4;
+         _loc1_.y = param5;
+         _loc1_.buttonMode = true;
+         _loc1_.useHandCursor = true;
+         _loc1_.mouseChildren = false;
+         var _loc2_:TextField = modText(param3,12,0xFFFFFF);
+         _loc2_.name = "label";
+         _loc1_.addChild(_loc2_);
+         paintFlatButton(_loc1_,param6,param7);
+         _loc1_.addEventListener("mouseDown",onRoomControl,false,0,true);
+         param1.addChild(_loc1_);
+      }
+
+      private function onRoomControl(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         gMainFrame.server.setXtObject_Str("xrc",[Sprite(param1.currentTarget).name]);
+         _roomControl.visible = false;
+      }
+
+      // A visible close control is reliable even while an input field owns
+      // keyboard focus, unlike relying only on Escape.
+      private function theatreCloseButton(param1:Sprite) : void
+      {
+         var _loc1_:Sprite = new Sprite();
+         _loc1_.buttonMode = true;
+         _loc1_.useHandCursor = true;
+         _loc1_.graphics.beginFill(MOD_GREY);
+         _loc1_.graphics.drawCircle(0,0,13);
+         _loc1_.graphics.endFill();
+         _loc1_.graphics.lineStyle(2,0xFFFFFF);
+         _loc1_.graphics.moveTo(-4,-4);
+         _loc1_.graphics.lineTo(4,4);
+         _loc1_.graphics.moveTo(4,-4);
+         _loc1_.graphics.lineTo(-4,4);
+         _loc1_.x = 422;
+         _loc1_.y = 25;
+         _loc1_.addEventListener("mouseDown",onTheatreClose,false,0,true);
+         param1.addChild(_loc1_);
+      }
+
+      private function onTheatreClose(param1:MouseEvent) : void
+      {
+         param1.stopPropagation();
+         if(_theatreControl != null)
+         {
+            _theatreControl.visible = false;
+         }
+         if(_roomControl != null)
+         {
+            _roomControl.visible = false;
+         }
+         gMainFrame.stage.focus = null;
       }
 
       public static function staffMay(param1:String) : Boolean
@@ -1254,6 +1539,9 @@ package
       //         the 120 and 144 this once offered came to the same).
       //   9005  Camera: 1 Smooth (room.RoomManagerWorld.easeCamera), else the
       //         game's own.
+      //   9007  Performance profile: 1 Low-end, 2 High, unset Balanced. A
+      //         profile changes only optional rendering work, never the
+      //         game's native 24 FPS (which would slow its animations).
       
       
       private static var _smoothTimer:Timer;
@@ -1277,12 +1565,45 @@ package
       
       public static function smoothOn() : Boolean
       {
+         if(performanceProfile() == 1)
+         {
+            return false;
+         }
+         if(performanceProfile() == 2)
+         {
+            return true;
+         }
          return settingOf(9003) != 1;
+      }
+
+      // 0 Balanced, 1 Low-end, 2 High. It is persisted with the other client
+      // settings, so the preference follows the player to another computer.
+      public static function performanceProfile() : int
+      {
+         var _loc1_:int = settingOf(9007);
+         return _loc1_ == 1 || _loc1_ == 2 ? _loc1_ : 0;
+      }
+
+      public static function performanceProfileLabel() : String
+      {
+         switch(performanceProfile())
+         {
+            case 1:
+               return "Low-end";
+            case 2:
+               return "High";
+            default:
+               return "Balanced";
+         }
       }
       
       // pictures a second asked for, or 0 for no limit.
       public static function frameRate() : int
       {
+         if(performanceProfile() == 2)
+         {
+            return 0;
+         }
          return settingOf(9004) == 1 ? 60 : 0;
       }
       
@@ -1330,7 +1651,9 @@ package
          }
          try
          {
-            _loc2_ = !_smoothBroken && MainFrame.isInitialized() && gMainFrame.userInfo != null && gMainFrame.userInfo.userVarCache != null && AvatarManager.playerAvatarWorldView != null && !MinigameManager.inMinigame() && smoothOn();
+            // Extra interpolation cannot be seen below a modal. The world map
+            // is a modal without DarkenManager, so include it here too.
+            _loc2_ = !_smoothBroken && MainFrame.isInitialized() && gMainFrame.userInfo != null && gMainFrame.userInfo.userVarCache != null && AvatarManager.playerAvatarWorldView != null && !MinigameManager.inMinigame() && !GuiManager.isModal() && smoothOn();
          }
          catch(e:Error)
          {
@@ -1369,6 +1692,20 @@ package
                _smoothQuality = false;
                gMainFrame.stage.quality = gMainFrame.currStageQuality != null ? gMainFrame.currStageQuality : "medium";
             }
+         }
+         // Low-end uses Flash's lower-quality renderer but keeps the original
+         // game framerate, so movement and frame-based animations do not run
+         // in slow motion. Restore the game's normal renderer on exit.
+         if(performanceProfile() == 1)
+         {
+            if(gMainFrame.stage.quality != "LOW")
+            {
+               gMainFrame.stage.quality = "low";
+            }
+         }
+         else if(!_smoothQuality && gMainFrame.stage.quality == "LOW")
+         {
+            gMainFrame.stage.quality = gMainFrame.currStageQuality != null ? gMainFrame.currStageQuality : "medium";
          }
       }
       
@@ -2426,7 +2763,7 @@ package
       // the window's look: flat, dark, rounded, in the game's font.
       private static const MOD_W:int = 560;
 
-      private static const MOD_H:int = 432;
+      private static const MOD_H:int = 486;
 
       private static const MOD_PAD:int = 24;
 
@@ -2624,6 +2961,8 @@ package
          modButton("warnings","Warnings",_loc2_[0],372,_loc1_,MOD_GREY,"player.warn");
          modButton("unwarn","Undo warning",_loc2_[1],372,_loc1_,MOD_GREY,"player.warn");
          modButton("invisible","Go invisible",_loc2_[2],372,_loc1_,MOD_GREY,"staff.invisible");
+         modSection("Name",422);
+         modButton("reject","Reject username",_loc2_[0],440,_loc1_,MOD_RED,"player.names");
          _moderate.addEventListener("mouseDown",onFinderMouse);
          _moderate.addEventListener("mouseUp",onFinderMouse);
          _moderate.addEventListener("click",onFinderMouse);
@@ -3437,7 +3776,10 @@ package
             _emojiButton.addEventListener("mouseDown",onEmojiButton);
             addChild(_emojiButton);
          }
-         var _loc5_:Boolean = shownOnStage(_loc2_) && _loc2_.type == "input";
+         // The chat field remains technically visible under darkened game
+         // windows (inventory, trading, shops, etc.).  Do not leave the
+         // emoji button or its grid sitting above those interfaces.
+         var _loc5_:Boolean = shownOnStage(_loc2_) && _loc2_.type == "input" && !DarkenManager.isDarkened && !GuiManager.isModal();
          _emojiButton.visible = _loc5_;
          if(!_loc5_)
          {
@@ -4223,6 +4565,25 @@ package
             if(param1.keyCode == 27)
             {
                hideModerate();
+            }
+            param1.stopImmediatePropagation();
+            return;
+         }
+         if(_theatreControl != null && _theatreControl.visible)
+         {
+            if(param1.keyCode == 27)
+            {
+               _theatreControl.visible = false;
+               gMainFrame.stage.focus = null;
+            }
+            param1.stopImmediatePropagation();
+            return;
+         }
+         if(_roomControl != null && _roomControl.visible)
+         {
+            if(param1.keyCode == 27)
+            {
+               _roomControl.visible = false;
             }
             param1.stopImmediatePropagation();
             return;

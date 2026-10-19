@@ -870,7 +870,12 @@ package gui
          {
             _inputFormat = chatMsgText.defaultTextFormat;
             _inputEmbedded = chatMsgText.embedFonts;
-            _loc4_ = new TextFormat("Segoe UI Emoji",_inputFormat.size,_inputFormat.color,_inputFormat.bold);
+            // Keep ordinary letters and spaces in their normal Windows face;
+            // it falls back to Segoe UI Emoji only for the emoji glyphs.
+            // The emoji-only face widened mixed text and made spacing uneven.
+            _loc4_ = new TextFormat("Segoe UI",_inputFormat.size,_inputFormat.color,_inputFormat.bold);
+            _loc4_.letterSpacing = _inputFormat.letterSpacing;
+            _loc4_.leading = _inputFormat.leading;
             chatMsgText.embedFonts = false;
             chatMsgText.defaultTextFormat = _loc4_;
             chatMsgText.setTextFormat(_loc4_);
