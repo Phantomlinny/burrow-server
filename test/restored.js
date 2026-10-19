@@ -274,6 +274,10 @@ const run = async () => {
   assert.strictEqual((await panel(`masterpiece?id=${posted.uuid}`)).status, 401);
   assert.strictEqual((await panel("masterpiece", {id: posted.uuid, action: "approve"}, admin)).status, 200);
   assert.match((await a.untilXt("ep"))[7], /approved/);
+  // on show, with who approved it and when: the last approved first
+  const onShow = (await panel("masterpieces", undefined, admin)).data.approved;
+  assert.deepStrictEqual(onShow.map(entry => [entry.id, entry.approvedBy]), [[posted.uuid, "admin"]]);
+  assert.ok(Math.abs(onShow[0].approvedAt - Date.now() / 1000) < 60);
   const approved = await a.nextXt("di");
   assert.strictEqual(approved[approved.indexOf(painting, 5) + 4], "true");
   // hung, once Ann is home from the easel: a visitor is told which painting and whose.
@@ -316,6 +320,8 @@ const run = async () => {
   assert.strictEqual((await a.untilXt("db"))[2], "1");
   const last = await a.nextXt("di");
   assert.ok(!last.includes("2947") && last[last.indexOf(second.uuid) - 1] === "true");
+  // approved by nobody, that one
+  assert.deepStrictEqual((await panel("masterpieces", undefined, admin)).data.approved.map(entry => [entry.id, entry.approvedBy]), [[second.uuid, null]]);
 
   a.socket.destroy();
   b.socket.destroy();

@@ -172,6 +172,14 @@ const run = async () => {
   a.xt("mg", subRoom[4], 1, 2, 3); // not signed: no gems
   await a.nextXt("mg");
   assert.ok(nextSerial > 0);
+  // food machine wins award a temporary avatar attachment rather than an
+  // inventory entry.
+    a.xt("mm", subRoom[4], 15, "_a", 1);
+    assert.deepStrictEqual((await a.nextXt("mm")).slice(2), ["_a", "1", ""]);
+  // Attachment packets must also return to their sender: that echoed media
+  // id is what makes the local avatar draw the held item.
+  a.send(`<msg t='sys'><body action='pubMsg' r='${subRoom[4]}'><txt><![CDATA[1,%4]]></txt></body></msg>`);
+  assert.deepStrictEqual((await a.nextXt("uc")).slice(2), [String(annLogin.params.userId), "35,", "4"]);
   a.xt("rl", subRoom[4], subRoom[4]);
   a.xt("mj", roomId, 4, 0, 0, -1); // gem Ball takes the room's place
   const gameRoom = await a.nextXt("rj");
